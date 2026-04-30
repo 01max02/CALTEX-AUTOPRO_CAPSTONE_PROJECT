@@ -307,56 +307,46 @@ document.addEventListener('DOMContentLoaded', function() {
                 .catch(function(err){ showToast('Error: ' + err.message, 'error'); })
                 .finally(function(){ setLoading(false); });
         } else {
-            // Add — auto-generate password, create via Firebase Auth REST, save to Firestore, send email
+            // Add — check for existing email first, then auto-generate password, create via Firebase Auth REST, save to Firestore, send email
             var tempPass = _generateTempPassword();
             var apiKey = 'AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs';
-            fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + apiKey, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: email, password: tempPass, returnSecureToken: false })
-            })
-            .then(function(r){ return r.json(); })
-            .then(function(data) {
-                if (data.error) {
-                    if (data.error.message === 'EMAIL_EXISTS') {
-                        return db.collection('users').where('email', '==', email).limit(1).get()
-                            .then(function(snap) {
-                                if (!snap.empty) {
-                                    throw new Error('A user with this email already exists in the system.');
-                                }
-                                return db.collection('users').add({
-                                    name: name, username: username, email: email,
-                                    role: role, status: 'active',
-                                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                                }).then(function(){ return null; });
-                            });
+            
+            // First check if email already exists in Firestore
+            db.collection('users').where('email', '==', email).limit(1).get()
+                .then(function(snap) {
+                    if (!snap.empty) {
+                        throw new Error('A user with this email already exists in the system.');
                     }
-                    throw new Error(data.error.message);
-                }
-                var uid = data.localId;
-                return db.collection('users').doc(uid).set({
-                    name: name, username: username, email: email,
-                    role: role, status: 'active',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                }).then(function(){ return tempPass; });
-            })
-            .then(function(pass) {
-                if (pass === null) {
-                    closeModal('addUserModal');
-                    showToast('User record created. Note: Auth account already existed.', 'success');
-                    setLoading(false);
-                    return;
-                }
-                return _sendWelcomeEmail(email, name, pass, role)
-                    .then(function(sent) {
-                        closeModal('addUserModal');
-                        showToast('User added!' + (sent ? ' Credentials sent to ' + email + '.' : ' (Email not sent — check server.)'), 'success');
+                    // Email doesn't exist, proceed with Auth creation
+                    return fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + apiKey, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: email, password: tempPass, returnSecureToken: false })
+                    })
+                    .then(function(r){ return r.json(); })
+                    .then(function(data) {
+                        if (data.error) {
+                            throw new Error(data.error.message);
+                        }
+                        var uid = data.localId;
+                        return db.collection('users').doc(uid).set({
+                            name: name, username: username, email: email,
+                            role: role, status: 'active',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }).then(function(){ return tempPass; });
                     });
-            })
-            .catch(function(err){
-                showToast('Error: ' + (err.message || 'Unknown error'), 'error');
-            })
-            .finally(function(){ setLoading(false); });
+                })
+                .then(function(pass) {
+                    return _sendWelcomeEmail(email, name, pass, role)
+                        .then(function(sent) {
+                            closeModal('addUserModal');
+                            showToast('User added!' + (sent ? ' Credentials sent to ' + email + '.' : ' (Email not sent — check server.)'), 'success');
+                        });
+                })
+                .catch(function(err){
+                    showToast('Error: ' + (err.message || 'Unknown error'), 'error');
+                })
+                .finally(function(){ setLoading(false); });
         }
     });
 });

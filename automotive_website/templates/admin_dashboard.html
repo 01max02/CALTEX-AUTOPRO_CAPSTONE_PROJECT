@@ -269,6 +269,26 @@
     <script src="../static/js/admin.js"></script>
     <script src="../static/js/admin_sidebar.js"></script>
     <script>
+      // Load dashboard data on page load
+      document.addEventListener('DOMContentLoaded', function() {
+        // Load overview stats
+        if (typeof loadDashboardStats === 'function') {
+          loadDashboardStats();
+        }
+        // Load today's services
+        if (typeof renderTodayServices === 'function') {
+          renderTodayServices();
+        }
+        // Load issuances
+        if (typeof renderIssuancesList === 'function') {
+          renderIssuancesList();
+        }
+        // Load transactions
+        if (typeof renderInventoryTransactions === 'function') {
+          renderInventoryTransactions();
+        }
+      });
+
       // Activate section from URL hash (e.g. admin_dashboard.html#issuance)
       (function() {
         const hash = window.location.hash.replace('#', '');
@@ -289,7 +309,12 @@
             if (hash === 'inventory-transactions') {
               setTimeout(function() {
                 if (typeof renderInventoryTransactions === 'function') renderInventoryTransactions();
-              }, 1500);
+              }, 500);
+            }
+            if (hash === 'issuance') {
+              setTimeout(function() {
+                if (typeof renderIssuancesList === 'function') renderIssuancesList();
+              }, 500);
             }
           });
         }

@@ -3,19 +3,51 @@
 
   // ── Auth guard ──────────────────────────────────────────
   const stored = sessionStorage.getItem('spUser');
-  if (!stored) { window.location.href = 'login.html'; return; }
-  const spUser = JSON.parse(stored);
+  console.log('staff_dashboard.js loaded, spUser in sessionStorage:', !!stored);
+  
+  if (!stored) { 
+    console.log('No spUser in sessionStorage, checking Firebase auth...');
+    // Don't redirect immediately - wait for Firebase to initialize
+  }
+  
+  const spUser = stored ? JSON.parse(stored) : {};
+  console.log('spUser data:', spUser);
 
   const db   = firebase.firestore();
   const auth = firebase.auth();
 
   // ── Init ────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', () => {
-    loadUserInfo();
-    loadDashboard();
-    loadInventory();
-    loadServices();
-    loadVehicles();
+    console.log('staff_dashboard DOMContentLoaded');
+    
+    // Check Firebase auth state
+    firebase.auth().onAuthStateChanged((user) => {
+      console.log('Firebase auth state changed, user:', user?.uid);
+      
+      if (user) {
+        console.log('Firebase user authenticated:', user.uid);
+        // Store in sessionStorage if not already there
+        if (!sessionStorage.getItem('spUser')) {
+          console.log('spUser not in sessionStorage, storing from Firebase...');
+          const userData = {
+            uid: user.uid,
+            email: user.email,
+            name: spUser.name || user.displayName || '',
+            role: spUser.role || 'staff',
+          };
+          sessionStorage.setItem('spUser', JSON.stringify(userData));
+          console.log('Stored spUser:', userData);
+        }
+        loadUserInfo();
+        loadDashboard();
+        loadInventory();
+        loadServices();
+        loadVehicles();
+      } else {
+        console.log('No Firebase user, redirecting to login');
+        window.location.href = '/login.html';
+      }
+    });
   });
 
   // ── User info ────────────────────────────────────────────
@@ -51,7 +83,7 @@
     if (!confirm('Are you sure you want to logout?')) return;
     auth.signOut().then(() => {
       sessionStorage.removeItem('spUser');
-      window.location.href = 'login.html';
+      window.location.href = '/login.html';
     });
   };
 

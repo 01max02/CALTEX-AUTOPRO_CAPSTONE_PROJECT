@@ -21,6 +21,7 @@ class _ManageAlertsScreenState extends State<ManageAlertsScreen> {
   // Alert preferences
   bool _pmsOverdue    = true;
   bool _pmsDueSoon    = true;
+  bool _pmsDueThisWeek = true;
   bool _serviceUpdate = true;
   bool _lowStock      = true;
   bool _newAssignment = true;
@@ -41,11 +42,12 @@ class _ManageAlertsScreenState extends State<ManageAlertsScreen> {
     if (!mounted) return;
     final data = doc.data() ?? {};
     setState(() {
-      _pmsOverdue    = data['pmsOverdue']    as bool? ?? true;
-      _pmsDueSoon    = data['pmsDueSoon']    as bool? ?? true;
-      _serviceUpdate = data['serviceUpdate'] as bool? ?? true;
-      _lowStock      = data['lowStock']      as bool? ?? true;
-      _newAssignment = data['newAssignment'] as bool? ?? true;
+      _pmsOverdue     = data['pmsOverdue']     as bool? ?? true;
+      _pmsDueSoon     = data['pmsDueSoon']     as bool? ?? true;
+      _pmsDueThisWeek = data['pmsDueThisWeek'] as bool? ?? true;
+      _serviceUpdate  = data['serviceUpdate']  as bool? ?? true;
+      _lowStock       = data['lowStock']       as bool? ?? true;
+      _newAssignment  = data['newAssignment']  as bool? ?? true;
       _loading = false;
     });
   }
@@ -56,9 +58,10 @@ class _ManageAlertsScreenState extends State<ManageAlertsScreen> {
     setState(() => _saving = true);
     try {
       final payload = <String, dynamic>{
-        'pmsOverdue': _pmsOverdue,
-        'pmsDueSoon': _pmsDueSoon,
-        'updatedAt':  FieldValue.serverTimestamp(),
+        'pmsOverdue':     _pmsOverdue,
+        'pmsDueSoon':     _pmsDueSoon,
+        'pmsDueThisWeek': _pmsDueThisWeek,
+        'updatedAt':      FieldValue.serverTimestamp(),
       };
       if (widget.role == ManageAlertsRole.staff || widget.role == ManageAlertsRole.admin) {
         payload['serviceUpdate'] = _serviceUpdate;
@@ -128,18 +131,26 @@ class _ManageAlertsScreenState extends State<ManageAlertsScreen> {
                 const SizedBox(height: 8),
                 _alertCard([
                   _alertTile(
-                    icon: Icons.warning_amber_outlined,
+                    icon: Icons.error_outline,
                     color: Colors.red,
                     title: 'PMS Overdue',
-                    sub: 'Notify when a vehicle is overdue for PMS',
+                    sub: 'Notify when a vehicle is overdue for maintenance (< 0 days)',
                     value: _pmsOverdue,
                     onChanged: (v) => setState(() => _pmsOverdue = v),
+                  ),
+                  _alertTile(
+                    icon: Icons.calendar_today_outlined,
+                    color: Colors.orange,
+                    title: 'PMS Due This Week',
+                    sub: 'Notify when PMS is due within 7 days',
+                    value: _pmsDueThisWeek,
+                    onChanged: (v) => setState(() => _pmsDueThisWeek = v),
                   ),
                   _alertTile(
                     icon: Icons.schedule_outlined,
                     color: Colors.amber.shade700,
                     title: 'PMS Due Soon',
-                    sub: 'Notify when PMS is due within 30 days',
+                    sub: 'Notify when PMS is due within 14 days',
                     value: _pmsDueSoon,
                     onChanged: (v) => setState(() => _pmsDueSoon = v),
                     isLast: true,

@@ -189,6 +189,7 @@
 </div>
 
 <div id="toast"></div>
+<style>@keyframes spin { to { transform: rotate(360deg); } }</style>
 
 <script src="../static/js/data.js"></script>
 
@@ -219,19 +220,64 @@ var _svcServiceItems = [];
 var _svcMaterialItems = [];
 var _svcVehicles = [];
 
-// Populate vehicle dropdown and item lists from Firebase data
-document.addEventListener('DOMContentLoaded', function() {
-  setTimeout(function() {
-    // Vehicles
-    _svcVehicles = window._fbVehicles || window.assets || [];
-    // Item master
-    var master = window.itemMaster || [];
-    _svcServiceItems = master.filter(function(i){ return i.itemType === 'Service'; });
-    _svcMaterialItems = master.filter(function(i){ return i.itemType === 'Material'; });
-  }, 1500);
-});
+// Pull latest data from Firebase globals — called on demand so timing doesn't matter
+function _svcRefreshData() {
+  _svcVehicles = window._fbVehicles || window.assets || [];
+  var master = window.itemMaster || window._fbItemMaster || [];
+  // Normalize: _fbItemMaster uses raw Firestore fields, itemMaster uses mapped fields
+  if (master.length && master[0].name && !master[0].itemName) {
+    // Raw _fbItemMaster — map it
+    master = master.map(function(i) {
+      return {
+        itemName: i.name || '',
+        itemType: i.type || 'Material',
+        uom: i.uom || '',
+        cost: parseFloat(String(i.cost || 0).replace(/[₱,]/g, '')) || 0,
+      };
+    });
+  }
+  _svcServiceItems  = master.filter(function(i){ return (i.itemType || '').toLowerCase() === 'service'; });
+  _svcMaterialItems = master.filter(function(i){ return (i.itemType || '').toLowerCase() === 'material'; });
+}
+
+// If itemMaster isn't loaded yet, fetch directly from Firestore then open modal
+function _svcEnsureDataThen(callback) {
+  _svcRefreshData();
+  if (_svcServiceItems.length > 0 || _svcMaterialItems.length > 0) {
+    callback();
+    return;
+  }
+  // Fallback: fetch from Firestore directly
+  firebase.firestore().collection('item_master').get().then(function(snap) {
+    window._fbItemMaster = snap.docs.map(function(d) { return Object.assign({ _id: d.id }, d.data()); });
+    window.itemMaster = window._fbItemMaster.map(function(i) {
+      return {
+        id: i._id,
+        itemNum: i.num || i._id,
+        itemName: i.name || '',
+        uom: i.uom || '',
+        cost: parseFloat(String(i.cost || 0).replace(/[₱,]/g, '')) || 0,
+        itemType: i.type || 'Material',
+      };
+    });
+    _svcRefreshData();
+    callback();
+  }).catch(function() { callback(); });
+}
+
+// Also fetch vehicles from Firestore if not loaded yet
+function _svcEnsureVehiclesThen(callback) {
+  if (_svcVehicles.length > 0) { callback(); return; }
+  firebase.firestore().collection('vehicles').get().then(function(snap) {
+    window._fbVehicles = snap.docs.map(function(d) { return Object.assign({ _id: d.id }, d.data()); });
+    window.assets = window._fbVehicles;
+    _svcRefreshData();
+    callback();
+  }).catch(function() { callback(); });
+}
 
 function svcPlateLookup(input) {
+  _svcRefreshData();
   var q = input.value.trim().toUpperCase();
   var suggestions = document.getElementById('svcPlateSuggestions');
   var hidden = document.getElementById('svcPlateSelect');
@@ -312,6 +358,7 @@ function svcCalcTotal() {
 }
 
 function svcAddSvcRow(name, qty, uom, cost) {
+  _svcRefreshData();
   var opts = _svcServiceItems.map(function(i){ return '<option value="' + i.itemName + '">' + i.itemName + '</option>'; }).join('');
   var div = document.createElement('div');
   div.className = 'svc-row';
@@ -361,6 +408,7 @@ function svcOnSvcSelect(sel, preQty, preUom, preCost) {
 }
 
 function svcAddMatRow(name, qty, uom, cost) {
+  _svcRefreshData();
   var div = document.createElement('div');
   div.className = 'svc-row';
   div.style.cssText = 'margin-bottom:0.6rem;';
@@ -490,6 +538,8 @@ function svcMatClear(btn) {
 }
 
 function svcOpenAddModal() {
+  _svcEnsureDataThen(function() {
+  _svcEnsureVehiclesThen(function() {
   window._svcEditingId = null;
   _svcEditingId = null;
   document.getElementById('svcModalTitle').textContent = 'New Service';
@@ -506,6 +556,8 @@ function svcOpenAddModal() {
   document.getElementById('svcTotalDisplay').textContent = '₱0.00';
   svcAddSvcRow(); svcAddMatRow();
   document.getElementById('svcAddModal').classList.add('active');
+  }); // _svcEnsureVehiclesThen
+  }); // _svcEnsureDataThen
 }
 
 function openAddServiceModal() { svcOpenAddModal(); }
@@ -724,16 +776,23 @@ function svcSave() {
   };
 
   var db = firebase.firestore();
+  var sBtn = document.getElementById('svcSubmitBtn');
+  var sBtnOrigHtml = sBtn ? sBtn.innerHTML : '';
+  var spinSave = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 0.8s linear infinite"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.49"/></svg> Saving…';
+  var spinUpdate = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 0.8s linear infinite"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.49"/></svg> Updating…';
+  if (sBtn) { sBtn.disabled = true; sBtn.innerHTML = window._svcEditingId ? spinUpdate : spinSave; }
   if (window._svcEditingId) {
     db.collection('maintenance').doc(window._svcEditingId).update(data)
       .then(function() { closeModal('svcAddModal'); showToast('Service updated successfully!', 'success'); })
-      .catch(function(err) { showToast('Update failed: ' + err.message, 'error'); });
+      .catch(function(err) { showToast('Update failed: ' + err.message, 'error'); })
+      .finally(function() { if (sBtn) { sBtn.disabled = false; sBtn.innerHTML = sBtnOrigHtml; } });
   } else {
     data.status = 'Pending';
     data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
     db.collection('maintenance').add(data)
       .then(function() { closeModal('svcAddModal'); showToast('Service added successfully!', 'success'); })
-      .catch(function(err) { showToast('Save failed: ' + err.message, 'error'); });
+      .catch(function(err) { showToast('Save failed: ' + err.message, 'error'); })
+      .finally(function() { if (sBtn) { sBtn.disabled = false; sBtn.innerHTML = sBtnOrigHtml; } });
   }
 }
 </script>

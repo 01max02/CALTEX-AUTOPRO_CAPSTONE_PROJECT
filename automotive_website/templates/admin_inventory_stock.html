@@ -46,8 +46,8 @@
                     <div class="stat-icon green">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                     </div>
-                    <div class="stat-number" id="totalInventoryValue">₱0</div>
-                    <div class="stat-label">Total Value</div>
+                    <div class="stat-number" id="inStockCount">0</div>
+                    <div class="stat-label">In Stock</div>
                 </div>
             </div>
 
@@ -64,6 +64,7 @@
 </div>
 
 <div id="toast"></div>
+<style>@keyframes spin { to { transform: rotate(360deg); } }</style>
 
 <!-- ── View Stock Item Modal ── -->
 <div class="modal" id="inventoryDetailsModal">
@@ -218,7 +219,7 @@
         </div>
         <div style="padding:1.25rem 1.5rem;overflow-y:auto;flex:1;background:#f8fafc;display:flex;flex-direction:column;gap:0.85rem;">
             <div style="display:flex;gap:0.5rem;">
-                <input type="text" id="deliveryItemSearch" placeholder="Barcode, QR, item number or name..." style="flex:1;border:1.5px solid #e2e8f0;border-radius:10px;padding:0.65rem 0.9rem;font-size:0.88rem;outline:none;" oninput="stockSearchReceiveItem(this.value)">
+                <input type="text" id="deliveryItemSearch" placeholder="Search item..." style="flex:1;border:1.5px solid #e2e8f0;border-radius:10px;padding:0.65rem 0.9rem;font-size:0.88rem;outline:none;" oninput="stockSearchReceiveItem(this.value)">
                 <button onclick="stockSearchReceiveItem(document.getElementById('deliveryItemSearch').value)" style="background:#003087;border:none;color:white;padding:0 1rem;border-radius:10px;cursor:pointer;font-size:0.85rem;font-weight:600;">Search</button>
             </div>
             <div id="deliveryItemInfo" style="display:none;background:white;border:1.5px solid #90cdf4;border-radius:12px;padding:1rem 1.25rem;">
@@ -330,22 +331,28 @@ function openStaffReceiveDeliveryModal() {
 }
 
 function stockSearchReceiveItem(query) {
-    if (!query || query.trim().length < 2) return;
+    var infoEl = document.getElementById('deliveryItemInfo');
+    var notFoundEl = document.getElementById('deliveryNotFound');
+    if (!query || query.trim().length < 2) {
+        _receiveFoundItem = null;
+        infoEl.style.display = 'none';
+        notFoundEl.style.display = 'none';
+        return;
+    }
     var q = query.trim().toLowerCase();
     var inv = window.inventory || [];
     var found = inv.find(function(i) {
         return (i.itemNum||'').toLowerCase() === q
+            || (i.itemNum||'').toLowerCase().includes(q)
             || (i.itemName||'').toLowerCase().includes(q)
             || (i.barcode||'').toLowerCase() === q
             || (i.qrcode||'').toLowerCase() === q;
     });
-    var infoEl = document.getElementById('deliveryItemInfo');
-    var notFoundEl = document.getElementById('deliveryNotFound');
     if (found) {
         _receiveFoundItem = found;
-        document.getElementById('deliveryItemName').textContent = found.itemName || found.name || '—';
-        document.getElementById('deliveryItemMeta').textContent = (found.itemNum||'') + ' • ' + (found.commodityGroup||found.group||'');
-        document.getElementById('deliveryCurrentStock').textContent = 'Current stock: ' + (found.stock||0) + ' ' + (found.uom||found.unit||'');
+        document.getElementById('deliveryItemName').textContent = found.itemName || '—';
+        document.getElementById('deliveryItemMeta').textContent = (found.itemNum||'') + ' • ' + (found.commodityGroup||'');
+        document.getElementById('deliveryCurrentStock').textContent = 'Current stock: ' + (found.stock||0) + ' ' + (found.unit||'');
         document.getElementById('deliveryQty').value = '';
         infoEl.style.display = 'block';
         notFoundEl.style.display = 'none';
@@ -361,25 +368,47 @@ function stockConfirmReceive() {
     var qty = parseInt(document.getElementById('deliveryQty').value) || 0;
     if (qty <= 0) { showToast('Please enter a valid quantity.', 'error'); return; }
 
+    var btn = document.querySelector('#staffReceiveDeliveryModal .btn-primary');
+    var origHtml = btn ? btn.innerHTML : '';
+    var spinHtml = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 0.8s linear infinite"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.49"/></svg> Confirming…';
+    if (btn) { btn.disabled = true; btn.innerHTML = spinHtml; }
+
     var db = firebase.firestore();
-    // Find the stock_inventory doc by num
-    var num = _receiveFoundItem.itemNum || _receiveFoundItem.num;
-    db.collection('stock_inventory').where('num', '==', num).limit(1).get().then(function(snap) {
-        if (snap.empty) { showToast('Item not found in stock inventory.', 'error'); return; }
-        var doc = snap.docs[0];
-        var currentStock = (doc.data().stock || 0);
-        var min = (doc.data().min || 0);
-        var newStock = currentStock + qty;
-        return doc.ref.update({
-            stock: newStock,
-            status: newStock >= min ? 'OK' : 'Low',
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    var docId = _receiveFoundItem.id;
+    var newStock = (_receiveFoundItem.stock || 0) + qty;
+    var min = _receiveFoundItem.minLevel || 0;
+    var itemName = _receiveFoundItem.itemName || '';
+    var unit = _receiveFoundItem.unit || '';
+
+    // Get current user name for the transaction log
+    var apUser = JSON.parse(sessionStorage.getItem('apUser') || '{}');
+    var byName = apUser.name || 'Admin';
+
+    var dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    db.collection('stock_inventory').doc(docId).update({
+        stock: newStock,
+        status: newStock >= min ? 'OK' : 'Low',
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(function() {
+        // Log to transactions collection so it appears in Inventory Transactions
+        return db.collection('transactions').add({
+            item: itemName,
+            desc: 'Stock received',
+            type: 'IN',
+            qty: '+' + qty,
+            date: dateStr,
+            by: byName,
+            stockId: docId,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
     }).then(function() {
         closeModal('staffReceiveDeliveryModal');
-        showToast('Stock received successfully!', 'success');
+        showToast('Stock received successfully! (+' + qty + ' ' + unit + ')', 'success');
     }).catch(function(err) {
         showToast('Error: ' + err.message, 'error');
+    }).finally(function() {
+        if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
     });
 }
 
@@ -454,6 +483,11 @@ function stockSaveNewItem() {
     var max = parseInt(document.getElementById('invStockMax').value) || 0;
     var reorder = parseInt(document.getElementById('invStockReorder').value) || 0;
 
+    var btn = document.getElementById('invSaveBtn');
+    var origHtml = btn ? btn.innerHTML : '';
+    var spinHtml = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 0.8s linear infinite"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.49"/></svg> Saving…';
+    if (btn) { btn.disabled = true; btn.innerHTML = spinHtml; }
+
     var db = firebase.firestore();
     var data = {
         num: _addFoundMaster.itemNum || '',
@@ -470,11 +504,29 @@ function stockSaveNewItem() {
     db.collection('stock_inventory').where('num', '==', data.num).limit(1).get().then(function(snap) {
         if (!snap.empty) { showToast('Already in stock inventory.', 'error'); return; }
         return db.collection('stock_inventory').add(data);
+    }).then(function(docRef) {
+        if (!docRef) return; // was already existing, early return above
+        // Log initial stock as a transaction
+        var apUser = JSON.parse(sessionStorage.getItem('apUser') || '{}');
+        var byName = apUser.name || 'Admin';
+        var dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        return db.collection('transactions').add({
+            item: data.name,
+            desc: 'Initial stock added',
+            type: 'IN',
+            qty: '+' + stock,
+            date: dateStr,
+            by: byName,
+            stockId: docRef.id,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
     }).then(function() {
         closeModal('addInventoryModal');
         showToast('Stock item added successfully!', 'success');
     }).catch(function(err) {
         showToast('Error: ' + err.message, 'error');
+    }).finally(function() {
+        if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
     });
 }
 
@@ -561,6 +613,10 @@ function stockSaveEdit() {
     var min = parseInt(document.getElementById('editInvMin').value) || 0;
     var max = parseInt(document.getElementById('editInvMax').value) || 0;
     var reorder = parseInt(document.getElementById('editInvReorder').value) || 0;
+    var btn = document.querySelector('#editInventoryModal .btn-primary');
+    var origHtml = btn ? btn.innerHTML : '';
+    var spinHtml = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 0.8s linear infinite"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.49"/></svg> Updating…';
+    if (btn) { btn.disabled = true; btn.innerHTML = spinHtml; }
     firebase.firestore().collection('stock_inventory').doc(_editingInvDocId).update({
         stock: stock, min: min, max: max, reorder: reorder,
         status: stock >= min ? 'OK' : 'Low',
@@ -570,6 +626,8 @@ function stockSaveEdit() {
         showToast('Stock updated successfully!', 'success');
     }).catch(function(err) {
         showToast('Update failed: ' + err.message, 'error');
+    }).finally(function() {
+        if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
     });
 }
 

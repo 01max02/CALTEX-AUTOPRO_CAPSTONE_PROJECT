@@ -26,12 +26,15 @@ function navigateTo(section) {
         document.body.setAttribute('data-page', section);
         initSidebarActive();
         window.location.hash = targetHash;
+        // Switch the visible section and header controls
+        if (typeof switchAdminSection === 'function') switchAdminSection(section);
         if (typeof switchDSSSection === 'function') switchDSSSection(section);
         _closeSidebar();
     } else if (currentPage === targetFile && !targetHash) {
         document.body.setAttribute('data-page', section);
         initSidebarActive();
         history.pushState(null, '', window.location.pathname);
+        if (typeof switchAdminSection === 'function') switchAdminSection(section);
         if (typeof switchDSSSection === 'function') switchDSSSection(section);
         _closeSidebar();
     } else {
@@ -73,11 +76,31 @@ function bindHeaderControls() {
     if (typeof firebase !== 'undefined') {
         firebase.auth().onAuthStateChanged(user => {
             if (user) {
-                const avatar = document.getElementById('adminHeaderAvatar');
-                if (avatar) {
-                    const name = user.displayName || user.email || 'AD';
-                    avatar.textContent = name.slice(0, 2).toUpperCase();
+                const avatar   = document.getElementById('adminHeaderAvatar');
+                const nameEl   = document.getElementById('adminAvatarName');
+
+                // Try sessionStorage first (instant)
+                const sess = JSON.parse(sessionStorage.getItem('apUser') || '{}');
+                const sessName = sess.name || '';
+                if (sessName && avatar) {
+                    const parts = sessName.trim().split(' ').filter(Boolean);
+                    avatar.textContent = parts.length >= 2
+                        ? (parts[0][0] + parts[1][0]).toUpperCase()
+                        : parts[0].slice(0, 2).toUpperCase();
+                    if (nameEl) nameEl.textContent = sessName;
                 }
+
+                // Then update from Firestore
+                firebase.firestore().collection('users').doc(user.uid).get().then(doc => {
+                    const name = (doc.exists && doc.data().name) ? doc.data().name : sessName || user.email || '';
+                    if (!name) return;
+                    const parts = name.trim().split(' ').filter(Boolean);
+                    const initials = parts.length >= 2
+                        ? (parts[0][0] + parts[1][0]).toUpperCase()
+                        : parts[0].slice(0, 2).toUpperCase();
+                    if (avatar) avatar.textContent = initials;
+                    if (nameEl) nameEl.textContent  = name;
+                }).catch(() => {});
             }
         });
     }
@@ -126,9 +149,9 @@ window.adminAvatarLogout = function() {
     sessionStorage.removeItem('spUser');
     sessionStorage.removeItem('cpUser');
     if (typeof firebase !== 'undefined' && firebase.auth) {
-        firebase.auth().signOut().finally(() => { window.location.href = 'login.html'; });
+        firebase.auth().signOut().finally(() => { window.location.href = '/login.html'; });
     } else {
-        window.location.href = 'login.html';
+        window.location.href = '/login.html';
     }
 };
 

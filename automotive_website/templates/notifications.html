@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications – AutoPro</title>
+    <link rel="stylesheet" href="../static/css/notifications.css">
+</head>
+<body class="portal-body" data-page="notifications">
+
+<!-- ── Admin layout ── -->
+<div id="adminWrap" style="display:none;flex-direction:column;" class="admin-dashboard">
+    <div id="headerContainer"></div>
+    <div class="admin-dashboard-body">
+        <div id="sidebarContainer"></div>
+        <div class="admin-main">
+            <div class="admin-header">
+                <div>
+                    <div class="breadcrumb">Admin Portal › My Profile › Notifications</div>
+                    <div class="admin-header-title">Manage Alerts</div>
+                </div>
+            </div>
+            <div class="admin-content">
+                <div id="notifContent"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Customer / Staff layout ── -->
+<div id="standaloneWrap" style="display:none;flex-direction:column;min-height:100vh;">
+    <div id="cuHeaderWrap"></div>
+    <main style="flex:1;overflow-y:auto;padding:1.5rem 2rem;background:#F7F8FA;">
+        <div id="notifContent2"></div>
+    </main>
+</div>
+
+<div id="notifToast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+  if (!firebase.apps.length) {
+    firebase.initializeApp({
+      apiKey: "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
+      authDomain: "caltex-autopro-1e664.firebaseapp.com",
+      projectId: "caltex-autopro-1e664",
+      storageBucket: "caltex-autopro-1e664.firebasestorage.app",
+      messagingSenderId: "930140433367",
+      appId: "1:930140433367:web:cf67bfa388fa517422b992"
+    });
+  }
+</script>
+<script>
+(function() {
+    var _role = sessionStorage.getItem('apUser') ? 'admin'
+              : sessionStorage.getItem('spUser') ? 'staff'
+              : sessionStorage.getItem('cpUser') ? 'customer' : null;
+    if (!_role) { window.location.href = 'login.html'; return; }
+    window._notifRole = _role;
+    if (_role === 'admin') {
+        var scripts = ['../static/js/admin_firebase.js','../static/js/admin_functions.js','../static/js/admin.js','../static/js/admin_sidebar.js','../static/js/customer_shared.js'];
+        (function loadNext(i) {
+            if (i >= scripts.length) return;
+            var s = document.createElement('script'); s.src = scripts[i];
+            s.onload = function() { loadNext(i + 1); }; document.body.appendChild(s);
+        })(0);
+    } else {
+        var s = document.createElement('script'); s.src = '../static/js/customer_shared.js'; document.body.appendChild(s);
+    }
+})();
+</script>
+<script>
+var _notifRole = window._notifRole || 'customer';
+var _notifUid  = null;
+
+// ── Defaults ──
+var _prefs = {
+    pmsOverdue:    true,
+    pmsDueSoon:    true,
+    serviceUpdate: true,
+    newAssignment: true,
+    lowStock:      true,
+};
+
+(function () {
+    if (_notifRole === 'admin') {
+        document.getElementById('adminWrap').style.display = 'flex';
+    } else {
+        document.getElementById('standaloneWrap').style.display = 'flex';
+        fetch('customer_header.html').then(function (r) { return r.text(); }).then(function (html) {
+            document.getElementById('cuHeaderWrap').innerHTML = html;
+            if (typeof setActiveTab === 'function') setActiveTab();
+            var sessKey = _notifRole === 'staff' ? 'spUser' : 'cpUser';
+            var sess = JSON.parse(sessionStorage.getItem(sessKey) || '{}');
+            if (sess.name) {
+                var parts = sess.name.trim().split(' ').filter(Boolean);
+                var ini = parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : parts[0][0].toUpperCase();
+                var av = document.getElementById('cuAvatar'); if (av) av.textContent = ini;
+                var nm = document.getElementById('cuAvatarName'); if (nm) nm.textContent = sess.name;
+            }
+        });
+    }
+    _renderContent();
+})();
+
+firebase.auth().onAuthStateChanged(function (user) {
+    if (!user) { window.location.href = 'login.html'; return; }
+    _notifUid = user.uid;
+
+    // Load saved prefs and re-render with actual values
+    firebase.firestore().collection('users').doc(user.uid)
+        .collection('settings').doc('alerts').get()
+        .then(function (doc) {
+            var data = doc.exists ? doc.data() : {};
+            _prefs.pmsOverdue    = data.pmsOverdue    !== undefined ? data.pmsOverdue    : true;
+            _prefs.pmsDueSoon    = data.pmsDueSoon    !== undefined ? data.pmsDueSoon    : true;
+            _prefs.serviceUpdate = data.serviceUpdate !== undefined ? data.serviceUpdate : true;
+            _prefs.newAssignment = data.newAssignment !== undefined ? data.newAssignment : true;
+            _prefs.lowStock      = data.lowStock      !== undefined ? data.lowStock      : true;
+            // Update toggle states without full re-render
+            ['pmsOverdue','pmsDueSoon','serviceUpdate','newAssignment','lowStock'].forEach(function (k) {
+                var el = document.getElementById('nt_' + k);
+                if (el) el.checked = _prefs[k];
+            });
+        })
+        .catch(function () {});
+});
+
+function _renderContent() {
+    var isStaffOrAdmin = _notifRole === 'staff' || _notifRole === 'admin';
+    var isAdmin        = _notifRole === 'admin';
+
+    // ── Right column: alert cards ──
+    var rightHtml = '<div class="notif-right">';
+
+    // Vehicle Alerts (all roles)
+    rightHtml += '<div>'
+        + '<div class="notif-section-label">Vehicle Alerts</div>'
+        + '<div class="notif-card">'
+        +   '<div class="notif-card-head">'
+        +     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#718096" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>'
+        +     '<span class="notif-card-head-title">PMS Notifications</span>'
+        +   '</div>'
+        +   _alertTile('rgba(232,0,28,0.1)', '#E8001C',
+              '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+              'PMS Overdue', 'Notify when a vehicle is overdue for PMS', 'pmsOverdue', false)
+        +   '<div class="notif-divider"></div>'
+        +   _alertTile('rgba(237,137,54,0.1)', '#ed8936',
+              '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+              'PMS Due Soon', 'Notify when PMS is due within 30 days', 'pmsDueSoon', true)
+        + '</div>'
+        + '</div>';
+
+    if (isStaffOrAdmin) {
+        rightHtml += '<div>'
+            + '<div class="notif-section-label">Service Alerts</div>'
+            + '<div class="notif-card">'
+            +   '<div class="notif-card-head">'
+            +     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#718096" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>'
+            +     '<span class="notif-card-head-title">Service Notifications</span>'
+            +   '</div>'
+            +   _alertTile('rgba(56,161,105,0.1)', '#38a169',
+                  '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+                  'Service Updates', 'Notify on service status changes', 'serviceUpdate', false)
+            +   '<div class="notif-divider"></div>'
+            +   _alertTile('rgba(0,48,135,0.1)', '#003087',
+                  '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>',
+                  'New Assignment', 'Notify when a service is assigned to you', 'newAssignment', true)
+            + '</div>'
+            + '</div>';
+    }
+
+    if (isAdmin) {
+        rightHtml += '<div>'
+            + '<div class="notif-section-label">Inventory Alerts</div>'
+            + '<div class="notif-card">'
+            +   '<div class="notif-card-head">'
+            +     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#718096" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>'
+            +     '<span class="notif-card-head-title">Inventory Notifications</span>'
+            +   '</div>'
+            +   _alertTile('rgba(237,137,54,0.1)', '#ed8936',
+                  '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>',
+                  'Low Stock', 'Notify when stock falls below minimum level', 'lowStock', true)
+            + '</div>'
+            + '</div>';
+    }
+
+    rightHtml += '<div>'
+        + '<button class="notif-save-btn" id="notifSaveBtn" onclick="saveNotifPrefs()">'
+        +   '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>'
+        +   ' Save Preferences'
+        + '</button>'
+        + '</div>'
+        + '</div>'; // .notif-right
+
+    var html = '<a class="notif-back" href="profile.html">'
+        +   '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>'
+        +   'Back to Profile'
+        + '</a>'
+        + '<div class="notif-page-grid">'
+
+        // ── Left: info card ──
+        + '<div class="notif-info-card">'
+        +   '<div class="notif-info-banner">'
+        +     '<div class="notif-info-banner-icon">'
+        +       '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>'
+        +     '</div>'
+        +     '<div class="notif-info-banner-title">Manage Alerts</div>'
+        +     '<div class="notif-info-banner-sub">Control which notifications you receive for your account</div>'
+        +   '</div>'
+        +   '<div class="notif-info-body">'
+        +     '<div class="notif-info-row"><div class="notif-info-dot" style="background:#E8001C;"></div>Vehicle PMS alerts</div>'
+        +     (isStaffOrAdmin ? '<div class="notif-info-row"><div class="notif-info-dot" style="background:#38a169;"></div>Service update alerts</div>' : '')
+        +     (isAdmin ? '<div class="notif-info-row"><div class="notif-info-dot" style="background:#ed8936;"></div>Inventory stock alerts</div>' : '')
+        +   '</div>'
+        + '</div>'
+
+        + rightHtml
+        + '</div>'; // .notif-page-grid
+
+    var target = _notifRole === 'admin'
+        ? document.getElementById('notifContent')
+        : document.getElementById('notifContent2');
+    if (target) target.innerHTML = html;
+}
+
+function _alertTile(iconBg, iconColor, svgPath, label, sub, key, isLast) {
+    var checked = _prefs[key] ? 'checked' : '';
+    return '<div class="notif-tile">'
+        + '<div class="notif-tile-icon" style="background:' + iconBg + ';">'
+        +   '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="' + iconColor + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + svgPath + '</svg>'
+        + '</div>'
+        + '<div class="notif-tile-text">'
+        +   '<div class="notif-tile-label">' + label + '</div>'
+        +   '<div class="notif-tile-sub">' + sub + '</div>'
+        + '</div>'
+        + '<label class="notif-toggle" aria-label="' + label + '">'
+        +   '<input type="checkbox" id="nt_' + key + '" ' + checked + ' onchange="_prefs[\'' + key + '\']=this.checked">'
+        +   '<span class="notif-slider"></span>'
+        + '</label>'
+        + '</div>';
+}
+
+window.saveNotifPrefs = function () {
+    if (!_notifUid) return;
+    var btn = document.getElementById('notifSaveBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+    var isStaffOrAdmin = _notifRole === 'staff' || _notifRole === 'admin';
+    var isAdmin        = _notifRole === 'admin';
+
+    var payload = {
+        pmsOverdue: _prefs.pmsOverdue,
+        pmsDueSoon: _prefs.pmsDueSoon,
+        updatedAt:  firebase.firestore.FieldValue.serverTimestamp(),
+    };
+    if (isStaffOrAdmin) {
+        payload.serviceUpdate = _prefs.serviceUpdate;
+        payload.newAssignment = _prefs.newAssignment;
+    }
+    if (isAdmin) {
+        payload.lowStock = _prefs.lowStock;
+    }
+
+    firebase.firestore().collection('users').doc(_notifUid)
+        .collection('settings').doc('alerts').set(payload)
+        .then(function () { _showNotifToast('Alert preferences saved!', 'success'); })
+        .catch(function (err) { _showNotifToast('Error: ' + err.message, 'error'); })
+        .finally(function () {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save Preferences';
+            }
+        });
+};
+
+function _showNotifToast(msg, type) {
+    var t = document.getElementById('notifToast');
+    if (!t) return;
+    t.textContent = msg;
+    t.className = 'toast-visible toast-' + (type || 'success');
+    clearTimeout(window._notifToastTimer);
+    window._notifToastTimer = setTimeout(function () { t.className = ''; }, 3000);
+}
+</script>
+</body>
+</html>

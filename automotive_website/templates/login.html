@@ -48,14 +48,6 @@
         </svg>
       </span>
       <input id="password" type="password" placeholder="Enter your password" autocomplete="current-password" />
-      <button class="toggle-pass" type="button" id="togglePass" aria-label="Toggle password visibility" style="display:none;">
-        <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none"
-             viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-          <path stroke-linecap="round" stroke-linejoin="round"
-                d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/>
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
-        </svg>
-      </button>
     </div>
 
     <div class="forgot-row">
@@ -103,26 +95,8 @@
 
   // ── Toggle password ──
   const passwordInput = document.getElementById('password');
-  const toggleBtn = document.getElementById('togglePass');
   
-  // Show/hide toggle button based on input
-  passwordInput.addEventListener('input', () => {
-    toggleBtn.style.display = passwordInput.value ? 'flex' : 'none';
-  });
-
-  toggleBtn.addEventListener('click', () => {
-    const inp = document.getElementById('password');
-    const icon = document.getElementById('eyeIcon');
-    const show = inp.type === 'password';
-    inp.type = show ? 'text' : 'password';
-    icon.innerHTML = show
-      ? `<path stroke-linecap="round" stroke-linejoin="round"
-           d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88"/>
-         `
-      : `<path stroke-linecap="round" stroke-linejoin="round"
-           d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/>
-         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>`;
-  });
+  // Password field - no toggle needed
 
   // ── Sign In ──
   const signinBtn = document.getElementById('signinBtn');
@@ -143,39 +117,89 @@
 
     setLoading(signinBtn, true, signinDefault);
     try {
-      console.log('Attempting login with:', email);
+      console.log('=== Email/Password Login ===');
+      console.log('Step 1: Attempting Firebase Auth with:', email);
       const cred = await firebase.auth().signInWithEmailAndPassword(email, password);
-      console.log('Login successful, UID:', cred.user.uid);
+      console.log('Step 2: Firebase Auth successful, UID:', cred.user.uid);
       
       // First try by UID (document ID), then fallback to email query
-      let doc = await firebase.firestore().collection('users').doc(cred.user.uid).get();
+      console.log('Step 3: Looking up user document by UID...');
+      let doc = null;
+      let docExists = false;
       
-      if (!doc.exists) {
-        // Fallback: query by email field
-        const snap = await firebase.firestore().collection('users')
-          .where('email', '==', cred.user.email).limit(1).get();
-        if (!snap.empty) {
-          doc = snap.docs[0];
+      try {
+        doc = await firebase.firestore().collection('users').doc(cred.user.uid).get();
+        docExists = doc.exists;
+        console.log('Step 4: UID lookup result - exists:', docExists);
+      } catch (firestoreErr) {
+        console.log('Step 4: UID lookup failed:', firestoreErr.code, firestoreErr.message);
+        // Continue to email fallback
+      }
+      
+      if (!docExists) {
+        console.log('Step 5: User not found by UID, trying email query...');
+        try {
+          // Fallback: query by email field
+          const snap = await firebase.firestore().collection('users')
+            .where('email', '==', cred.user.email).limit(1).get();
+          console.log('Step 6: Email query returned', snap.size, 'documents');
+          if (!snap.empty) {
+            doc = snap.docs[0];
+            docExists = true;
+            console.log('Step 7: User found by email, migrating to UID-based document');
+            // Migrate to UID for faster future lookups
+            const userData = doc.data();
+            await firebase.firestore().collection('users').doc(cred.user.uid).set(userData);
+          }
+        } catch (queryErr) {
+          console.log('Step 6: Email query failed:', queryErr.code, queryErr.message);
+        }
+      } else {
+        console.log('Step 5: User found by UID');
+      }
+
+      console.log('Step 8: User doc exists:', docExists);
+
+      if (!docExists) {
+        console.log('Step 9: User document not found - creating default customer account');
+        // Auto-create user document for users who signed up via mobile app
+        // This handles the case where password was reset but document wasn't migrated
+        const defaultUserData = {
+          name: cred.user.displayName || email.split('@')[0],
+          email: cred.user.email,
+          role: 'customer',
+          status: 'active',
+          createdAt: new Date().toISOString(),
+        };
+        try {
+          await firebase.firestore().collection('users').doc(cred.user.uid).set(defaultUserData);
+          console.log('Step 10: Default user document created');
+          doc = await firebase.firestore().collection('users').doc(cred.user.uid).get();
+        } catch (createErr) {
+          console.log('Step 10: Failed to create user document:', createErr.code, createErr.message);
+          // If we can't create the document, still allow login with default role
+          const userData = {
+            uid: cred.user.uid,
+            email: cred.user.email,
+            name: defaultUserData.name,
+            role: 'customer',
+          };
+          console.log('Step 11: Using default customer role due to Firestore error');
+          sessionStorage.setItem('cpUser', JSON.stringify(userData));
+          redirectByRole('customer');
+          return;
         }
       }
 
-      console.log('User doc exists:', doc.exists);
-
-      if (!doc.exists) {
-        await firebase.auth().signOut();
-        showToast('Account not found.');
-        setLoading(signinBtn, false, signinDefault);
-        return;
-      }
-
       const data = doc.data();
-      console.log('User data:', data);
-      const role = data.role || '';
+      console.log('Step 11: User data retrieved:', data);
+      const role = data.role || 'customer';
       const status = (data.status || 'active').toLowerCase();
-      console.log('User role:', role, '| status:', status);
+      console.log('Step 12: User role:', role, '| status:', status);
 
       // Block inactive users
       if (status === 'inactive') {
+        console.log('Step 13: Account is inactive - signing out');
         await firebase.auth().signOut();
         showToast('Your account has been deactivated. Please contact the administrator.');
         setLoading(signinBtn, false, signinDefault);
@@ -190,6 +214,7 @@
         role: role,
       };
       
+      console.log('Step 14: Storing session data for role:', role);
       if (role === 'admin') {
         sessionStorage.setItem('apUser', JSON.stringify(userData));
       } else if (role === 'staff') {
@@ -198,93 +223,37 @@
         sessionStorage.setItem('cpUser', JSON.stringify(userData));
       }
       
+      console.log('Step 15: Redirecting to dashboard');
       redirectByRole(role);
     } catch (e) {
-      console.error('Login error:', e);
-      const bad = ['user-not-found', 'wrong-password', 'invalid-credential'];
-      const msg = bad.includes(e.code) ? 'Invalid email or password.' : (e.message || 'Login failed.');
+      console.error('=== Login Error ===');
+      console.error('Error Code:', e.code);
+      console.error('Error Message:', e.message);
+      console.error('Full Error:', e);
+      
+      let msg = 'Invalid email or password.';
+      
+      // Handle specific Firebase Auth errors
+      if (e.code === 'auth/user-not-found') {
+        msg = 'No account found with this email. Please sign up first.';
+      } else if (e.code === 'auth/wrong-password') {
+        msg = 'Incorrect password. Please try again.';
+      } else if (e.code === 'auth/invalid-credential') {
+        msg = 'Invalid email or password.';
+      } else if (e.code === 'permission-denied') {
+        msg = 'Permission denied. Firestore rules may need to be updated. Please contact the administrator.';
+      } else if (e.code && !e.code.startsWith('auth/')) {
+        msg = e.message || 'Login failed.';
+      }
+      
       showToast(msg);
       setLoading(signinBtn, false, signinDefault);
     }
   });
 
   // ── Google Sign-In ──
-  const googleBtn = document.getElementById('googleBtn');
-  const googleDefault = `<svg class="g-logo" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-  </svg>Continue with Google`;
-
-  googleBtn.addEventListener('click', async () => {
-    setLoading(googleBtn, true, googleDefault);
-    try {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      const cred = await firebase.auth().signInWithPopup(provider);
-      const uid = cred.user.uid;
-
-      const ref = firebase.firestore().collection('users').doc(uid);
-      let doc = await ref.get();
-
-      // Fallback: query by email if doc doesn't exist
-      if (!doc.exists) {
-        const snap = await firebase.firestore().collection('users')
-          .where('email', '==', cred.user.email).limit(1).get();
-        if (!snap.empty) {
-          doc = snap.docs[0];
-        }
-      }
-
-      let role;
-      if (!doc.exists) {
-        role = 'customer';
-        await ref.set({
-          name: cred.user.displayName || '',
-          email: cred.user.email || '',
-          photoUrl: cred.user.photoURL || '',
-          role,
-          status: 'active',
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        });
-      } else {
-        role = doc.data().role || 'customer';
-        const status = (doc.data().status || 'active').toLowerCase();
-
-        // Block inactive users
-        if (status === 'inactive') {
-          await firebase.auth().signOut();
-          showToast('Your account has been deactivated. Please contact the administrator.');
-          setLoading(googleBtn, false, googleDefault);
-          return;
-        }
-      }
-      
-      // Store user in sessionStorage for dashboard auth guards
-      const userData = {
-        uid: uid,
-        email: cred.user.email,
-        name: cred.user.displayName || '',
-        role: role,
-      };
-      
-      if (role === 'admin') {
-        sessionStorage.setItem('apUser', JSON.stringify(userData));
-      } else if (role === 'staff') {
-        sessionStorage.setItem('spUser', JSON.stringify(userData));
-      } else {
-        sessionStorage.setItem('cpUser', JSON.stringify(userData));
-      }
-      
-      redirectByRole(role);
-    } catch (e) {
-      if (e.code !== 'auth/popup-closed-by-user') {
-        showToast('Google sign-in failed. Please try again.');
-      }
-    } finally {
-      setLoading(googleBtn, false, googleDefault);
-    }
-  });
+  // Using GoogleSignInModule from google_sign_in.html
+  // The module is auto-initialized and handles all Google Sign-In logic
 
   // ── Role redirect ──
   function redirectByRole(role) {
@@ -303,7 +272,7 @@
   // Redirects to forgot_password.html (handled via href link)
 </script>
 
-<!-- Firebase SDK (replace config with your own) -->
+<!-- Firebase SDK (must load FIRST before google_signin.js) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -322,11 +291,15 @@
   firebase.auth().onAuthStateChanged((user) => {
     if (user) {
       console.log('Auth state: User logged in', user.uid);
-      // Don't redirect here - let the login button handler do it
+      // Don't auto sign out - let user stay logged in
+      // Only sign out if explicitly needed
     } else {
       console.log('Auth state: No user');
     }
   });
 </script>
+
+<!-- Google Sign-In Module (loads AFTER Firebase) -->
+<script src="../static/js/google_signin.js"></script>
 </body>
 </html>

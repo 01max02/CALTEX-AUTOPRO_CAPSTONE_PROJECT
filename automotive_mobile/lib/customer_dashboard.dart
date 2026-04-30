@@ -21,6 +21,8 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
   static const _bg = Color(0xFFF7F8FA);
   String _initials = '?';
   String? _photoUrl;
+  IconData _fleetNavIcon = Icons.directions_car_outlined;
+  bool _iconComputed = false; // Flag to prevent recomputing icon on every rebuild
 
   @override
   void initState() {
@@ -55,6 +57,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
       body: _buildBody(),
       bottomNavigationBar: CustomerBottomNavBar(
         currentIndex: _currentIndex,
+        vehiclesIcon: _fleetNavIcon,
         onTap: (i) {
           if (i == 1) {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerSmartAI()));
@@ -169,6 +172,12 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
             final overdue = vehicles.where((v) => v['status'] == 'Overdue').length;
             final dueSoon = vehicles.where((v) => v['status'] == 'PMS Due Soon').length;
 
+            // Update nav icon based on fleet type (only once when vehicles first load)
+            if (!_iconComputed && vehicles.isNotEmpty) {
+              _iconComputed = true;
+              _fleetNavIcon = _fleetIcon(vehicles);
+            }
+
             return SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -177,14 +186,13 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                   physics: const NeverScrollableScrollPhysics(),
                   crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.4,
                   children: [
-                    _miniStat('Total Vehicles', '${vehicles.length}', Icons.directions_car_outlined, _red),
+                    _miniStat('Total Vehicles', '${vehicles.length}', _fleetIcon(vehicles), _red),
                     _miniStat('Maintenance', '$maint', Icons.build_outlined, Colors.orange),
                     _miniStat('PMS Overdue', '$overdue', Icons.warning_amber_outlined, Colors.red),
                     _miniStat('Due Soon', '$dueSoon', Icons.schedule_outlined, Colors.amber),
                   ],
                 ),
                 const SizedBox(height: 20),
-                const Text('My Fleet', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1a202c))),
                 const SizedBox(height: 12),
                 if (vehicles.isEmpty)
                   const Center(child: Padding(
@@ -226,6 +234,25 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
     );
   }
 
+  Widget _vehicleIcon(String type, {double size = 26, Color color = _red}) {
+    final t = type.toLowerCase();
+    final icon = t.contains('truck')
+        ? Icons.local_shipping_outlined
+        : Icons.directions_car_outlined;
+    return Icon(icon, color: color, size: size);
+  }
+
+  /// Returns a single icon that best represents the whole fleet.
+  /// All trucks → truck icon. All cars → car icon. Mixed → directions_car (generic).
+  IconData _fleetIcon(List<Map<String, String>> vehicles) {
+    if (vehicles.isEmpty) return Icons.directions_car_outlined;
+    final allTruck = vehicles.every((v) => (v['type'] ?? '').toLowerCase().contains('truck'));
+    final allCar   = vehicles.every((v) => !(v['type'] ?? '').toLowerCase().contains('truck'));
+    if (allTruck) return Icons.local_shipping_outlined;
+    if (allCar)   return Icons.directions_car_outlined;
+    return Icons.commute_outlined; // mixed fleet
+  }
+
   Widget _vehicleCard(Map<String, String> v) {
     final status = v['status'] ?? 'Active';
     final statusColor = status == 'Active' ? Colors.green
@@ -255,7 +282,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
               Container(
                 width: 52, height: 52,
                 decoration: BoxDecoration(color: _red.withOpacity(0.08), borderRadius: BorderRadius.circular(14)),
-                child: const Icon(Icons.directions_car_outlined, color: _red, size: 26),
+                child: _vehicleIcon(v['type'] ?? '', size: 26),
               ),
               const SizedBox(width: 14),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -322,7 +349,10 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
       if (date != null && months != null) {
         final next = DateTime(date.year, date.month + months, date.day);
         nextPms = '${next.year}-${next.month.toString().padLeft(2, '0')}-${next.day.toString().padLeft(2, '0')}';
-        daysUntil = next.difference(DateTime.now()).inDays;
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final nextMidnight = DateTime(next.year, next.month, next.day);
+        daysUntil = nextMidnight.difference(today).inDays;
       }
     }
 
@@ -364,7 +394,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                 Row(children: [
                   Container(width: 52, height: 52,
                     decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(14)),
-                    child: const Icon(Icons.directions_car_outlined, color: Colors.white, size: 26)),
+                    child: _vehicleIcon(v['type'] ?? '', size: 26, color: Colors.white)),
                   const SizedBox(width: 14),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(v['plate']!, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
@@ -464,7 +494,10 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
     final months = int.tryParse(svcFreq);
     if (date == null || months == null) return 'Active';
     final nextPms = DateTime(date.year, date.month + months, date.day);
-    final daysUntil = nextPms.difference(DateTime.now()).inDays;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final nextMidnight = DateTime(nextPms.year, nextPms.month, nextPms.day);
+    final daysUntil = nextMidnight.difference(today).inDays;
     if (daysUntil < 0) return 'Overdue';
     if (daysUntil <= 30) return 'PMS Due Soon';
     return 'Active';

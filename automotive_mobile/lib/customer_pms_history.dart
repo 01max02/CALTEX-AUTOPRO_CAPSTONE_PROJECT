@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'pms_history_details.dart';
 
 class CustomerPms extends StatefulWidget {
   const CustomerPms({super.key});
@@ -75,7 +76,8 @@ class _CustomerPmsState extends State<CustomerPms> {
                   final vData = myVehicles[i].data() as Map<String, dynamic>;
                   final plate = vData['plate'] as String? ?? '';
                   final desc = vData['desc'] as String? ?? '';
-                  return _VehicleHistoryCard(plate: plate, desc: desc);
+                  final type = vData['type'] as String? ?? '';
+                  return _VehicleHistoryCard(plate: plate, desc: desc, type: type);
                 },
               ),
             ),
@@ -89,9 +91,17 @@ class _CustomerPmsState extends State<CustomerPms> {
 class _VehicleHistoryCard extends StatelessWidget {
   final String plate;
   final String desc;
+  final String type;
   static const _red = Color(0xFFE8001C);
 
-  const _VehicleHistoryCard({required this.plate, required this.desc});
+  const _VehicleHistoryCard({required this.plate, required this.desc, required this.type});
+
+  IconData get _vehicleIcon {
+    final t = type.toLowerCase();
+    if (t.contains('car')) return Icons.directions_car_outlined;
+    if (t.contains('truck')) return Icons.local_shipping_outlined;
+    return Icons.directions_car_outlined;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -115,7 +125,12 @@ class _VehicleHistoryCard extends StatelessWidget {
         });
 
         return GestureDetector(
-          onTap: () => _showHistory(context, docs),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PmsHistoryDetails(plate: plate, desc: desc, type: type),
+            ),
+          ),
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -127,9 +142,8 @@ class _VehicleHistoryCard extends StatelessWidget {
               Container(
                 width: 46, height: 46,
                 decoration: BoxDecoration(color: _red.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.directions_car_outlined, color: _red, size: 22),
+                child: Icon(_vehicleIcon, color: _red, size: 22),
               ),
-              const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(plate, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1a202c))),
                 Text(desc, style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
@@ -152,133 +166,6 @@ class _VehicleHistoryCard extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-
-  void _showHistory(BuildContext context, List<QueryDocumentSnapshot> docs) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => DraggableScrollableSheet(
-        expand: false, initialChildSize: 0.85, maxChildSize: 0.95,
-        builder: (_, ctrl) => Column(children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-            decoration: const BoxDecoration(color: _red,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-            child: Column(children: [
-              Align(alignment: Alignment.topRight,
-                child: GestureDetector(onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.close, color: Colors.white))),
-              const Icon(Icons.directions_car_outlined, color: Colors.white, size: 36),
-              const SizedBox(height: 8),
-              Text(desc, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
-              Text(plate, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-              const SizedBox(height: 4),
-              Text('${docs.length} completed service${docs.length != 1 ? 's' : ''}',
-                style: const TextStyle(color: Colors.white60, fontSize: 11)),
-            ]),
-          ),
-          Expanded(
-            child: docs.isEmpty
-              ? const Center(child: Text('No completed services yet.', style: TextStyle(color: Color(0xFF718096))))
-              : ListView.separated(
-                  controller: ctrl,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: docs.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 14),
-                  itemBuilder: (_, i) {
-                    final r = docs[i].data() as Map<String, dynamic>;
-                    final svcRows = (r['svcRows'] as List<dynamic>? ?? [])
-                        .where((x) => (x['name'] as String? ?? '').isNotEmpty).toList();
-                    final matRows = (r['matRows'] as List<dynamic>? ?? [])
-                        .where((x) => (x['name'] as String? ?? '').isNotEmpty).toList();
-
-                    return Container(
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)]),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(color: const Color(0xFFF7F8FA),
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-                            border: Border(bottom: BorderSide(color: Colors.grey.shade100))),
-                          child: Row(children: [
-                            const Icon(Icons.calendar_today_outlined, size: 13, color: Color(0xFF718096)),
-                            const SizedBox(width: 6),
-                            Text(r['date'] as String? ?? '—',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1a202c))),
-                            const Spacer(),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                              child: const Text('Completed', style: TextStyle(fontSize: 10, color: Colors.green, fontWeight: FontWeight.w600)),
-                            ),
-                          ]),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Row(children: [
-                              const Icon(Icons.person_outline, size: 13, color: Color(0xFF718096)),
-                              const SizedBox(width: 5),
-                              Text('Mechanic: ${r['mechanic'] ?? '—'}',
-                                style: const TextStyle(fontSize: 12, color: Color(0xFF718096))),
-                            ]),
-                            if (svcRows.isNotEmpty) ...[
-                              const SizedBox(height: 12),
-                              _sectionLabel(Icons.build_outlined, 'Services Rendered', const Color(0xFF2b6cb0)),
-                              const SizedBox(height: 6),
-                              ...svcRows.map((s) => _lineItem(s as Map<String, dynamic>, const Color(0xFF2b6cb0))),
-                            ],
-                            if (matRows.isNotEmpty) ...[
-                              const SizedBox(height: 10),
-                              _sectionLabel(Icons.inventory_2_outlined, 'Materials Used', Colors.teal),
-                              const SizedBox(height: 6),
-                              ...matRows.map((m) => _lineItem(m as Map<String, dynamic>, Colors.teal)),
-                            ],
-                            const Divider(height: 20),
-                            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                              const Text('Total', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF4a5568))),
-                              Text(r['cost'] as String? ?? '—',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _red)),
-                            ]),
-                          ]),
-                        ),
-                      ]),
-                    );
-                  },
-                ),
-          ),
-        ]),
-      ),
-    );
-  }
-
-  Widget _sectionLabel(IconData icon, String label, Color color) {
-    return Row(children: [
-      Container(padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-        child: Icon(icon, size: 13, color: color)),
-      const SizedBox(width: 6),
-      Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
-    ]);
-  }
-
-  Widget _lineItem(Map<String, dynamic> item, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(children: [
-        Container(width: 4, height: 4, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 8),
-        Expanded(child: Text(item['name'] as String? ?? '', style: const TextStyle(fontSize: 12, color: Color(0xFF1a202c)))),
-        Text('${item['qty']} ${item['uom']}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
-        const SizedBox(width: 10),
-        Text('₱${((double.tryParse((item['cost'] as String? ?? '0').replaceAll('₱', '')) ?? 0) * (double.tryParse(item['qty'] as String? ?? '1') ?? 1)).toStringAsFixed(2)}',
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1a202c))),
-      ]),
     );
   }
 }

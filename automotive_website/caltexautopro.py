@@ -1,10 +1,13 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 import smtplib
 import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from datetime import timedelta
 
 app = Flask(__name__)
+app.secret_key = 'your-secret-key-change-this-in-production'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
 # ── Email config (Gmail SMTP) ────────────────────────────────
 # Set SMTP_APP_PASSWORD as an environment variable, or paste the
@@ -191,9 +194,15 @@ def send_welcome_email():
             server.sendmail(SMTP_USER, to_email, msg.as_string())
 
         return jsonify({'ok': True})
+    except smtplib.SMTPAuthenticationError:
+        print('SMTP Authentication failed - check email credentials')
+        return jsonify({'ok': False, 'error': 'Email service authentication failed. Please contact administrator.'}), 500
+    except smtplib.SMTPException as e:
+        print(f'SMTP error: {e}')
+        return jsonify({'ok': False, 'error': 'Failed to send email. Please try again later.'}), 500
     except Exception as e:
         print(f'Email error: {e}')
-        return jsonify({'ok': False, 'error': str(e)}), 500
+        return jsonify({'ok': False, 'error': 'An error occurred while sending email.'}), 500
 
 # ── Landing / Home ──────────────────────────────────────────
 @app.route('/')
@@ -205,6 +214,27 @@ def index():
 @app.route('/login.html')
 def login():
     return render_template('login.html')
+
+@app.route('/api/redirect-to-dashboard', methods=['POST'])
+def redirect_to_dashboard():
+    """
+    Endpoint for login.html to redirect to the appropriate dashboard.
+    Expects: { role: 'admin' | 'staff' | 'customer' }
+    """
+    data = request.get_json(silent=True) or {}
+    role = data.get('role', 'customer').lower()
+    
+    # Map role to dashboard
+    dashboard_map = {
+        'admin': '/admin_dashboard.html',
+        'staff': '/staff_dashboard.html',
+        'customer': '/customer_dashboard.html',
+    }
+    
+    target = dashboard_map.get(role, '/customer_dashboard.html')
+    print(f'Redirecting user with role "{role}" to {target}')
+    
+    return jsonify({'ok': True, 'redirect': target})
 
 @app.route('/forgot_password.html')
 def forgot_password():
@@ -263,6 +293,14 @@ def notifications():
 def profile():
     return render_template('profile.html')
 
+@app.route('/change_password.html')
+def change_password():
+    return render_template('change_password.html')
+
+@app.route('/help_support.html')
+def help_support():
+    return render_template('help_support.html')
+
 # ── Staff ────────────────────────────────────────────────────
 @app.route('/staff_dashboard.html')
 def staff_dashboard():
@@ -289,6 +327,10 @@ def customer_dashboard():
 def customer_pms_history():
     return render_template('customer_pms_history.html')
 
+@app.route('/pms_history_details.html')
+def pms_history_details():
+    return render_template('pms_history_details.html')
+
 @app.route('/customer_smart_ai.html')
 def customer_smart_ai():
     return render_template('customer_smart_ai.html')
@@ -300,3 +342,10 @@ def customer_header():
 # ── Run ──────────────────────────────────────────────────────
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
+
+
+# ── Setup / Admin Tools ──────────────────────────────────────
+@app.route('/setup_notifications.html')
+def setup_notifications():
+    """Setup page to create notifications collection in Firestore"""
+    return render_template('setup_notifications.html')

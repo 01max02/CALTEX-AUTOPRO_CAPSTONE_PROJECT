@@ -4,186 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Profile – AutoPro</title>
-    <link rel="stylesheet" href="../static/css/style.css">
-    <link rel="stylesheet" href="../static/css/admin.css">
-    <link rel="stylesheet" href="../static/css/customer_dashboard.css">
-    <style>
-        /* ── Profile layout ── */
-        .profile-grid {
-            display: grid;
-            grid-template-columns: 320px 1fr;
-            gap: 1.5rem;
-            align-items: start;
-        }
-        @media (max-width: 860px) {
-            .profile-grid { grid-template-columns: 1fr; }
-        }
-
-        /* ── Left column: hero card ── */
-        .profile-hero-card {
-            background: #fff;
-            border-radius: 16px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.07);
-            overflow: hidden;
-        }
-        .profile-hero-banner {
-            background: linear-gradient(135deg, #E8001C 0%, #003087 100%);
-            padding: 2rem 1.5rem 3.5rem;
-            position: relative;
-        }
-        .profile-avatar-lg {
-            width: 80px; height: 80px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.25);
-            color: #fff;
-            font-size: 1.8rem;
-            font-weight: 800;
-            display: flex; align-items: center; justify-content: center;
-            border: 3px solid rgba(255,255,255,0.5);
-            overflow: hidden;
-            margin: 0 auto;
-        }
-        .profile-avatar-lg img { width: 100%; height: 100%; object-fit: cover; }
-        .profile-hero-name {
-            text-align: center;
-            color: #fff;
-            font-size: 1.1rem;
-            font-weight: 800;
-            margin-top: 0.75rem;
-        }
-        .profile-hero-role-badge {
-            display: block;
-            text-align: center;
-            margin-top: 0.4rem;
-        }
-        .profile-hero-role-badge span {
-            background: rgba(255,255,255,0.2);
-            color: #fff;
-            font-size: 0.7rem;
-            font-weight: 700;
-            padding: 3px 12px;
-            border-radius: 20px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .profile-info-list { padding: 1.25rem; }
-        .profile-info-row {
-            display: flex;
-            align-items: center;
-            gap: 0.85rem;
-            padding: 0.75rem 0;
-            border-bottom: 1px solid #f7fafc;
-        }
-        .profile-info-row:last-child { border-bottom: none; }
-        .profile-info-icon {
-            width: 34px; height: 34px;
-            border-radius: 9px;
-            display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0;
-        }
-        .profile-info-label { font-size: 0.72rem; color: #a0aec0; font-weight: 600; margin-bottom: 1px; }
-        .profile-info-value { font-size: 0.9rem; font-weight: 700; color: #1a202c; }
-
-        /* ── Right column: edit + actions ── */
-        .profile-right { display: flex; flex-direction: column; gap: 1.25rem; }
-
-        .profile-section-card {
-            background: #fff;
-            border-radius: 16px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.07);
-            overflow: hidden;
-        }
-        .profile-section-head {
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid #f0f4f8;
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-        }
-        .profile-section-head-title {
-            font-size: 0.88rem;
-            font-weight: 700;
-            color: #1a202c;
-            flex: 1;
-        }
-        .profile-section-body { padding: 1.5rem; }
-
-        /* Form */
-        .pf-group { margin-bottom: 1.1rem; }
-        .pf-group:last-child { margin-bottom: 0; }
-        .pf-label {
-            display: block;
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: #718096;
-            margin-bottom: 0.35rem;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-        }
-        .pf-input {
-            width: 100%;
-            padding: 0.65rem 0.9rem;
-            border: 1.5px solid #e2e8f0;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            font-family: inherit;
-            color: #1a202c;
-            background: #f7fafc;
-            box-sizing: border-box;
-            transition: border-color 0.2s, background 0.2s;
-        }
-        .pf-input:focus { outline: none; border-color: #003087; background: #fff; }
-        .pf-input:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        .pf-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        @media (max-width: 600px) { .pf-row-2 { grid-template-columns: 1fr; } }
-
-        /* Buttons */
-        .pf-btn-primary {
-            display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
-            padding: 0.65rem 1.5rem;
-            background: #003087; color: #fff;
-            border: none; border-radius: 8px;
-            font-size: 0.88rem; font-weight: 700;
-            cursor: pointer; font-family: inherit;
-            transition: background 0.2s;
-        }
-        .pf-btn-primary:hover { background: #002060; }
-        .pf-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        .pf-btn-danger {
-            display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
-            padding: 0.65rem 1.5rem;
-            background: #fff5f5; color: #E8001C;
-            border: 1.5px solid #fed7d7; border-radius: 8px;
-            font-size: 0.88rem; font-weight: 700;
-            cursor: pointer; font-family: inherit;
-            transition: all 0.2s;
-        }
-        .pf-btn-danger:hover { background: #E8001C; color: #fff; border-color: #E8001C; }
-
-        .pf-btn-row {
-            display: flex; gap: 0.75rem; flex-wrap: wrap;
-            margin-top: 1.25rem;
-        }
-
-        /* Password strength hint */
-        .pf-hint { font-size: 0.72rem; color: #a0aec0; margin-top: 0.3rem; }
-
-        /* Toast */
-        #toast {
-            position: fixed; bottom: 2rem; left: 50%;
-            transform: translateX(-50%) translateY(20px);
-            padding: 0.75rem 1.5rem;
-            border-radius: 10px; font-size: 0.88rem; font-weight: 600;
-            color: white; opacity: 0; pointer-events: none;
-            transition: opacity 0.25s ease, transform 0.25s ease;
-            z-index: 99999; white-space: nowrap;
-        }
-        .toast-visible { opacity: 1 !important; transform: translateX(-50%) translateY(0) !important; }
-        .toast-success { background: #38a169; }
-        .toast-error   { background: #E8001C; }
-    </style>
+    <link rel="stylesheet" href="../static/css/profile.css">
 </head>
 <body class="portal-body" data-page="profile">
 
@@ -207,9 +28,9 @@
 </div>
 
 <!-- ── Customer / Staff layout ── -->
-<div id="standaloneWrap" style="display:none;">
+<div id="standaloneWrap" style="display:none;flex-direction:column;min-height:100vh;">
     <div id="cuHeaderWrap"></div>
-    <main class="cu-main">
+    <main style="flex:1;overflow-y:auto;padding:1.5rem 2rem;background:#F7F8FA;">
         <div id="profileContent2"></div>
     </main>
 </div>
@@ -231,68 +52,144 @@
     });
   }
 </script>
-<script src="../static/js/admin_firebase.js"></script>
-<script src="../static/js/admin_functions.js"></script>
-<script src="../static/js/admin.js"></script>
-<script src="../static/js/admin_sidebar.js"></script>
-<script src="../static/js/customer_shared.js"></script>
+
+<!-- Load admin scripts only for admin role; customer/staff use customer_shared.js only -->
+<script>
+(function() {
+    var _role = sessionStorage.getItem('apUser') ? 'admin'
+              : sessionStorage.getItem('spUser') ? 'staff'
+              : sessionStorage.getItem('cpUser') ? 'customer'
+              : null;
+    if (!_role) { window.location.href = 'login.html'; return; }
+    window._profileRoleDetected = _role;
+
+    if (_role === 'admin') {
+        // Admin: load full admin stack
+        var scripts = [
+            '../static/js/admin_firebase.js',
+            '../static/js/admin_functions.js',
+            '../static/js/admin.js',
+            '../static/js/admin_sidebar.js',
+            '../static/js/customer_shared.js',
+        ];
+        (function loadNext(i) {
+            if (i >= scripts.length) { window._profileScriptsReady = true; return; }
+            var s = document.createElement('script');
+            s.src = scripts[i];
+            s.onload = function() { loadNext(i + 1); };
+            document.body.appendChild(s);
+        })(0);
+    } else {
+        // Customer / Staff: only load customer_shared.js — no admin redirects
+        var s = document.createElement('script');
+        s.src = '../static/js/customer_shared.js';
+        s.onload = function() { window._profileScriptsReady = true; };
+        document.body.appendChild(s);
+    }
+})();
+</script>
 <script>
 // ── Role detection ──────────────────────────────────────────
-var _profileRole    = 'customer';
-var _profileSession = null;
+var _profileRole = window._profileRoleDetected || 'customer';
 
 (function () {
-    var ap = sessionStorage.getItem('apUser');
-    var sp = sessionStorage.getItem('spUser');
-    var cp = sessionStorage.getItem('cpUser');
-    if (ap)      { _profileRole = 'admin';    _profileSession = JSON.parse(ap); }
-    else if (sp) { _profileRole = 'staff';    _profileSession = JSON.parse(sp); }
-    else if (cp) { _profileRole = 'customer'; _profileSession = JSON.parse(cp); }
-    else { window.location.href = 'login.html'; return; }
-
     if (_profileRole === 'admin') {
         document.getElementById('adminWrap').style.display = 'flex';
     } else {
-        document.getElementById('standaloneWrap').style.display = 'block';
+        document.getElementById('standaloneWrap').style.display = 'flex';
         fetch('customer_header.html').then(function (r) { return r.text(); }).then(function (html) {
             document.getElementById('cuHeaderWrap').innerHTML = html;
+            // Trigger active tab + avatar init after header is injected
+            if (typeof setActiveTab === 'function') setActiveTab();
+            // Populate avatar from session immediately
+            var sessKey2 = _profileRole === 'staff' ? 'spUser' : 'cpUser';
+            var sess2 = JSON.parse(sessionStorage.getItem(sessKey2) || '{}');
+            if (sess2.name) {
+                var parts2 = sess2.name.trim().split(' ').filter(Boolean);
+                var ini2 = parts2.length >= 2
+                    ? (parts2[0][0] + parts2[1][0]).toUpperCase()
+                    : parts2[0][0].toUpperCase();
+                var avatarEl2 = document.getElementById('cuAvatar');
+                if (avatarEl2) avatarEl2.textContent = ini2;
+                var nameEl2 = document.getElementById('cuAvatarName');
+                if (nameEl2) nameEl2.textContent = sess2.name;
+            }
         });
     }
 })();
 
 // ── Load from Firestore ─────────────────────────────────────
+var _profileUnsubscribe = null;
+
 firebase.auth().onAuthStateChanged(function (user) {
     if (!user) { window.location.href = 'login.html'; return; }
 
-    firebase.firestore().collection('users').doc(user.uid).get().then(function (doc) {
-        var data     = doc.exists ? doc.data() : {};
-        var name     = data.name     || (_profileSession && _profileSession.name) || 'User';
-        var email    = data.email    || user.email || '—';
-        var role     = data.role     || _profileRole;
-        var phone    = data.phone    || '';
-        var photoUrl = data.photoUrl || null;
+    // ── Render immediately from sessionStorage (fast) ──
+    var sessKey  = _profileRole === 'admin' ? 'apUser' : _profileRole === 'staff' ? 'spUser' : 'cpUser';
+    var sessData = JSON.parse(sessionStorage.getItem(sessKey) || '{}');
+    if (sessData.name || sessData.email) {
+        _renderProfile({
+            name:     sessData.name     || 'User',
+            email:    sessData.email    || user.email || '—',
+            role:     sessData.role     || _profileRole,
+            photoUrl: sessData.photoUrl || null,
+        });
+    }
 
-        var parts    = name.trim().split(' ').filter(Boolean);
-        var initials = parts.length >= 2
-            ? (parts[0][0] + parts[1][0]).toUpperCase()
-            : parts[0][0].toUpperCase();
+    // ── Real-time listener — auto-syncs from mobile or any other source ──
+    if (_profileUnsubscribe) _profileUnsubscribe(); // clean up previous listener
+    _profileUnsubscribe = firebase.firestore()
+        .collection('users').doc(user.uid)
+        .onSnapshot(function (doc) {
+            if (!doc.exists) return;
+            var data = doc.data();
+            var name     = data.name     || sessData.name  || 'User';
+            var email    = data.email    || user.email     || '—';
+            var role     = data.role     || _profileRole;
+            var photoUrl = data.photoUrl || null;
 
-        var roleColors  = { admin: '#E8001C', staff: '#003087', customer: '#38a169' };
-        var roleLabels  = { admin: 'Administrator', staff: 'Staff', customer: 'Customer' };
-        var roleColor   = roleColors[role]  || '#718096';
-        var roleLabel   = roleLabels[role]  || role;
+            // Only re-render if not currently in edit mode (avoid wiping unsaved input)
+            if (!_pEditing) {
+                _renderProfile({ name, email, role, photoUrl });
+            }
 
-        window._profileUid      = user.uid;
-        window._profileOrigName = name;
-
-        var html = _buildProfileHTML({ name, email, role, photoUrl, initials, roleColor, roleLabel });
-
-        var target = _profileRole === 'admin'
-            ? document.getElementById('profileContent')
-            : document.getElementById('profileContent2');
-        if (target) target.innerHTML = html;
-    });
+            // Always keep sessionStorage in sync
+            var key  = _profileRole === 'admin' ? 'apUser' : _profileRole === 'staff' ? 'spUser' : 'cpUser';
+            var sess = JSON.parse(sessionStorage.getItem(key) || '{}');
+            sess.name  = name;
+            sess.email = email;
+            sessionStorage.setItem(key, JSON.stringify(sess));
+        }, function (err) {
+            console.warn('Profile listener error:', err);
+        });
 });
+
+function _renderProfile(d) {
+    var name     = d.name;
+    var email    = d.email;
+    var role     = d.role;
+    var photoUrl = d.photoUrl;
+
+    var parts    = name.trim().split(' ').filter(Boolean);
+    var initials = parts.length >= 2
+        ? (parts[0][0] + parts[1][0]).toUpperCase()
+        : parts[0][0].toUpperCase();
+
+    var roleColors = { admin: '#E8001C', staff: '#003087', customer: '#38a169' };
+    var roleLabels = { admin: 'Administrator', staff: 'Staff', customer: 'Customer' };
+    var roleColor  = roleColors[role]  || '#718096';
+    var roleLabel  = roleLabels[role]  || role;
+
+    window._profileUid      = firebase.auth().currentUser?.uid;
+    window._profileOrigName = name;
+
+    var html = _buildProfileHTML({ name, email, role, photoUrl, initials, roleColor, roleLabel });
+
+    var target = _profileRole === 'admin'
+        ? document.getElementById('profileContent')
+        : document.getElementById('profileContent2');
+    if (target) target.innerHTML = html;
+}
 
 // ── Build HTML ──────────────────────────────────────────────
 function _buildProfileHTML(p) {
@@ -300,7 +197,16 @@ function _buildProfileHTML(p) {
         ? '<img src="' + p.photoUrl + '" alt="avatar">'
         : p.initials;
 
-    return '<div class="profile-grid">'
+    // Page header only for customer/staff (admin has it in admin-header)
+    var pageHeader = (_profileRole !== 'admin')
+        ? '<div class="pf-page-header"><div>'
+        +   '<div class="pf-page-title">My Profile</div>'
+        +   '<div class="pf-page-sub">Manage your account information</div>'
+        + '</div></div>'
+        : '';
+
+    return pageHeader
+        + '<div class="profile-grid">'
 
         // ── Left: hero card ──
         + '<div class="profile-hero-card">'
@@ -328,48 +234,35 @@ function _buildProfileHTML(p) {
         // Edit profile card
         +   '<div class="profile-section-card">'
         +     '<div class="profile-section-head">'
-        +       '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#003087" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>'
-        +       '<span class="profile-section-head-title">Edit Profile</span>'
+        +       '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#003087" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+        +       '<span class="profile-section-head-title">Account Information</span>'
+        +       '<button class="pf-edit-btn" id="pEditToggleBtn" onclick="toggleEditMode()">'
+        +         '<svg id="pEditBtnIcon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>'
+        +         '<span id="pEditBtnLabel">Edit</span>'
+        +       '</button>'
         +     '</div>'
-        +     '<div class="profile-section-body">'
-        +       '<div class="pf-group">'
-        +         '<label class="pf-label">Full Name</label>'
-        +         '<input class="pf-input" type="text" id="pEditName" placeholder="Your full name" value="' + _esc(p.name) + '">'
-        +       '</div>'
-        +       '<div class="pf-btn-row">'
-        +         '<button class="pf-btn-primary" id="pSaveBtn" onclick="saveProfile()">'
-        +           '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>'
-        +           'Save Changes'
-        +         '</button>'
-        +       '</div>'
-        +     '</div>'
+        +     _infoEditTile('person', 'Full Name', 'pFieldName', _esc(p.name), false, false)
+        +     _infoEditTile('email', 'Email', 'pFieldEmail', _esc(p.email), false, false)
+        +     _infoEditTile('role', 'Role', 'pFieldRole', _esc(p.roleLabel), true, true)
         +   '</div>'
 
-        // Change password card
+        // Settings card
         +   '<div class="profile-section-card">'
         +     '<div class="profile-section-head">'
-        +       '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#718096" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>'
-        +       '<span class="profile-section-head-title">Change Password</span>'
+        +       '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#718096" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
+        +       '<span class="profile-section-head-title">Settings</span>'
         +     '</div>'
-        +     '<div class="profile-section-body">'
-        +       '<div class="pf-row-2">'
-        +         '<div class="pf-group">'
-        +           '<label class="pf-label">New Password</label>'
-        +           '<input class="pf-input" type="password" id="pEditPassword" placeholder="Enter new password">'
-        +           '<div class="pf-hint">Leave blank to keep your current password.</div>'
-        +         '</div>'
-        +         '<div class="pf-group">'
-        +           '<label class="pf-label">Confirm Password</label>'
-        +           '<input class="pf-input" type="password" id="pEditPasswordConfirm" placeholder="Confirm new password">'
-        +         '</div>'
-        +       '</div>'
-        +       '<div class="pf-btn-row">'
-        +         '<button class="pf-btn-primary" id="pPassBtn" onclick="savePassword()">'
-        +           '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>'
-        +           'Update Password'
-        +         '</button>'
-        +       '</div>'
-        +     '</div>'
+        +     _settingsTile('rgba(113,128,150,0.1)', '#718096',
+                '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+                'Change Password', 'Update your credentials', 'change_password.html', false)
+        +     '<div class="pf-action-divider"></div>'
+        +     _settingsTile('rgba(0,48,135,0.1)', '#003087',
+                '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+                'Notifications', 'Manage alerts', 'notifications.html', false)
+        +     '<div class="pf-action-divider"></div>'
+        +     _settingsTile('rgba(0,48,135,0.1)', '#003087',
+                '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+                'Help & Support', 'Get assistance', 'help_support.html', true)
         +   '</div>'
 
         + '</div>'  // .profile-right
@@ -388,52 +281,137 @@ function _infoRow(iconBg, iconColor, svgPath, label, valueHtml) {
         + '</div>';
 }
 
+function _infoEditTile(type, label, fieldId, value, isLast, readOnly) {
+    var icons = {
+        person: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+        email:  '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
+        role:   '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    };
+    var borderStyle = isLast ? 'border-bottom:none;' : '';
+    return '<div class="pf-info-tile" id="tile_' + fieldId + '" style="' + borderStyle + '">'
+        + '<div class="pf-info-tile-icon">'
+        +   '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8001C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + (icons[type] || '') + '</svg>'
+        + '</div>'
+        + '<div style="flex:1;">'
+        +   '<div class="pf-info-tile-label">' + label + '</div>'
+        +   '<div class="pf-info-tile-value" id="view_' + fieldId + '">' + value + '</div>'
+        +   (readOnly ? '' : '<input class="pf-edit-field" type="text" id="' + fieldId + '" value="' + value + '" style="display:none;">')
+        + '</div>'
+        + '</div>';
+}
+
+function _settingsTile(iconBg, iconColor, svgPath, label, sub, href, isLast) {
+    return '<a class="pf-action-tile" href="' + href + '" style="' + (isLast ? '' : '') + '">'
+        + '<div class="pf-action-tile-icon" style="background:' + iconBg + ';">'
+        +   '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="' + iconColor + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + svgPath + '</svg>'
+        + '</div>'
+        + '<div class="pf-action-tile-text">'
+        +   '<div class="pf-action-tile-label">' + label + '</div>'
+        +   '<div class="pf-action-tile-sub">' + sub + '</div>'
+        + '</div>'
+        + '<svg class="pf-action-tile-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>'
+        + '</a>';
+}
+
+// ── Edit mode toggle ────────────────────────────────────────
+var _pEditing = false;
+
+window.toggleEditMode = function () {
+    if (_pEditing) {
+        saveProfile();
+    } else {
+        _pEditing = true;
+        // Show input fields, hide view values
+        ['pFieldName', 'pFieldEmail'].forEach(function (id) {
+            var view  = document.getElementById('view_' + id);
+            var input = document.getElementById(id);
+            if (view)  view.style.display  = 'none';
+            if (input) { input.style.display = 'block'; }
+        });
+        var nameInput = document.getElementById('pFieldName');
+        if (nameInput) nameInput.focus();
+        // Update button to Save/Check
+        var lbl  = document.getElementById('pEditBtnLabel');
+        var icon = document.getElementById('pEditBtnIcon');
+        if (lbl)  lbl.textContent = 'Save';
+        if (icon) icon.innerHTML  = '<polyline points="20 6 9 17 4 12"/>';
+    }
+};
+
 // ── Save profile ────────────────────────────────────────────
 window.saveProfile = function () {
-    var uid   = window._profileUid;
-    var name  = (document.getElementById('pEditName')?.value || '').trim();
-    if (!name) { _showToast('Name cannot be empty.', 'error'); return; }
+    var uid       = window._profileUid;
+    var nameInput  = document.getElementById('pFieldName');
+    var emailInput = document.getElementById('pFieldEmail');
+    var name  = nameInput  ? nameInput.value.trim()  : '';
+    var email = emailInput ? emailInput.value.trim() : '';
 
-    var btn = document.getElementById('pSaveBtn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    if (!name)  { _showToast('Name cannot be empty.', 'error'); return; }
+    if (!email) { _showToast('Email cannot be empty.', 'error'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        _showToast('Please enter a valid email.', 'error'); return;
+    }
 
-    firebase.firestore().collection('users').doc(uid).update({ name: name })
+    var btn = document.getElementById('pEditToggleBtn');
+    if (btn) btn.disabled = true;
+    var lbl = document.getElementById('pEditBtnLabel');
+    if (lbl) lbl.textContent = 'Saving…';
+
+    var user = firebase.auth().currentUser;
+
+    // Update Firestore first, then Firebase Auth email
+    firebase.firestore().collection('users').doc(uid).update({ name: name, email: email })
+        .then(function () {
+            return user.updateEmail(email);
+        })
         .then(function () {
             var key  = _profileRole === 'admin' ? 'apUser' : _profileRole === 'staff' ? 'spUser' : 'cpUser';
             var sess = JSON.parse(sessionStorage.getItem(key) || '{}');
-            sess.name = name;
+            sess.name  = name;
+            sess.email = email;
             sessionStorage.setItem(key, JSON.stringify(sess));
+
+            // Switch back to view mode
+            _pEditing = false;
+            ['pFieldName', 'pFieldEmail'].forEach(function (id) {
+                var view  = document.getElementById('view_' + id);
+                var input = document.getElementById(id);
+                if (view)  { view.textContent = id === 'pFieldName' ? name : email; view.style.display = 'block'; }
+                if (input) input.style.display = 'none';
+            });
+
+            // Update left card display name
             var dn = document.getElementById('pDisplayName');
             if (dn) dn.textContent = name;
             window._profileOrigName = name;
+
+            // Sync avatar initials and dropdown name in the header immediately
+            var parts    = name.trim().split(' ').filter(Boolean);
+            var initials = parts.length >= 2
+                ? (parts[0][0] + parts[1][0]).toUpperCase()
+                : parts[0].slice(0, 2).toUpperCase();
+            var avatarEl = document.getElementById('adminHeaderAvatar');
+            var nameEl   = document.getElementById('adminAvatarName');
+            if (avatarEl) avatarEl.textContent = initials;
+            if (nameEl)   nameEl.textContent   = name;
+
+            // Reset button
+            if (lbl) lbl.textContent = 'Edit';
+            var icon = document.getElementById('pEditBtnIcon');
+            if (icon) icon.innerHTML = '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>';
+
             _showToast('Profile updated successfully!', 'success');
         })
-        .catch(function (err) { _showToast('Error: ' + err.message, 'error'); })
-        .finally(function () {
-            if (btn) { btn.disabled = false; btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save Changes'; }
-        });
-};
-
-// ── Save password ───────────────────────────────────────────
-window.savePassword = function () {
-    var pass    = (document.getElementById('pEditPassword')?.value        || '').trim();
-    var confirm = (document.getElementById('pEditPasswordConfirm')?.value || '').trim();
-    if (!pass)            { _showToast('Please enter a new password.', 'error'); return; }
-    if (pass !== confirm) { _showToast('Passwords do not match.', 'error'); return; }
-    if (pass.length < 6)  { _showToast('Password must be at least 6 characters.', 'error'); return; }
-
-    var btn = document.getElementById('pPassBtn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Updating…'; }
-
-    firebase.auth().currentUser.updatePassword(pass)
-        .then(function () {
-            _showToast('Password updated successfully!', 'success');
-            document.getElementById('pEditPassword').value        = '';
-            document.getElementById('pEditPasswordConfirm').value = '';
+        .catch(function (err) {
+            var msg = err.code === 'auth/requires-recent-login'
+                ? 'Please log out and log back in before changing your email.'
+                : err.code === 'auth/email-already-in-use'
+                ? 'That email is already in use by another account.'
+                : 'Error: ' + err.message;
+            _showToast(msg, 'error');
         })
-        .catch(function (err) { _showToast('Error: ' + err.message, 'error'); })
         .finally(function () {
-            if (btn) { btn.disabled = false; btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Update Password'; }
+            if (btn) btn.disabled = false;
         });
 };
 

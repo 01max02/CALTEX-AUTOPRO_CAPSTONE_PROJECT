@@ -18,14 +18,31 @@
 
     // Wait for Firebase Auth before querying Firestore
     firebase.auth().onAuthStateChanged(function (user) {
+      console.log('Firebase auth state changed, user:', user?.uid);
+      
       if (!user) {
         // Only redirect if no session stored — avoids redirect during auth restore
         const stored = sessionStorage.getItem('apUser');
         if (!stored) {
-          window.location.href = 'login.html';
+          console.log('No apUser in sessionStorage and no Firebase user, redirecting to login');
+          window.location.href = '/login.html';
         }
         return;
       }
+      
+      // User is authenticated - restore sessionStorage if needed
+      if (!sessionStorage.getItem('apUser')) {
+        console.log('apUser not in sessionStorage, storing from Firebase...');
+        const userData = {
+          uid: user.uid,
+          email: user.email,
+          name: user.displayName || '',
+          role: 'admin',
+        };
+        sessionStorage.setItem('apUser', JSON.stringify(userData));
+        console.log('Stored apUser:', userData);
+      }
+      
       _initFirestore(user);
     });
   });
@@ -75,8 +92,10 @@
         let status = v.status || '';
         if (status.toLowerCase() !== 'under maintenance' && status.toLowerCase() !== 'maintenance' && nextPMSDue) {
           const due = new Date(nextPMSDue);
-          const today = new Date(); today.setHours(0,0,0,0);
-          const diff = Math.ceil((due - today) / 86400000);
+          const now = new Date();
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const dueMidnight = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+          const diff = Math.round((dueMidnight - today) / 86400000);
           if (diff < 0) status = 'Overdue';
           else if (diff <= 30) status = 'PMS Due Soon';
           else status = 'Active';
@@ -406,6 +425,7 @@
     _setStat('totalInventoryItems', inv.length);
     const low = inv.filter(i => (i.status || '').toLowerCase() === 'low');
     _setStat('lowStockCount', low.length);
+    _setStat('inStockCount', inv.length - low.length);
     const total = inv.reduce((s, i) => {
       const qty = parseFloat(i.stock) || 0;
       const price = parseFloat(i.price || i.cost || 0);

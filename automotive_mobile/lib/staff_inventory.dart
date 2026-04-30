@@ -147,12 +147,29 @@ class _StaffInventoryState extends State<StaffInventory> {
   }
 
   Widget _statChip(String label, String value, Color color) {
+    IconData icon;
+    switch (label) {
+      case 'Total Items':
+        icon = Icons.inventory_2_outlined;
+        break;
+      case 'Low Stock':
+        icon = Icons.warning_outlined;
+        break;
+      case 'In Stock':
+        icon = Icons.check_circle_outline;
+        break;
+      default:
+        icon = Icons.info_outline;
+    }
+    
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
         child: Column(children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 4),
           Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
           Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
         ]),
@@ -223,6 +240,7 @@ class _StaffInventoryState extends State<StaffInventory> {
   void _showStockDetails(Map<String, dynamic> item) {
     showModalBottomSheet(
       context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => DraggableScrollableSheet(
         expand: false, initialChildSize: 0.55, maxChildSize: 0.85,
@@ -264,7 +282,7 @@ class _StaffInventoryState extends State<StaffInventory> {
                     onPressed: () { Navigator.pop(context); _showReceiveModal(item); },
                     icon: const Icon(Icons.download_outlined, size: 16),
                     label: const Text('Receive Stock'),
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF003087), foregroundColor: Colors.white,
+                    style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 13)),
                   )),
               ]),
@@ -283,6 +301,7 @@ class _StaffInventoryState extends State<StaffInventory> {
 
     showModalBottomSheet(
       context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => StatefulBuilder(
         builder: (ctx, setModal) => DraggableScrollableSheet(
@@ -375,8 +394,11 @@ class _StaffInventoryState extends State<StaffInventory> {
                   if (!searching && selectedItem != null) ...[
                     Container(
                       padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(color: const Color(0xFFebf8ff),
-                        border: Border.all(color: const Color(0xFF90cdf4)), borderRadius: BorderRadius.circular(12)),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: const Color(0xFFe2e8f0)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: Row(children: [
                         Container(width: 44, height: 44,
                           decoration: BoxDecoration(color: const Color(0xFF003087), borderRadius: BorderRadius.circular(10)),

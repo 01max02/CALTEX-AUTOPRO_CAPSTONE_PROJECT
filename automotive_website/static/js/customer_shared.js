@@ -20,6 +20,7 @@
         });
     }
     ready(setActiveTab);
+    window.setActiveTab = setActiveTab; // expose for pages that inject header dynamically
 
     // ── Avatar dropdown ─────────────────────────────────────
     window.toggleAvatarMenu = function (id) {
@@ -46,9 +47,9 @@
         sessionStorage.removeItem('cpUser');
         sessionStorage.removeItem('spUser');
         if (typeof firebase !== 'undefined' && firebase.auth) {
-            firebase.auth().signOut().finally(function () { window.location.href = 'login.html'; });
+            firebase.auth().signOut().finally(function () { window.location.href = '/login.html'; });
         } else {
-            window.location.href = 'login.html';
+            window.location.href = '/login.html';
         }
     };
 

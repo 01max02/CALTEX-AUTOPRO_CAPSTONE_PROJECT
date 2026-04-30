@@ -64,6 +64,12 @@ function switchAdminSection(sectionName) {
     var titleEl = document.getElementById('currentSectionTitle');
     if (titleEl) titleEl.textContent = titles[sectionName] || 'Admin Panel';
 
+    // Show/hide header controls
+    var txnCtrl = document.getElementById('txnHeaderControls');
+    var issCtrl = document.getElementById('issuanceHeaderControls');
+    if (txnCtrl) txnCtrl.style.display = sectionName === 'inventory-transactions' ? 'flex' : 'none';
+    if (issCtrl) issCtrl.style.display = sectionName === 'issuance' ? 'flex' : 'none';
+
     if (sectionName === 'assets') renderAssetsList();
     if (sectionName === 'asset-servicing') renderServicesList();
     if (sectionName === 'issuance') renderIssuancesList();
@@ -180,14 +186,13 @@ function renderAssetsList() {
     });
 
     assetsList.innerHTML = filtered.map(function(asset) {
-        return '<div class="table-row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 1fr 120px;">'
+        return '<div class="table-row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 120px;">'
             + '<div>' + asset.plateNumber + '</div>'
             + '<div>' + (asset.icon||'') + ' ' + (asset.type||'-') + '</div>'
             + '<div>' + (asset.owner||'-') + '</div>'
             + '<div>' + (asset.odometer ? asset.odometer.toLocaleString() + ' km' : '-') + '</div>'
             + '<div>' + (asset.lastServiceDate ? new Date(asset.lastServiceDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '-') + '</div>'
             + '<div>' + (asset.nextPMSDue ? new Date(asset.nextPMSDue).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '-') + '</div>'
-            + '<div>' + getStatusBadge(asset) + '</div>'
             + '<div style="display:flex;gap:0.4rem;">'
             +   '<button class="btn-small btn-primary" onclick="viewAssetDetails(\'' + asset.assetNum + '\')" title="View" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>'
             +   '<button class="btn-small btn-secondary" onclick="editAsset(\'' + asset.assetNum + '\')" title="Edit" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
@@ -564,8 +569,20 @@ function completeService(serviceId) {
 
 function deleteService(serviceId) {
     if (!confirm('Delete this service transaction?')) return;
-    window.serviceTransactions = (window.serviceTransactions||[]).filter(function(s){ return s.serviceId !== serviceId; });
-    renderServicesList();
+
+    // Delete from Firestore
+    firebase.firestore().collection('maintenance').doc(serviceId).delete()
+        .then(function () {
+            // Also remove from local cache so the list updates immediately
+            window.serviceTransactions = (window.serviceTransactions || []).filter(function (s) {
+                return s.serviceId !== serviceId;
+            });
+            renderServicesList();
+            if (typeof showToast === 'function') showToast('Service deleted successfully.', 'success');
+        })
+        .catch(function (err) {
+            if (typeof showToast === 'function') showToast('Delete failed: ' + err.message, 'error');
+        });
 }
 
 function viewServiceDetails(serviceId) {
@@ -960,8 +977,7 @@ function renderInventoryList() {
     var s = function(id,val){ var el=document.getElementById(id); if(el) el.textContent=val; };
     s('totalInventoryItems', inventory.length);
     s('lowStockCount', inventory.filter(function(i){ return i.stock <= i.minLevel; }).length);
-    var totalVal = inventory.reduce(function(sum,i){ return sum + (i.stock * (i.price||0)); },0);
-    s('totalInventoryValue', '₱' + totalVal.toLocaleString('en-PH',{minimumFractionDigits:0}));
+    s('inStockCount', inventory.filter(function(i){ return i.stock > i.minLevel; }).length);
 
     if (filtered.length === 0) {
         inventoryList.innerHTML = '<div class="table-row" style="text-align:center;color:#718096;padding:2rem;">No inventory items found.</div>';
@@ -1591,22 +1607,28 @@ document.addEventListener('DOMContentLoaded', function() {
             if (currentEditingItemMaster) {
                 var fbItem = (window._fbItemMaster || []).find(function(i){ return i.num === currentEditingItemMaster.itemNum; });
                 if (!fbItem || !fbItem._id) { alert('Item not found in database.'); return; }
+                var submitBtn = document.getElementById('imSubmitBtn');
+                if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 0.8s linear infinite"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.49"/></svg> Updating…'; }
                 db.collection('item_master').doc(fbItem._id).update(data)
                     .then(function() {
                         showToast('Item updated successfully!', 'success');
                         closeModal('addItemMasterModal');
                     })
-                    .catch(function(err) { showToast('Update failed: ' + err.message, 'error'); });
+                    .catch(function(err) { showToast('Update failed: ' + err.message, 'error'); })
+                    .finally(function() { if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Update'; } });
             } else {
                 var isDuplicate = (window.itemMaster || []).some(function(i){ return i.itemNum === itemNum; });
                 if (isDuplicate) { alert('Item Number already exists.'); return; }
                 data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                var submitBtn2 = document.getElementById('imSubmitBtn');
+                if (submitBtn2) { submitBtn2.disabled = true; submitBtn2.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 0.8s linear infinite"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.49"/></svg> Saving…'; }
                 db.collection('item_master').add(data)
                     .then(function() {
                         showToast('Item added successfully!', 'success');
                         closeModal('addItemMasterModal');
                     })
-                    .catch(function(err) { showToast('Save failed: ' + err.message, 'error'); });
+                    .catch(function(err) { showToast('Save failed: ' + err.message, 'error'); })
+                    .finally(function() { if (submitBtn2) { submitBtn2.disabled = false; submitBtn2.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save'; } });
             }
         });
     }

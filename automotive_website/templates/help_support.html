@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help & Support – AutoPro</title>
+    <link rel="stylesheet" href="../static/css/help_support.css">
+</head>
+<body class="portal-body" data-page="help_support">
+<!-- ── Admin layout ── -->
+<div id="adminWrap" style="display:none;flex-direction:column;" class="admin-dashboard">
+    <div id="headerContainer"></div>
+    <div class="admin-dashboard-body">
+        <div id="sidebarContainer"></div>
+        <div class="admin-main">
+            <div class="admin-header">
+                <div>
+                    <div class="breadcrumb">Admin Portal › My Profile › Help & Support</div>
+                    <div class="admin-header-title">Help & Support</div>
+                </div>
+            </div>
+            <div class="admin-content">
+                <div id="hsContent"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Customer / Staff layout ── -->
+<div id="standaloneWrap" style="display:none;flex-direction:column;min-height:100vh;">
+    <div id="cuHeaderWrap"></div>
+    <main style="flex:1;overflow-y:auto;padding:1.5rem 2rem;background:#F7F8FA;">
+        <div id="hsContent2"></div>
+    </main>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+  if (!firebase.apps.length) {
+    firebase.initializeApp({
+      apiKey: "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
+      authDomain: "caltex-autopro-1e664.firebaseapp.com",
+      projectId: "caltex-autopro-1e664",
+      storageBucket: "caltex-autopro-1e664.firebasestorage.app",
+      messagingSenderId: "930140433367",
+      appId: "1:930140433367:web:cf67bfa388fa517422b992"
+    });
+  }
+</script>
+<script>
+(function() {
+    var _role = sessionStorage.getItem('apUser') ? 'admin'
+              : sessionStorage.getItem('spUser') ? 'staff'
+              : sessionStorage.getItem('cpUser') ? 'customer' : null;
+    if (!_role) { window.location.href = 'login.html'; return; }
+    window._hsRole = _role;
+    if (_role === 'admin') {
+        var scripts = ['../static/js/admin_firebase.js','../static/js/admin_functions.js','../static/js/admin.js','../static/js/admin_sidebar.js','../static/js/customer_shared.js'];
+        (function loadNext(i) {
+            if (i >= scripts.length) return;
+            var s = document.createElement('script'); s.src = scripts[i];
+            s.onload = function() { loadNext(i + 1); }; document.body.appendChild(s);
+        })(0);
+    } else {
+        var s = document.createElement('script'); s.src = '../static/js/customer_shared.js'; document.body.appendChild(s);
+    }
+})();
+</script>
+<script>
+var _hsRole = window._hsRole || 'customer';
+
+var _faqsByRole = {
+    admin: [
+        { q: 'How do I add a new vehicle?',
+          a: 'Go to the Vehicles section, then click the Add Vehicle button. Fill in the plate number, description, vehicle type, owner, odometer, last service date, and service frequency, then save.' },
+        { q: 'How do I edit or delete a vehicle?',
+          a: 'In the Vehicles list, click the action menu on any vehicle row and select Edit or Delete. You can update all vehicle details including odometer and service schedule.' },
+        { q: 'How does vehicle status get computed?',
+          a: 'Status is automatically calculated based on the last service date and service frequency. It will show Active, PMS Due Soon, Overdue, or Under Maintenance depending on how close or past the next due date is.' },
+        { q: 'How do I manage inventory?',
+          a: 'Go to the Inventory section. It has Item Master (manage items), Transactions (view stock movements), and Stock (current stock levels).' },
+        { q: 'How do I manage users?',
+          a: 'Go to the Users section in the admin portal. You can view all registered users, update their roles, and manage their accounts from there.' },
+        { q: 'How do I change my password?',
+          a: 'Go to My Profile, then click Change Password. Enter your new password (minimum 6 characters) and confirm it.' },
+    ],
+    staff: [
+        { q: 'How do I view vehicles due for service?',
+          a: 'The dashboard shows stat cards for vehicles that are Overdue or Due Soon. You can also browse the Vehicles section and filter by status to see which ones need attention.' },
+        { q: 'How do I update a vehicle\'s service record?',
+          a: 'Click on a vehicle row to open its details, then use the edit option to update the last service date, odometer, and service frequency. The status will be recalculated automatically.' },
+        { q: 'How do I view inventory stock?',
+          a: 'Go to the Inventory section. You can view current stock levels, receive stock, and browse item details from there.' },
+        { q: 'How do I change my profile photo?',
+          a: 'Go to My Profile and click your avatar to upload a new photo from your device.' },
+        { q: 'How do I change my password?',
+          a: 'Go to My Profile, then click Change Password. Enter your new password (minimum 6 characters) and confirm it.' },
+        { q: 'I forgot my password. What should I do?',
+          a: 'On the login page, click "Forgot Password". Enter your email address to receive a reset link.' },
+    ],
+    customer: [
+        { q: 'How do I view my vehicles?',
+          a: 'Your vehicles are shown on your dashboard. Each card shows the plate number, description, odometer, last service date, and current status.' },
+        { q: 'Why is my vehicle showing "Overdue"?',
+          a: 'Your vehicle\'s next PMS due date has already passed based on the last service date and service frequency recorded in the system. Contact the service center to schedule a maintenance.' },
+        { q: 'How do I view my service history?',
+          a: 'Go to PMS History from your dashboard. Click any vehicle to see a full list of completed services including date, mechanic, services rendered, materials used, and total cost.' },
+        { q: 'What is Smart Reports AI?',
+          a: 'Smart Reports AI lets you ask questions about your vehicles, check which ones are overdue or due soon, and get a summary of your service history using natural language.' },
+        { q: 'How do I change my profile photo?',
+          a: 'Go to My Profile and click your avatar to upload a new photo from your device.' },
+        { q: 'I forgot my password. What should I do?',
+          a: 'On the login page, click "Forgot Password". Enter your email to receive a reset link.' },
+    ],
+};
+
+(function () {
+    if (_hsRole === 'admin') {
+        document.getElementById('adminWrap').style.display = 'flex';
+    } else {
+        document.getElementById('standaloneWrap').style.display = 'flex';
+        fetch('customer_header.html').then(function (r) { return r.text(); }).then(function (html) {
+            document.getElementById('cuHeaderWrap').innerHTML = html;
+            if (typeof setActiveTab === 'function') setActiveTab();
+            var sessKey = _hsRole === 'staff' ? 'spUser' : 'cpUser';
+            var sess = JSON.parse(sessionStorage.getItem(sessKey) || '{}');
+            if (sess.name) {
+                var parts = sess.name.trim().split(' ').filter(Boolean);
+                var ini = parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : parts[0][0].toUpperCase();
+                var av = document.getElementById('cuAvatar'); if (av) av.textContent = ini;
+                var nm = document.getElementById('cuAvatarName'); if (nm) nm.textContent = sess.name;
+            }
+        });
+    }
+    var target = _hsRole === 'admin' ? document.getElementById('hsContent') : document.getElementById('hsContent2');
+    if (target) target.innerHTML = _buildHTML();
+})();
+
+firebase.auth().onAuthStateChanged(function (user) {
+    if (!user) window.location.href = 'login.html';
+});
+
+function _buildHTML() {
+    var faqs = _faqsByRole[_hsRole] || _faqsByRole.customer;
+
+    var faqItems = faqs.map(function (f, i) {
+        return '<div class="hs-faq-item">'
+            + '<div class="hs-faq-q" onclick="toggleFaq(' + i + ')" id="faqQ' + i + '">'
+            +   '<div class="hs-faq-q-icon">'
+            +     '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#E8001C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
+            +   '</div>'
+            +   '<span class="hs-faq-q-text" id="faqQT' + i + '">' + _escHs(f.q) + '</span>'
+            +   '<svg class="hs-faq-chevron" id="faqChev' + i + '" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'
+            + '</div>'
+            + '<div class="hs-faq-a" id="faqA' + i + '">' + _escHs(f.a) + '</div>'
+            + '</div>';
+    }).join('');
+
+    return '<a class="hs-back" href="profile.html">'
+        +   '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>'
+        +   'Back to Profile'
+        + '</a>'
+        + '<div class="hs-page-grid">'
+
+        // ── Left column ──
+        + '<div class="hs-left">'
+
+        // Hero
+        +   '<div class="hs-hero">'
+        +     '<div class="hs-hero-icon">'
+        +       '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'
+        +     '</div>'
+        +     '<div class="hs-hero-title">How can we help?</div>'
+        +     '<div class="hs-hero-sub">Browse FAQs or reach out to our support team.</div>'
+        +   '</div>'
+
+        // Contact
+        +   '<div>'
+        +     '<div class="hs-section-label">Contact Us</div>'
+        +     '<div class="hs-card">'
+        +       '<a class="hs-contact-tile" href="tel:+639123456789">'
+        +         '<div class="hs-contact-icon" style="background:rgba(56,161,105,0.1);">'
+        +           '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38a169" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.18 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 6 6l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
+        +         '</div>'
+        +         '<div><div class="hs-contact-label">Call Us</div><div class="hs-contact-value">+63 912 345 6789</div></div>'
+        +         '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>'
+        +       '</a>'
+        +       '<div class="hs-contact-divider"></div>'
+        +       '<a class="hs-contact-tile" href="mailto:support@janoblecaltex.com">'
+        +         '<div class="hs-contact-icon" style="background:rgba(0,48,135,0.1);">'
+        +           '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#003087" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>'
+        +         '</div>'
+        +         '<div><div class="hs-contact-label">Email Support</div><div class="hs-contact-value">support@janoblecaltex.com</div></div>'
+        +         '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>'
+        +       '</a>'
+        +       '<div class="hs-contact-divider"></div>'
+        +       '<div class="hs-contact-tile">'
+        +         '<div class="hs-contact-icon" style="background:rgba(232,0,28,0.1);">'
+        +           '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8001C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>'
+        +         '</div>'
+        +         '<div><div class="hs-contact-label">Visit Us</div><div class="hs-contact-value">JA Noble Caltex, Philippines</div></div>'
+        +       '</div>'
+        +     '</div>'
+        +   '</div>'
+
+        // Business Hours
+        +   '<div>'
+        +     '<div class="hs-section-label">Business Hours</div>'
+        +     '<div class="hs-card">'
+        +       '<div class="hs-hours-row"><span class="hs-hours-day">Monday – Friday</span><span class="hs-hours-time">8:00 AM – 5:00 PM</span></div>'
+        +       '<div class="hs-hours-row"><span class="hs-hours-day">Saturday</span><span class="hs-hours-time">8:00 AM – 12:00 PM</span></div>'
+        +       '<div class="hs-hours-row"><span class="hs-hours-day">Sunday</span><span class="hs-hours-time closed">Closed</span></div>'
+        +     '</div>'
+        +   '</div>'
+
+        +   '<div class="hs-footer">v1.0.0 • JA Noble Enterprise</div>'
+        + '</div>' // .hs-left
+
+        // ── Right column: FAQs ──
+        + '<div class="hs-right">'
+        +   '<div>'
+        +     '<div class="hs-section-label">Frequently Asked Questions</div>'
+        +     '<div class="hs-card">' + faqItems + '</div>'
+        +   '</div>'
+        + '</div>'
+
+        + '</div>'; // .hs-page-grid
+}
+
+window.toggleFaq = function (i) {
+    var a    = document.getElementById('faqA'    + i);
+    var qt   = document.getElementById('faqQT'   + i);
+    var chev = document.getElementById('faqChev' + i);
+    if (!a) return;
+    var isOpen = a.classList.contains('open');
+    // Close all
+    document.querySelectorAll('.hs-faq-a').forEach(function (el) { el.classList.remove('open'); });
+    document.querySelectorAll('.hs-faq-q-text').forEach(function (el) { el.classList.remove('open'); });
+    document.querySelectorAll('.hs-faq-chevron').forEach(function (el) { el.classList.remove('open'); });
+    if (!isOpen) {
+        a.classList.add('open');
+        if (qt)   qt.classList.add('open');
+        if (chev) chev.classList.add('open');
+    }
+};
+
+function _escHs(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

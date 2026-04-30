@@ -108,22 +108,6 @@
     <div id="phVehiclesList"></div>
 </main>
 
-<!-- History Modal -->
-<div class="ph-modal" id="phModal">
-    <div class="ph-modal-content">
-        <div class="ph-modal-header">
-            <div class="ph-modal-close-row">
-                <button class="ph-modal-close" onclick="phCloseModal()">&times;</button>
-            </div>
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-            <div style="color:white;font-size:16px;font-weight:700;margin-top:8px;" id="phModalDesc">—</div>
-            <div style="color:rgba(255,255,255,0.7);font-size:12px;" id="phModalPlate">—</div>
-            <div style="color:rgba(255,255,255,0.6);font-size:11px;margin-top:4px;" id="phModalCount">0 records</div>
-        </div>
-        <div class="ph-modal-body" id="phModalBody"></div>
-    </div>
-</div>
-
 <div id="cuToast"></div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -147,6 +131,16 @@
 
   let _userName = '';
   let _allRecords = [];
+
+  // ── Vehicle icon SVG based on type ───────────────────────
+  function vehicleIconSvg(type, size) {
+    const t = (type || '').toLowerCase();
+    const s = size || 24;
+    if (t.includes('truck')) {
+      return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`;
+    }
+    return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1l2-4h10l2 4h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg>`;
+  }
 
   // Show loading immediately
   document.getElementById('phVehiclesList').innerHTML =
@@ -215,11 +209,11 @@
           const num = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(/[₱,]/g, '')) || 0;
           return sum + num;
         }, 0);
-        const safeDesc = (v.desc || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const detailsUrl = `pms_history_details.html?plate=${encodeURIComponent(v.plate)}&desc=${encodeURIComponent(v.desc || '')}&type=${encodeURIComponent(v.type || '')}`;
         return `
-          <div class="ph-vehicle-card" onclick="phShowHistory('${v.plate}','${safeDesc}')">
+          <div class="ph-vehicle-card" onclick="window.location.href='${detailsUrl}'">
             <div class="ph-vehicle-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+              ${vehicleIconSvg(v.type, 22)}
             </div>
             <div style="flex:1;">
               <div class="ph-plate">${v.plate}</div>
@@ -248,87 +242,6 @@
   firebase.auth().onAuthStateChanged((user) => {
     if (user) init(user);
     else window.location.href = 'login.html';
-  });
-
-  window.phShowHistory = function (plate, desc) {
-    const records = _allRecords.filter(r => r.plate === plate)
-      .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-
-    document.getElementById('phModalPlate').textContent = plate;
-    document.getElementById('phModalDesc').textContent = desc;
-    document.getElementById('phModalCount').textContent =
-      `${records.length} completed service${records.length !== 1 ? 's' : ''}`;
-
-    const body = document.getElementById('phModalBody');
-    if (!records.length) {
-      body.innerHTML = '<div class="cu-empty">No completed services yet.</div>';
-    } else {
-      body.innerHTML = records.map(r => {
-        const svcRows = (r.svcRows || []).filter(s => s.name);
-        const matRows = (r.matRows || []).filter(m => m.name);
-        return `
-          <div class="ph-record-card">
-            <div class="ph-record-header">
-              <div style="display:flex;align-items:center;gap:6px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#718096" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                <strong style="font-size:13px;color:#1a202c;">${r.date || '—'}</strong>
-              </div>
-              <span style="background:#f0fdf4;color:#16a34a;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;">Completed</span>
-            </div>
-            <div class="ph-record-body">
-              <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#718096;margin-bottom:10px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                Mechanic: ${r.mechanic || '—'}
-              </div>
-              ${svcRows.length ? `
-                <div class="ph-section-label" style="color:#2b6cb0;">
-                  <span style="background:#ebf8ff;padding:3px 5px;border-radius:6px;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2b6cb0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-                  </span>
-                  Services Rendered
-                </div>
-                ${svcRows.map(s => `
-                  <div class="ph-line-item">
-                    <div class="ph-dot" style="background:#2b6cb0;"></div>
-                    <span style="flex:1;">${s.name}</span>
-                    <span style="color:#718096;">${s.qty} ${s.uom}</span>
-                  </div>`).join('')}
-              ` : ''}
-              ${matRows.length ? `
-                <div class="ph-section-label" style="color:#0d9488;margin-top:10px;">
-                  <span style="background:#f0fdfa;padding:3px 5px;border-radius:6px;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-                  </span>
-                  Materials Used
-                </div>
-                ${matRows.map(m => `
-                  <div class="ph-line-item">
-                    <div class="ph-dot" style="background:#0d9488;"></div>
-                    <span style="flex:1;">${m.name}</span>
-                    <span style="color:#718096;">${m.qty} ${m.uom}</span>
-                  </div>`).join('')}
-              ` : ''}
-              <hr style="border:none;border-top:1px solid #e2e8f0;margin:12px 0;">
-              <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-size:13px;font-weight:600;color:#4a5568;">Total</span>
-                <span style="font-size:15px;font-weight:700;color:#E8001C;">${
-                  r.totalCost
-                    ? '₱' + parseFloat(r.totalCost).toLocaleString('en-PH', {minimumFractionDigits:2})
-                    : (r.cost || '—')
-                }</span>
-              </div>
-            </div>
-          </div>`;
-      }).join('');
-    }
-    document.getElementById('phModal').classList.add('active');
-  };
-
-  window.phCloseModal = function () {
-    document.getElementById('phModal').classList.remove('active');
-  };
-  document.getElementById('phModal').addEventListener('click', function (e) {
-    if (e.target === this) phCloseModal();
   });
 
 </script>

@@ -4762,7 +4762,10 @@
                 details += `Due Date: ${new Date(schedule.dueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}\n`;
                 details += `Alert Date: ${new Date(schedule.alertDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}\n`;
                 
-                const daysUntilDue = Math.ceil((new Date(schedule.dueDate) - new Date()) / (1000 * 60 * 60 * 24));
+                const _dueDate = new Date(schedule.dueDate);
+                const _dueMidnight = new Date(_dueDate.getFullYear(), _dueDate.getMonth(), _dueDate.getDate());
+                const _nowMidnight = new Date(); const _nm = new Date(_nowMidnight.getFullYear(), _nowMidnight.getMonth(), _nowMidnight.getDate());
+                const daysUntilDue = Math.round((_dueMidnight - _nm) / (1000 * 60 * 60 * 24));
                 if (daysUntilDue > 0) {
                     details += `Days Until Due: ${daysUntilDue}\n`;
                 } else if (daysUntilDue < 0) {

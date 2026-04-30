@@ -676,7 +676,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error loading transactions: ${snapshot.error}'));
+        }
+        
         final docs = snapshot.data?.docs ?? [];
+        debugPrint('Transactions loaded: ${docs.length} records');
+        
         final txns = docs.map((d) {
           final data = d.data() as Map<String, dynamic>;
           return {
@@ -1007,7 +1013,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error loading issuances: ${snapshot.error}'));
+        }
+        
         final docs = snapshot.data?.docs ?? [];
+        debugPrint('Issuances loaded: ${docs.length} records');
+        
         final issuances = docs.map((d) {
           final data = d.data() as Map<String, dynamic>;
           return {
@@ -1657,12 +1669,14 @@ class _ScanAddStockWidgetState extends State<_ScanAddStockWidget> {
                 final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
                 final byName = (userDoc.data()?['name'] as String?) ?? 'Admin';
                 final now = DateTime.now();
+                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                final dateStr = '${months[now.month - 1]} ${now.day}, ${now.year}';
                 await FirebaseFirestore.instance.collection('transactions').add({
                   'item': widget.itemData['name'] ?? '',
                   'desc': 'Initial stock added',
                   'type': 'IN',
                   'qty': '+$stock',
-                  'date': '${now.month}/${now.day}/${now.year}',
+                  'date': dateStr,
                   'by': byName,
                   'createdAt': FieldValue.serverTimestamp(),
                 });
@@ -1778,7 +1792,8 @@ class _ScanReceiveWidgetState extends State<_ScanReceiveWidget> {
                   final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
                   final byName = (userDoc.data()?['name'] as String?) ?? 'Admin';
                   final now = DateTime.now();
-                  final dateStr = '${now.month}/${now.day}/${now.year}';
+                  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                  final dateStr = '${months[now.month - 1]} ${now.day}, ${now.year}';
                   await FirebaseFirestore.instance.collection('transactions').add({
                     'item': widget.stockData['name'] ?? '',
                     'desc': 'Stock received',

@@ -4,11 +4,13 @@ document.addEventListener('DOMContentLoaded', function () {
     // Check session
     const user = sessionStorage.getItem('apUser');
     if (!user) {
-        window.location.href = 'login.html';
+        console.log('No apUser in sessionStorage, redirecting to login');
+        window.location.href = '/login.html';
         return;
     }
 
     const adminUser = JSON.parse(user);
+    console.log('Auth guard passed, adminUser:', adminUser);
     window.currentUser = adminUser;
 
     // Set admin name
@@ -33,10 +35,10 @@ document.addEventListener('DOMContentLoaded', function () {
             sessionStorage.removeItem('apUser');
             if (typeof firebase !== 'undefined' && firebase.auth) {
                 firebase.auth().signOut().finally(() => {
-                    window.location.href = 'login.html';
+                    window.location.href = '/login.html';
                 });
             } else {
-                window.location.href = 'login.html';
+                window.location.href = '/login.html';
             }
         }
     });
@@ -693,16 +695,16 @@ var _dssPmsFilter = 'all';
 
 function dssAnalyzePMS() {
     var today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
     return (window.assets || []).map(function (asset) {
-        // Days until / since next PMS
+        // Days until / since next PMS — midnight-to-midnight comparison
         var daysUntil = null;
         var isOverdue = false;
         if (asset.nextPMSDue) {
             var due = new Date(asset.nextPMSDue);
-            due.setHours(0, 0, 0, 0);
-            daysUntil = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+            var dueMidnight = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+            daysUntil = Math.round((dueMidnight - today) / (1000 * 60 * 60 * 24));
             isOverdue = daysUntil < 0;
         }
 

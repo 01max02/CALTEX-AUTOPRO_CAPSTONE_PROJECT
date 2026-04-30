@@ -525,6 +525,22 @@ class _AdminUsersState extends State<AdminUsers> {
                             // ── Add new user ──
                             final tempPass = _generateTempPassword();
 
+                            // Check if user already exists by email
+                            final existingSnap = await FirebaseFirestore.instance
+                                .collection('users')
+                                .where('email', isEqualTo: emailCtrl.text.trim())
+                                .limit(1)
+                                .get();
+                            
+                            if (existingSnap.docs.isNotEmpty) {
+                              if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(
+                                  content: Text('A user with this email already exists.'),
+                                  backgroundColor: Colors.orange));
+                              setModal(() => saving = false);
+                              return;
+                            }
+
                             // Use a secondary Firebase app so the admin
                             // session is NOT replaced by the new user's session
                             FirebaseApp? secondaryApp;

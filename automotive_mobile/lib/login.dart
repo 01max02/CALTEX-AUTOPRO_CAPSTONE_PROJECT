@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
+import 'google_sign_in.dart';
 import 'staff_dashboard.dart';
 import 'customer_dashboard.dart';
 import 'admin_dashboard.dart';
@@ -19,7 +20,16 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordCtrl = TextEditingController();
   bool _passVisible = false;
   bool _loading = false;
+  bool _googleLoading = false;
+  bool _showPasswordToggle = false;
   static const _red = Color(0xFFE8001C);
+
+  @override
+  void initState() {
+    super.initState();
+    // Do NOT sign out here — it breaks OneSignal UID linking in main.dart
+    // and forces users to re-login every time the app restarts.
+  }
 
   @override
   void dispose() {
@@ -42,19 +52,40 @@ class _LoginScreenState extends State<LoginScreen> {
       final cred = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
 
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(cred.user!.uid)
-          .get();
+      final uid = cred.user!.uid;
 
-      if (!doc.exists) {
+      // Try UID-keyed doc first (new accounts), fall back to email query (legacy accounts)
+      DocumentSnapshot? doc;
+      final uidDoc = await FirebaseFirestore.instance
+          .collection('users').doc(uid).get();
+
+      if (uidDoc.exists) {
+        doc = uidDoc;
+      } else {
+        // Legacy: doc was created with auto-ID, look up by email
+        final snap = await FirebaseFirestore.instance
+            .collection('users')
+            .where('email', isEqualTo: email)
+            .limit(1)
+            .get();
+        if (snap.docs.isNotEmpty) {
+          doc = snap.docs.first;
+          // Migrate: re-save under the correct UID so future logins are fast
+          final data = snap.docs.first.data() as Map<String, dynamic>;
+          await FirebaseFirestore.instance
+              .collection('users').doc(uid).set(data);
+        }
+      }
+
+      if (doc == null || !doc.exists) {
         await FirebaseAuth.instance.signOut();
-        _showError('Account not found.');
+        _showError('Account not found. Please contact the administrator.');
         return;
       }
 
-      final role = doc.data()?['role'] as String? ?? '';
-      final status = ((doc.data()?['status'] as String?) ?? 'active').toLowerCase();
+      final data = doc.data() as Map<String, dynamic>;
+      final role = data['role'] as String? ?? '';
+      final status = ((data['status'] as String?) ?? 'active').toLowerCase();
 
       // Block inactive users
       if (status == 'inactive') {
@@ -64,6 +95,12 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (!mounted) return;
+      // Register this device with OneSignal using Firebase UID
+      OneSignal.login(uid);
+      debugPrint('✅ OneSignal login: $uid');
+      // Save OneSignal subscription ID to Firestore so we can target this device
+      _saveOneSignalId(uid);
+
       switch (role) {
         case 'admin':
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminDashboard()));
@@ -91,62 +128,52 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleGoogleSignIn() async {
-    setState(() => _loading = true);
+    setState(() => _googleLoading = true);
     try {
-      final googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) { setState(() => _loading = false); return; }
-
-      final googleAuth = await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final cred = await FirebaseAuth.instance.signInWithCredential(credential);
-      final uid = cred.user!.uid;
-
-      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-
-      String role;
-      if (!doc.exists) {
-        // Auto-register as customer
-        role = 'customer';
-        await FirebaseFirestore.instance.collection('users').doc(uid).set({
-          'name': cred.user!.displayName ?? '',
-          'email': cred.user!.email ?? '',
-          'photoUrl': cred.user!.photoURL ?? '',
-          'role': role,
-          'status': 'active',
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      } else {
-        role = doc.data()?['role'] as String? ?? '';
-        final status = ((doc.data()?['status'] as String?) ?? 'active').toLowerCase();
-
-        // Block inactive users
-        if (status == 'inactive') {
-          await FirebaseAuth.instance.signOut();
-          _showError('Your account has been deactivated. Please contact the administrator.');
-          return;
-        }
+      final role = await GoogleSignInHelper.signInWithGoogle();
+      
+      if (role == null) {
+        // User cancelled the sign-in
+        if (mounted) setState(() => _googleLoading = false);
+        return;
       }
 
       if (!mounted) return;
-      switch (role) {
+
+      // Register this device with OneSignal using Firebase UID
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        OneSignal.login(uid);
+        debugPrint('✅ OneSignal login (Google): $uid');
+        _saveOneSignalId(uid);
+      }
+
+      // Navigate based on role
+      switch (role.toLowerCase()) {
         case 'admin':
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminDashboard()));
           break;
         case 'staff':
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const StaffDashboard()));
           break;
-        case 'customer':
         default:
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const CustomerDashboard()));
       }
     } catch (e) {
-      _showError('Google sign-in failed. Please try again.');
-    } finally {
-      if (mounted) setState(() => _loading = false);
+      print('Google Sign-In error in UI: $e');
+      
+      // Determine error message based on exception type
+      String errorMsg = 'Sign-in failed. Please try again.';
+      
+      if (e.toString().contains('inactive')) {
+        errorMsg = 'Your account has been deactivated. Please contact the administrator.';
+      } else if (e.toString().contains('not found')) {
+        errorMsg = 'User account not found. Please contact the administrator to register your account.';
+      }
+      
+      _showError(errorMsg);
+      
+      if (mounted) setState(() => _googleLoading = false);
     }
   }
 
@@ -154,6 +181,27 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), backgroundColor: Colors.redAccent));
+  }
+
+  /// Saves the OneSignal subscription (player) ID to Firestore under users/{uid}.
+  /// This lets us target this specific device by subscription ID instead of
+  /// external user ID (which requires a paid OneSignal plan).
+  Future<void> _saveOneSignalId(String uid) async {
+    try {
+      // Give OneSignal a moment to register the subscription after login()
+      await Future.delayed(const Duration(seconds: 2));
+      final subId = OneSignal.User.pushSubscription.id;
+      if (subId == null || subId.isEmpty) {
+        debugPrint('⚠️ OneSignal subscription ID not available yet');
+        return;
+      }
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'oneSignalId': subId,
+      });
+      debugPrint('✅ OneSignal subscription ID saved: $subId');
+    } catch (e) {
+      debugPrint('⚠️ Could not save OneSignal ID: $e');
+    }
   }
 
   void _showForgotPassword() {
@@ -226,11 +274,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   obscureText: !_passVisible,
                   style: const TextStyle(fontSize: 14, color: Color(0xFF1a202c)),
                   onSubmitted: (_) => _handleLogin(),
+                  onChanged: (_) => setState(() => _showPasswordToggle = _passwordCtrl.text.isNotEmpty),
                   decoration: _inputDecoration('Enter your password', Icons.lock_outline,
-                    suffix: IconButton(
-                      icon: Icon(_passVisible ? Icons.visibility_off : Icons.visibility, color: const Color(0xFF718096)),
-                      onPressed: () => setState(() => _passVisible = !_passVisible),
-                    )),
+                    suffix: _showPasswordToggle
+                        ? IconButton(
+                            icon: Icon(_passVisible ? Icons.visibility : Icons.visibility_off, color: const Color(0xFF718096)),
+                            onPressed: () => setState(() => _passVisible = !_passVisible),
+                          )
+                        : null),
                 ),
                 Align(
                   alignment: Alignment.centerRight,
@@ -275,19 +326,21 @@ class _LoginScreenState extends State<LoginScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: _loading ? null : _handleGoogleSignIn,
+                    onPressed: _googleLoading ? null : _handleGoogleSignIn,
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 13),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                       side: const BorderSide(color: Color(0xFFe2e8f0)),
                       backgroundColor: Colors.white,
                     ),
-                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      _GoogleLogo(size: 20),
-                      const SizedBox(width: 10),
-                      const Text('Continue with Google',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1a202c))),
-                    ]),
+                    child: _googleLoading
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Color(0xFF1a202c), strokeWidth: 2))
+                        : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            _GoogleLogo(size: 20),
+                            const SizedBox(width: 10),
+                            const Text('Continue with Google',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1a202c))),
+                          ]),
                   ),
                 ),
               ]),

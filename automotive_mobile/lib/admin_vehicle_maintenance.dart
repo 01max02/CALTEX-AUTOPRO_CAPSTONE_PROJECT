@@ -991,7 +991,10 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
     final months = int.tryParse(svcFreq);
     if (date == null || months == null) return 'Active';
     final nextPms = DateTime(date.year, date.month + months, date.day);
-    final daysUntil = nextPms.difference(DateTime.now()).inDays;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final nextMidnight = DateTime(nextPms.year, nextPms.month, nextPms.day);
+    final daysUntil = nextMidnight.difference(today).inDays;
     if (daysUntil < 0) return 'Overdue';
     if (daysUntil <= 30) return 'PMS Due Soon';
     return 'Active';

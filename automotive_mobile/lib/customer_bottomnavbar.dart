@@ -9,15 +9,16 @@ import 'customer_smart_ai.dart';
 class CustomerBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
+  final IconData vehiclesIcon;
 
   static const _red   = Color(0xFFE8001C);
-  static const _dark  = Color(0xFF1a202c);
   static const _grey  = Color(0xFF718096);
 
   const CustomerBottomNavBar({
     super.key,
     required this.currentIndex,
     required this.onTap,
+    this.vehiclesIcon = Icons.directions_car_outlined,
   });
 
   @override
@@ -36,7 +37,7 @@ class CustomerBottomNavBar extends StatelessWidget {
             children: [
               // ── Left + placeholder + Right ──
               Row(children: [
-                _tab(index: 0, icon: Icons.directions_car_outlined, label: 'My Vehicles'),
+                _tab(index: 0, icon: vehiclesIcon, label: 'My Vehicles'),
                 const Expanded(child: SizedBox()), // center placeholder
                 _tab(index: 2, icon: Icons.history,   label: 'PMS History'),
               ]),

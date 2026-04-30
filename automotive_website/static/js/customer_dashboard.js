@@ -3,8 +3,16 @@
 
   // ── Auth guard ──────────────────────────────────────────
   const stored = sessionStorage.getItem('cpUser');
-  if (!stored) { window.location.href = 'login.html'; return; }
-  const cpUser = JSON.parse(stored);
+  console.log('customer_dashboard.js loaded, cpUser in sessionStorage:', !!stored);
+  
+  if (!stored) { 
+    console.log('No cpUser in sessionStorage, checking Firebase auth...');
+    // Don't redirect immediately - wait for Firebase to initialize
+    // The auth check below will handle the redirect
+  }
+  
+  const cpUser = stored ? JSON.parse(stored) : {};
+  console.log('cpUser data:', cpUser);
 
   const db   = firebase.firestore();
   const auth = firebase.auth();
@@ -20,10 +28,26 @@
 
     // Wait for Firebase Auth before querying Firestore
     firebase.auth().onAuthStateChanged((user) => {
+      console.log('Firebase auth state changed, user:', user?.uid);
+      
       if (user) {
+        console.log('Firebase user authenticated:', user.uid);
+        // Store in sessionStorage if not already there
+        if (!sessionStorage.getItem('cpUser')) {
+          console.log('cpUser not in sessionStorage, storing from Firebase...');
+          const userData = {
+            uid: user.uid,
+            email: user.email,
+            name: cpUser.name || user.displayName || '',
+            role: cpUser.role || 'customer',
+          };
+          sessionStorage.setItem('cpUser', JSON.stringify(userData));
+          console.log('Stored cpUser:', userData);
+        }
         loadUserInfo(user);
       } else {
-        window.location.href = 'login.html';
+        console.log('No Firebase user, redirecting to login');
+        window.location.href = '/login.html';
       }
     });
   });
@@ -65,6 +89,38 @@
     });
   }
 
+  // ── Vehicle icon SVG based on type ───────────────────────
+  function vehicleIconSvg(type, size) {
+    const t = (type || '').toLowerCase();
+    const s = size || 24;
+    if (t.includes('truck')) {
+      // Truck / delivery van
+      return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`;
+    }
+    // Car (default)
+    return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1l2-4h10l2 4h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg>`;
+  }
+
+  // ── Fleet icon based on vehicle types ────────────────────
+  function fleetIconSvg(vehicles, size) {
+    const s = size || 20;
+    if (!vehicles.length) {
+      return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1l2-4h10l2 4h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg>`;
+    }
+    const allTruck = vehicles.every(v => (v.type || '').toLowerCase().includes('truck'));
+    const allCar = vehicles.every(v => !(v.type || '').toLowerCase().includes('truck'));
+    if (allTruck) {
+      // Truck icon
+      return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`;
+    }
+    if (allCar) {
+      // Car icon
+      return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1l2-4h10l2 4h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg>`;
+    }
+    // Mixed fleet - commute icon
+    return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1l2-4h10l2 4h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/><path d="M16 3v4M20 3v4"/></svg>`;
+  }
+
   function computeStatus(v) {
     if (v.status === 'Under Maintenance') return 'Under Maintenance';
     const lastSvc = v.lastSvcDate || '';
@@ -74,7 +130,11 @@
     if (isNaN(date)) return v.status || 'Active';
     const next = new Date(date);
     next.setMonth(next.getMonth() + freq);
-    const days = Math.floor((next - new Date()) / 86400000);
+    // Strip both dates to local midnight for consistent day-level comparison
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const nextMidnight = new Date(next.getFullYear(), next.getMonth(), next.getDate());
+    const days = Math.round((nextMidnight - today) / 86400000);
     if (days < 0) return 'Overdue';
     if (days <= 30) return 'PMS Due Soon';
     return 'Active';
@@ -83,6 +143,7 @@
   function updateStats() {
     const statuses = _vehicles.map(v => computeStatus(v));
     document.getElementById('cuTotalVehicles').textContent = _vehicles.length;
+    document.getElementById('cuTotalVehiclesIcon').innerHTML = fleetIconSvg(_vehicles, 20);
     document.getElementById('cuMaintenance').textContent = statuses.filter(s => s === 'Under Maintenance').length;
     document.getElementById('cuOverdue').textContent = statuses.filter(s => s === 'Overdue').length;
     document.getElementById('cuDueSoon').textContent = statuses.filter(s => s === 'PMS Due Soon').length;
@@ -95,39 +156,50 @@
       return;
     }
 
-    el.innerHTML = _vehicles.map(v => {
+    el.innerHTML = `<div class="cu-vehicles-grid">${_vehicles.map(v => {
       const status = computeStatus(v);
       const statusColor = status === 'Active' ? '#16a34a'
         : status === 'Under Maintenance' ? '#ea580c'
         : status === 'Overdue' ? '#E8001C'
         : status === 'PMS Due Soon' ? '#d97706'
         : '#718096';
+      const statusBg = status === 'Active' ? 'rgba(22,163,74,0.08)'
+        : status === 'Under Maintenance' ? 'rgba(234,88,12,0.08)'
+        : status === 'Overdue' ? 'rgba(232,0,28,0.08)'
+        : status === 'PMS Due Soon' ? 'rgba(217,119,6,0.08)'
+        : 'rgba(113,128,150,0.08)';
       const statusLabel = status === 'PMS Due Soon' ? 'Due Soon' : status;
 
       return `
         <div class="cu-vehicle-card" onclick="cuShowVehicle('${v.id}')">
-          <div class="cu-vehicle-top">
-            <div class="cu-vehicle-icon">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          <div class="cu-vehicle-card-header">
+            <div class="cu-vehicle-card-icon">
+              ${vehicleIconSvg(v.type, 24)}
             </div>
-            <div style="flex:1;">
+            <div style="flex:1;min-width:0;">
               <div class="cu-vehicle-plate">${v.plate || '—'}</div>
               <div class="cu-vehicle-desc">${v.desc || '—'}</div>
             </div>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#cbd5e0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            <span class="cu-vehicle-status-badge" style="background:${statusBg};color:${statusColor};">${statusLabel}</span>
           </div>
-          <div class="cu-vehicle-bottom">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 5v5l3 3"/></svg>
-            ${v.odo ? v.odo + ' km' : '—'}
-            <div class="cu-vb-divider"></div>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            ${v.lastSvcDate || '—'}
-            <div class="cu-vb-divider"></div>
-            <span class="cu-status-dot" style="background:${statusColor};"></span>
-            <span style="color:${statusColor};font-weight:600;">${statusLabel}</span>
+          <div class="cu-vehicle-card-body">
+            <div class="cu-vehicle-meta-row">
+              <div class="cu-vehicle-meta-item">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 5v5l3 3"/></svg>
+                <span>${v.odo ? v.odo + ' km' : '—'}</span>
+              </div>
+              <div class="cu-vehicle-meta-item">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span>${v.lastSvcDate || '—'}</span>
+              </div>
+            </div>
+          </div>
+          <div class="cu-vehicle-card-footer">
+            <span>View details</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
           </div>
         </div>`;
-    }).join('');
+    }).join('')}</div>`;
   }
 
   // ── Vehicle modal ─────────────────────────────────────────
@@ -141,6 +213,11 @@
       : status === 'Overdue' ? '#E8001C'
       : status === 'PMS Due Soon' ? '#d97706'
       : '#718096';
+    const statusBg = status === 'Active' ? 'rgba(22,163,74,0.08)'
+      : status === 'Under Maintenance' ? 'rgba(234,88,12,0.08)'
+      : status === 'Overdue' ? 'rgba(232,0,28,0.08)'
+      : status === 'PMS Due Soon' ? 'rgba(217,119,6,0.08)'
+      : 'rgba(113,128,150,0.08)';
 
     // Compute next PMS
     let nextPms = '—';
@@ -152,7 +229,11 @@
         const next = new Date(date);
         next.setMonth(next.getMonth() + months);
         nextPms = next.toISOString().split('T')[0];
-        daysUntil = Math.floor((next - new Date()) / 86400000);
+        // Strip both dates to local midnight for consistent day-level comparison
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const nextMidnight = new Date(next.getFullYear(), next.getMonth(), next.getDate());
+        daysUntil = Math.round((nextMidnight - today) / 86400000);
       }
     }
 
@@ -165,12 +246,13 @@
 
     document.getElementById('cuModalPlate').textContent = v.plate || '—';
     document.getElementById('cuModalDesc').textContent = v.desc || '—';
+    document.getElementById('cuModalIcon').innerHTML = vehicleIconSvg(v.type, 22);
 
     document.getElementById('cuModalDetails').innerHTML = `
       ${detailRow('#718096', 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 5v5l3 3', 'Odometer', v.odo ? v.odo + ' km' : '—')}
       ${detailRow('#2b6cb0', 'M3 4h18v18H3zM16 2v4M8 2v4M3 10h18', 'Last Service', v.lastSvcDate || '—')}
       ${detailRow(statusColor, 'M8 6l4-4 4 4M8 18l4 4 4-4M4 12h16', 'Next PMS Due', nextPms)}
-      ${detailRow(statusColor, 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'Status', statusLabel)}
+      ${detailRow(statusColor, 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'Status', `<span style="background:${statusBg};color:${statusColor};padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:700;">${statusLabel}</span>`)}
     `;
 
     document.getElementById('cuVehicleModal').classList.add('active');
@@ -206,7 +288,7 @@
     if (!confirm('Are you sure you want to logout?')) return;
     auth.signOut().then(() => {
       sessionStorage.removeItem('cpUser');
-      window.location.href = 'login.html';
+      window.location.href = '/login.html';
     });
   };
 

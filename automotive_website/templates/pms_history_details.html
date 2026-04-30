@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoPro – PMS History Details</title>
+    <link rel="stylesheet" href="../static/css/customer_dashboard.css">
+    <style>
+        
+        /* Main content */
+        .phd-main {
+            padding: 16px;
+        }
+        
+        /* Chips */
+        .phd-chip {
+            background: #f7f8fa;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #4a5568;
+            white-space: nowrap;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .phd-chip-value {
+            font-weight: 700;
+            color: #1a202c;
+        }
+        
+        /* Record card */
+        .phd-record-card {
+            background: white;
+            border-radius: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            margin-bottom: 14px;
+            overflow: hidden;
+        }
+        .phd-record-header {
+            background: #f7f8fa;
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #f0f4f8;
+        }
+        .phd-record-date {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #1a202c;
+        }
+        .phd-record-status {
+            background: #f0fdf4;
+            color: #16a34a;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 20px;
+        }
+        
+        .phd-record-body {
+            padding: 14px;
+        }
+        .phd-mechanic {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            color: #718096;
+            margin-bottom: 10px;
+        }
+        
+        .phd-section-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            margin-top: 10px;
+        }
+        .phd-section-label:first-child { margin-top: 0; }
+        
+        .phd-line-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #1a202c;
+            margin-bottom: 6px;
+        }
+        .phd-dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        
+        .phd-divider {
+            border: none;
+            border-top: 1px solid #e2e8f0;
+            margin: 12px 0;
+        }
+        
+        .phd-total {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .phd-total-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #4a5568;
+        }
+        .phd-total-value {
+            font-size: 15px;
+            font-weight: 700;
+            color: #E8001C;
+        }
+        
+        /* Empty state */
+        .phd-empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: #718096;
+        }
+        .phd-empty-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        
+        /* Loading */
+        .phd-loading {
+            text-align: center;
+            padding: 40px 20px;
+            color: #718096;
+        }
+    </style>
+</head>
+<body data-page="pms-details">
+
+<!-- Header (loaded dynamically) -->
+<div id="customerHeader"></div>
+
+<!-- Main content -->
+<main class="phd-main" id="phdMain">
+    <div class="phd-loading">Loading...</div>
+</main>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+  firebase.initializeApp({
+    apiKey: "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
+    authDomain: "caltex-autopro-1e664.firebaseapp.com",
+    projectId: "caltex-autopro-1e664",
+    storageBucket: "caltex-autopro-1e664.firebasestorage.app",
+    messagingSenderId: "930140433367",
+    appId: "1:930140433367:web:cf67bfa388fa517422b992"
+  });
+
+  const db = firebase.firestore();
+  const params = new URLSearchParams(window.location.search);
+  const plate = params.get('plate');
+  const desc = params.get('desc');
+  const type = params.get('type') || '';
+
+  // ── Vehicle icon SVG based on type ───────────────────────
+  function vehicleIconSvg(vehicleType, size) {
+    const t = (vehicleType || '').toLowerCase();
+    const s = size || 24;
+    if (t.includes('truck')) {
+      return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`;
+    }
+    return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1l2-4h10l2 4h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg>`;
+  }
+
+  async function init() {
+    if (!plate) {
+      document.getElementById('phdMain').innerHTML =
+        '<div class="phd-empty"><div class="phd-empty-icon">⚠️</div><div>No vehicle selected.</div></div>';
+      return;
+    }
+
+    try {
+      // Render vehicle info card at top
+      const vehicleInfoHtml = `
+        <div style="background:white;border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+            <div style="width:48px;height:48px;background:rgba(232,0,28,0.08);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;" id="phdHeaderIcon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E8001C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:16px;font-weight:700;color:#1a202c;" id="phdPlate">—</div>
+              <div style="font-size:12px;color:#718096;margin-top:2px;" id="phdDesc">—</div>
+            </div>
+            <button onclick="history.back()" style="background:none;border:none;color:#E8001C;cursor:pointer;font-size:20px;padding:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">←</button>
+          </div>
+          <div id="phdSummary" style="display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;"></div>
+        </div>
+      `;
+
+      document.getElementById('phdMain').innerHTML = vehicleInfoHtml;
+
+      // Set vehicle info
+      document.getElementById('phdPlate').textContent = plate;
+      document.getElementById('phdDesc').textContent = desc || '—';
+      document.getElementById('phdHeaderIcon').innerHTML = vehicleIconSvg(type, 24);
+
+      // Load maintenance records for this plate
+      const snap = await db.collection('maintenance')
+        .where('plate', '==', plate)
+        .where('status', '==', 'Completed')
+        .get();
+
+      const records = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+
+      // Compute summary
+      const totalCost = records.reduce((sum, r) => {
+        const raw = r.cost || r.totalCost || '0';
+        const num = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(/[₱,]/g, '')) || 0;
+        return sum + num;
+      }, 0);
+
+      // Render summary chips
+      document.getElementById('phdSummary').innerHTML = `
+        <div class="phd-chip">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <span class="phd-chip-value">${records.length}</span> service${records.length !== 1 ? 's' : ''}
+        </div>
+        <div class="phd-chip">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <span class="phd-chip-value">₱${totalCost.toLocaleString('en-PH', {minimumFractionDigits:2})}</span> total
+        </div>
+      `;
+
+      // Render records
+      if (!records.length) {
+        document.getElementById('phdMain').innerHTML += '<div class="phd-empty"><div class="phd-empty-icon">📋</div><div>No completed services yet.</div></div>';
+        return;
+      }
+
+      const recordsHtml = records.map(r => {
+        const svcRows = (r.svcRows || []).filter(s => s.name);
+        const matRows = (r.matRows || []).filter(m => m.name);
+        return `
+          <div class="phd-record-card">
+            <div class="phd-record-header">
+              <div class="phd-record-date">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#718096" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                ${r.date || '—'}
+              </div>
+              <span class="phd-record-status">Completed</span>
+            </div>
+            <div class="phd-record-body">
+              <div class="phd-mechanic">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                Mechanic: ${r.mechanic || '—'}
+              </div>
+              ${svcRows.length ? `
+                <div class="phd-section-label" style="color:#2b6cb0;">
+                  <span style="background:#ebf8ff;padding:3px 5px;border-radius:6px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2b6cb0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                  </span>
+                  Services Rendered
+                </div>
+                ${svcRows.map(s => `
+                  <div class="phd-line-item">
+                    <div class="phd-dot" style="background:#2b6cb0;"></div>
+                    <span style="flex:1;">${s.name}</span>
+                    <span style="color:#718096;">${s.qty} ${s.uom}</span>
+                  </div>`).join('')}
+              ` : ''}
+              ${matRows.length ? `
+                <div class="phd-section-label" style="color:#0d9488;margin-top:10px;">
+                  <span style="background:#f0fdfa;padding:3px 5px;border-radius:6px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                  </span>
+                  Materials Used
+                </div>
+                ${matRows.map(m => `
+                  <div class="phd-line-item">
+                    <div class="phd-dot" style="background:#0d9488;"></div>
+                    <span style="flex:1;">${m.name}</span>
+                    <span style="color:#718096;">${m.qty} ${m.uom}</span>
+                  </div>`).join('')}
+              ` : ''}
+              <hr class="phd-divider">
+              <div class="phd-total">
+                <span class="phd-total-label">Total</span>
+                <span class="phd-total-value">${
+                  r.totalCost
+                    ? '₱' + parseFloat(r.totalCost).toLocaleString('en-PH', {minimumFractionDigits:2})
+                    : (r.cost || '—')
+                }</span>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+
+      document.getElementById('phdMain').innerHTML += recordsHtml;
+
+    } catch (err) {
+      console.error('Error loading PMS history:', err);
+      document.getElementById('phdMain').innerHTML =
+        `<div class="phd-empty"><div class="phd-empty-icon">⚠️</div><div>Error loading data: ${err.message}</div></div>`;
+    }
+  }
+
+  // Wait for Firebase Auth before loading data
+  firebase.auth().onAuthStateChanged((user) => {
+    if (user) {
+      init();
+    } else {
+      window.location.href = 'login.html';
+    }
+  });
+</script>
+<script>
+  fetch('customer_header.html').then(r => r.text()).then(html => {
+    document.getElementById('customerHeader').innerHTML = html;
+  });
+</script>
+</body>
+</html>

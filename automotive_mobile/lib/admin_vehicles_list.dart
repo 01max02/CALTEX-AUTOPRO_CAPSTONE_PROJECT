@@ -152,13 +152,11 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Row(children: [
-                _statChip('Total', '${vehicles.length}', const Color(0xFF003087), Icons.directions_car_outlined),
+                _statChip('Total', '${vehicles.length}', const Color(0xFF2563EB), Icons.directions_car_outlined),
                 const SizedBox(width: 8),
-                _statChip('Active', '$good', Colors.green, Icons.check_circle_outline),
+                _statChip('Cars', '${vehicles.where((v) => (v['type'] ?? '').toLowerCase() == 'car').length}', const Color(0xFF003087), Icons.directions_car_outlined),
                 const SizedBox(width: 8),
-                _statChip('Maintenance', '$maint', Colors.orange, Icons.build_outlined),
-                const SizedBox(width: 8),
-                _statChip('Overdue', '$overdue', _red, Icons.warning_amber_outlined),
+                _statChip('Trucks', '${vehicles.where((v) => (v['type'] ?? '').toLowerCase() == 'truck').length}', _red, Icons.local_shipping_outlined),
               ]),
             ),
             Expanded(
@@ -198,7 +196,7 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
   }
 
   Widget _vehicleCard(Map<String, String> v) {
-    final sc = _statusColor(v['status']!);
+    final isTruck = v['type']?.toLowerCase() == 'truck';
     return GestureDetector(
       onTap: () => _showVehicleDetails(v),
       child: Container(
@@ -208,18 +206,16 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
         child: Row(children: [
           Container(width: 44, height: 44,
             decoration: BoxDecoration(color: const Color(0xFFF0F4FF), borderRadius: BorderRadius.circular(12)),
-            child: const Icon(Icons.directions_car_outlined, color: _red, size: 22)),
+            child: Icon(
+              isTruck ? Icons.local_shipping_outlined : Icons.directions_car_outlined,
+              color: isTruck ? _red : const Color(0xFF003087), size: 22,
+            )),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(v['plate']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             Text(v['desc']!, style: const TextStyle(fontSize: 12, color: Color(0xFF4a5568))),
             Text('${v['owner']} • ${v['odo']}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
           ])),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(color: sc.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-            child: Text(v['status']!, style: TextStyle(fontSize: 10, color: sc, fontWeight: FontWeight.w600)),
-          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF718096)),
             onSelected: (val) {
@@ -272,7 +268,6 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
                 _detailRow('Owner', v['owner']!),
                 _detailRow('Odometer', v['odo']!),
                 _detailRow('Vehicle Type', v['type']!),
-                _detailRow('Status', v['status']!),
                 _detailRow('Last Service Date', v['lastSvcDate']!),
                 _detailRow('Next PMS Due', _calcNextPms(v['lastSvcDate']!, v['svcFreq']!)),
                 const SizedBox(height: 16),
@@ -297,7 +292,9 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
     if (date == null || months == null) return 'Active';
     final nextPms = DateTime(date.year, date.month + months, date.day);
     final now = DateTime.now();
-    final daysUntil = nextPms.difference(now).inDays;
+    final today = DateTime(now.year, now.month, now.day);
+    final nextMidnight = DateTime(nextPms.year, nextPms.month, nextPms.day);
+    final daysUntil = nextMidnight.difference(today).inDays;
     if (daysUntil < 0) return 'Overdue';
     if (daysUntil <= 30) return 'PMS Due Soon';
     return 'Active';
@@ -335,7 +332,6 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
     final lastSvcDateCtrl = TextEditingController(text: vehicle?['lastSvcDate'] ?? '');
     final svcFreqCtrl = TextEditingController(text: vehicle?['svcFreq'] ?? '');
     String? selectedType = (vehicle?['type']?.isNotEmpty == true && types.contains(vehicle!['type'])) ? vehicle['type'] : null;
-    String selectedStatus = vehicle?['status'] ?? 'Active';
 
     showModalBottomSheet(
       context: context, isScrollControlled: true,

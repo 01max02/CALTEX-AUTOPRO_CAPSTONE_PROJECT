@@ -183,12 +183,32 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
   }
 
   Widget _statChip(String label, String value, Color color) {
+    IconData icon;
+    switch (label) {
+      case 'Total':
+        icon = Icons.build_circle_outlined;
+        break;
+      case 'Ongoing':
+        icon = Icons.autorenew_outlined;
+        break;
+      case 'Completed':
+        icon = Icons.check_circle_outline;
+        break;
+      case 'Pending':
+        icon = Icons.pending_outlined;
+        break;
+      default:
+        icon = Icons.info_outline;
+    }
+    
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
         child: Column(children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(height: 4),
           Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
           Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
         ]),
@@ -233,6 +253,7 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
     final sc = _statusColor(s['status'] as String);
     showModalBottomSheet(
       context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (sheetCtx) => StatefulBuilder(
         builder: (sheetCtx, setSheet) => AnimatedPadding(
@@ -437,9 +458,9 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isService ? const Color(0xFFebf8ff) : const Color(0xFFF0F4FF),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: isService ? const Color(0xFF90cdf4) : const Color(0xFFbee3f8)),
+        border: Border.all(color: const Color(0xFFe2e8f0)),
       ),
       child: Row(children: [
         Icon(isService ? Icons.build_outlined : Icons.inventory_2_outlined,
@@ -489,6 +510,7 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
 
     showModalBottomSheet(
       context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => StatefulBuilder(
         builder: (ctx, setModal) {
@@ -590,8 +612,11 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
                       const SizedBox(height: 8),
                       Container(
                         padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: const Color(0xFFF0F4FF), borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFbee3f8))),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFe2e8f0)),
+                        ),
                         child: Row(children: [
                           const Icon(Icons.directions_car_outlined, color: _red, size: 20),
                           const SizedBox(width: 10),
@@ -760,7 +785,11 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
           const SizedBox(height: 6),
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: const Color(0xFFebf8ff), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF90cdf4))),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFe2e8f0)),
+            ),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('UOM: ${row['uom']!.text}  -  Unit Cost: ${row['cost']!.text}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
               const SizedBox(height: 8),
@@ -838,7 +867,11 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
           const SizedBox(height: 6),
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: const Color(0xFFebf8ff), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF90cdf4))),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFe2e8f0)),
+            ),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 const Icon(Icons.inventory_2_outlined, size: 16, color: Color(0xFF003087)),

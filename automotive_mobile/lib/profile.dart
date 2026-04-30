@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -32,33 +33,57 @@ class _UserProfileState extends State<UserProfile> {
   final _emailCtrl = TextEditingController();
   final _roleCtrl  = TextEditingController();
 
+  StreamSubscription<DocumentSnapshot>? _profileSub;
+
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    _subscribeToProfile();
   }
 
   @override
   void dispose() {
+    _profileSub?.cancel();
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _roleCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _loadUserData() async {
+  void _subscribeToProfile() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-    if (!mounted) return;
-    final data = doc.data() ?? {};
-    final role = (data['role'] as String? ?? '');
-    setState(() {
-      _nameCtrl.text  = data['name'] as String? ?? '';
-      _emailCtrl.text = data['email'] as String? ?? '';
-      _roleCtrl.text  = role.isEmpty ? '' : role[0].toUpperCase() + role.substring(1);
-      _photoUrl       = data['photoUrl'] as String?;
-      _loading = false;
+
+    _profileSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .snapshots()
+        .listen((doc) {
+      if (!mounted) return;
+      final data = doc.data() ?? {};
+      final role = (data['role'] as String? ?? '');
+
+      // Don't overwrite fields the user is actively editing
+      if (!_editingInfo) {
+        setState(() {
+          _nameCtrl.text  = data['name']  as String? ?? _nameCtrl.text;
+          _emailCtrl.text = data['email'] as String? ?? _emailCtrl.text;
+          _roleCtrl.text  = role.isEmpty ? _roleCtrl.text
+              : role[0].toUpperCase() + role.substring(1);
+          _photoUrl       = data['photoUrl'] as String? ?? _photoUrl;
+          _loading        = false;
+        });
+      } else {
+        // Still update role and photo even in edit mode (read-only fields)
+        setState(() {
+          _roleCtrl.text = role.isEmpty ? _roleCtrl.text
+              : role[0].toUpperCase() + role.substring(1);
+          _photoUrl      = data['photoUrl'] as String? ?? _photoUrl;
+          _loading       = false;
+        });
+      }
+    }, onError: (e) {
+      if (mounted) setState(() => _loading = false);
     });
   }
 
@@ -194,7 +219,32 @@ class _UserProfileState extends State<UserProfile> {
                             const Text('Info', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF718096))),
                             TextButton.icon(
                               onPressed: () async {
-                                if (_editingInfo) await _saveUserData();
+                                if (_editingInfo) {
+                                  try {
+                                    await _saveUserData();
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                        content: const Row(children: [
+                                          Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                                          SizedBox(width: 8),
+                                          Text('Profile updated successfully!'),
+                                        ]),
+                                        backgroundColor: Colors.green,
+                                        behavior: SnackBarBehavior.floating,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ));
+                                    }
+                                  } catch (e) {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                        content: Text('Error: $e'),
+                                        backgroundColor: Colors.red,
+                                        behavior: SnackBarBehavior.floating,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ));
+                                    }
+                                  }
+                                }
                                 setState(() => _editingInfo = !_editingInfo);
                               },
                               icon: Icon(_editingInfo ? Icons.check : Icons.edit_outlined, size: 15),
@@ -204,8 +254,8 @@ class _UserProfileState extends State<UserProfile> {
                           ]),
                         ),
                         _editableTile(Icons.person_outline, 'Full Name', _nameCtrl),
-                        _editableTile(Icons.alternate_email, 'Email', _emailCtrl),
-                        _editableTile(Icons.badge_outlined, 'Role', _roleCtrl, isLast: true, readOnly: true),
+                        _editableTile(Icons.email_outlined, 'Email', _emailCtrl),
+                        _editableTile(Icons.shield_outlined, 'Role', _roleCtrl, isLast: true, readOnly: true),
                       ]),
                     ),
                     const SizedBox(height: 16),
@@ -283,7 +333,13 @@ class _UserProfileState extends State<UserProfile> {
             (_editingInfo && !readOnly)
                 ? TextField(controller: ctrl,
                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1a202c)),
-                    decoration: const InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 4), border: UnderlineInputBorder()))
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(vertical: 4),
+                      border: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFE8001C))),
+                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFE8001C))),
+                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFE8001C), width: 1.5)),
+                    ))
                 : Text(ctrl.text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1a202c))),
           ])),
         ]),

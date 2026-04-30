@@ -8,6 +8,7 @@ import 'staff_maintenance.dart';
 import 'staff_vehicle_list.dart';
 import 'notifications.dart';
 import 'barcode_scanner_screen.dart';
+import 'staff_bottomnavbar.dart';
 
 class StaffDashboard extends StatefulWidget {
   const StaffDashboard({super.key});
@@ -46,13 +47,6 @@ class _StaffDashboardState extends State<StaffDashboard> {
     }
     if (mounted) setState(() { _initials = ini; _photoUrl = photo; });
   }
-
-  final List<_NavItem> _navItems = const [
-    _NavItem(icon: Icons.dashboard_outlined, label: 'Dashboard'),
-    _NavItem(icon: Icons.inventory_2_outlined, label: 'Inventory'),
-    _NavItem(icon: Icons.build_outlined, label: 'Maintenance'),
-    _NavItem(icon: Icons.directions_car_outlined, label: 'Vehicle'),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -115,65 +109,10 @@ class _StaffDashboardState extends State<StaffDashboard> {
   }
 
   Widget _buildBottomNav() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        boxShadow: [BoxShadow(color: Color(0x18000000), blurRadius: 12, offset: Offset(0, -2))],
-      ),
-      child: SafeArea(
-        child: SizedBox(
-          height: 64,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // 5 slots: 2 left + center placeholder + 2 right
-              Row(children: [
-                _navBtn(0), // Dashboard
-                _navBtn(1), // Inventory
-                const Expanded(child: SizedBox()), // center placeholder for scan button
-                _navBtn(2), // Maintenance
-                _navBtn(3), // Vehicle
-              ]),
-              // Center scan button
-              Positioned(
-                top: -20,
-                left: 0, right: 0,
-                child: Center(
-                  child: GestureDetector(
-                    onTap: () => _showScanModal(),
-                    child: Container(
-                      width: 56, height: 56,
-                      decoration: BoxDecoration(
-                        color: _red,
-                        shape: BoxShape.circle,
-                        boxShadow: [BoxShadow(color: _red.withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4))],
-                        border: Border.all(color: Colors.white, width: 3),
-                      ),
-                      child: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 26),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _navBtn(int i) {
-    final active = _currentIndex == i;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _currentIndex = i),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(_navItems[i].icon, color: active ? _red : const Color(0xFF718096), size: 22),
-          const SizedBox(height: 2),
-          Text(_navItems[i].label,
-            style: TextStyle(fontSize: 10, color: active ? _red : const Color(0xFF718096),
-              fontWeight: active ? FontWeight.w600 : FontWeight.normal)),
-        ]),
-      ),
+    return StaffBottomNavBar(
+      currentIndex: _currentIndex,
+      onIndexChanged: (index) => setState(() => _currentIndex = index),
+      onScanPressed: _showScanModal,
     );
   }
 
@@ -1173,12 +1112,6 @@ class _StaffDashboardState extends State<StaffDashboard> {
   Widget _sectionTitle(String title) {
     return Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1a202c)));
   }
-}
-
-class _NavItem {
-  final IconData icon;
-  final String label;
-  const _NavItem({required this.icon, required this.label});
 }
 
 class _LogoutPlaceholder extends StatelessWidget {

@@ -12,7 +12,20 @@
           "package_name": "com.example.automotive_mobile"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "930140433367-c6o8t35ce7njj482ivpreet0u98ptt7r.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.automotive_mobile",
+            "certificate_hash": "b3dddea5b5d41330886429edd79416b5fa9bd88a"
+          }
+        },
+        {
+          "client_id": "930140433367-k0ccsrel2fs31rs5dce4iqmquakgke04.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAmssL8Aipf7I62gig5gToAQcQtLSu1UJI"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "930140433367-k0ccsrel2fs31rs5dce4iqmquakgke04.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "930140433367-s37vr8m2vtv0qn0l3qpmglauneh1u9t9.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.automotiveMobile"
+              }
+            }
+          ]
         }
       }
     }

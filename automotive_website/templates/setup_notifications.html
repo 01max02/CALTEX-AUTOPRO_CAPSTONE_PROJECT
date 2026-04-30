@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup Notifications Collection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .status {
+            background: #f5f5f5;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #555;
+        }
+        .status.success {
+            border-left-color: #10b981;
+            background: #ecfdf5;
+            color: #065f46;
+        }
+        .status.error {
+            border-left-color: #ef4444;
+            background: #fef2f2;
+            color: #7f1d1d;
+        }
+        .status.loading {
+            border-left-color: #f59e0b;
+            background: #fffbeb;
+            color: #78350f;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .documents {
+            margin-top: 30px;
+        }
+        .document-item {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .document-item.created {
+            background: #ecfdf5;
+            border-color: #10b981;
+        }
+        .document-item.created::before {
+            content: "✓";
+            color: #10b981;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .document-item.pending::before {
+            content: "○";
+            color: #9ca3af;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .info {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #1e40af;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📬 Setup Notifications</h1>
+        <p class="subtitle">Create the notifications collection with sample documents</p>
+        
+        <div class="info">
+            ℹ️ This will create a notifications collection with 6 sample documents for testing push notifications.
+        </div>
+
+        <div id="status" class="status" style="display: none;"></div>
+
+        <button id="setupBtn" onclick="setupNotifications()">
+            Create Notifications Collection
+        </button>
+
+        <div class="documents" id="documentsContainer" style="display: none;">
+            <h3 style="margin-bottom: 15px; color: #333; font-size: 16px;">Documents to Create:</h3>
+            <div class="document-item pending">
+                <span>d1_admin_welcome - Welcome Admin (info)</span>
+            </div>
+            <div class="document-item pending">
+                <span>d2_maintenance_due - Maintenance Due (warning)</span>
+            </div>
+            <div class="document-item pending">
+                <span>d3_service_complete - Service Complete (success)</span>
+            </div>
+            <div class="document-item pending">
+                <span>d4_system_maintenance - System Maintenance (warning)</span>
+            </div>
+            <div class="document-item pending">
+                <span>d5_new_vehicle - New Vehicle Added (info)</span>
+            </div>
+            <div class="document-item pending">
+                <span>d6_special_offer - Special Offer (success)</span>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, getDocs, query, limit } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBvKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK",
+            authDomain: "caltex-autopro-1e664.firebaseapp.com",
+            projectId: "caltex-autopro-1e664",
+            storageBucket: "caltex-autopro-1e664.appspot.com",
+            messagingSenderId: "930140433367",
+            appId: "1:930140433367:web:XXXXXXXXXXXXXXXXXXXXXXXX"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        window.setupNotifications = async function() {
+            const btn = document.getElementById('setupBtn');
+            const status = document.getElementById('status');
+            const documentsContainer = document.getElementById('documentsContainer');
+
+            btn.disabled = true;
+            documentsContainer.style.display = 'block';
+            status.style.display = 'block';
+            status.className = 'status loading';
+            status.innerHTML = '<div class="spinner"></div> Setting up notifications collection...';
+
+            try {
+                // Sign in anonymously if needed
+                if (!auth.currentUser) {
+                    await signInAnonymously(auth);
+                }
+
+                const notificationsRef = collection(db, 'notifications');
+                
+                // Check if collection already exists
+                const q = query(notificationsRef, limit(1));
+                const snapshot = await getDocs(q);
+
+                if (!snapshot.empty) {
+                    status.className = 'status success';
+                    status.innerHTML = '✓ Notifications collection already exists!';
+                    btn.disabled = false;
+                    return;
+                }
+
+                // Sample notifications
+                const sampleNotifications = [
+                    {
+                        id: 'd1_admin_welcome',
+                        data: {
+                            title: 'Welcome Admin',
+                            message: 'Welcome to AutoPro Admin Dashboard. You can now manage vehicles, users, and maintenance records.',
+                            type: 'info',
+                            targetRole: 'admin',
+                            createdAt: new Date()
+                        }
+                    },
+                    {
+                        id: 'd2_maintenance_due',
+                        data: {
+                            title: 'Maintenance Due',
+                            message: 'Vehicle ABC-123 requires scheduled maintenance. Please schedule it as soon as possible.',
+                            type: 'warning',
+                            targetRole: 'staff',
+                            createdAt: new Date()
+                        }
+                    },
+                    {
+                        id: 'd3_service_complete',
+                        data: {
+                            title: 'Service Complete',
+                            message: 'Your vehicle service has been completed. Please pick it up at your earliest convenience.',
+                            type: 'success',
+                            targetRole: 'customer',
+                            createdAt: new Date()
+                        }
+                    },
+                    {
+                        id: 'd4_system_maintenance',
+                        data: {
+                            title: 'System Maintenance',
+                            message: 'System maintenance scheduled for tonight at 10 PM. Please save your work.',
+                            type: 'warning',
+                            targetRole: 'admin',
+                            createdAt: new Date()
+                        }
+                    },
+                    {
+                        id: 'd5_new_vehicle',
+                        data: {
+                            title: 'New Vehicle Added',
+                            message: 'A new vehicle (Toyota Camry 2024) has been added to the system. Please review it.',
+                            type: 'info',
+                            targetRole: 'staff',
+                            createdAt: new Date()
+                        }
+                    },
+                    {
+                        id: 'd6_special_offer',
+                        data: {
+                            title: 'Special Offer',
+                            message: 'Get 20% off on your next service! Use code SAVE20 at checkout.',
+                            type: 'success',
+                            targetRole: 'customer',
+                            createdAt: new Date()
+                        }
+                    }
+                ];
+
+                // Create all documents
+                let created = 0;
+                for (const notification of sampleNotifications) {
+                    const docRef = doc(notificationsRef, notification.id);
+                    await setDoc(docRef, notification.data);
+                    created++;
+                    
+                    // Update UI
+                    const items = document.querySelectorAll('.document-item');
+                    if (items[created - 1]) {
+                        items[created - 1].classList.add('created');
+                        items[created - 1].classList.remove('pending');
+                    }
+                }
+
+                status.className = 'status success';
+                status.innerHTML = `✓ Successfully created notifications collection with ${created} documents!`;
+                btn.disabled = false;
+
+            } catch (error) {
+                console.error('Error:', error);
+                status.className = 'status error';
+                status.innerHTML = `✗ Error: ${error.message}`;
+                btn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>

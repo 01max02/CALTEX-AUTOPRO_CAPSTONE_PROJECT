@@ -127,6 +127,8 @@ label {
 }
 .input-wrap input::placeholder { color: #a0aec0; }
 .input-wrap input:focus { border-color: #E8001C; }
+.input-wrap input::placeholder { color: #a0aec0; }
+.input-wrap input:focus { border-color: #E8001C; }
 .input-wrap .toggle-pass {
   position: absolute;
   right: 12px;
@@ -137,8 +139,12 @@ label {
   cursor: pointer;
   color: #718096;
   padding: 0;
-  display: flex;
+  display: none !important;
   align-items: center;
+  justify-content: center;
+}
+.input-wrap .toggle-pass[style*="display: flex"] {
+  display: flex !important;
 }
 
 .forgot-row {
