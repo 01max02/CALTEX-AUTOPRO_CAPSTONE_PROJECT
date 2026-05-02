@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AutoPro – Login</title>
+  <title>Login</title>
+  <link rel="icon" type="image/png" href="../static/img/LOGO_CALTEX.png" />
   <link rel="stylesheet" href="../static/css/login.css" />
 </head>
 <body>
@@ -69,6 +70,11 @@
       </svg>
       Continue with Google
     </button>
+
+    <p style="text-align:center;margin-top:20px;font-size:13px;color:#718096;">
+      Don't have an account?
+      <a href="regsiter.html" style="color:#E8001C;font-weight:700;text-decoration:none;">Sign Up</a>
+    </p>
   </div>
 </div>
 
@@ -202,6 +208,15 @@
         console.log('Step 13: Account is inactive - signing out');
         await firebase.auth().signOut();
         showToast('Your account has been deactivated. Please contact the administrator.');
+        setLoading(signinBtn, false, signinDefault);
+        return;
+      }
+
+      // Block pending users
+      if (status === 'pending') {
+        console.log('Step 13: Account is pending approval - signing out');
+        await firebase.auth().signOut();
+        showToast('Your account is pending admin approval. You will be notified by email once approved.', 'error');
         setLoading(signinBtn, false, signinDefault);
         return;
       }

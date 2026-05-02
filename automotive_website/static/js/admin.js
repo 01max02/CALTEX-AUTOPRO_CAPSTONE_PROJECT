@@ -61,31 +61,6 @@ function buildAdminNotifications() {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const notifs = [];
 
-    // PMS overdue / due soon
-    (window.assets || []).forEach(a => {
-        if (!a.nextPMSDue || a.status === 'maintenance' || a.status === 'inactive') return;
-        const due  = new Date(a.nextPMSDue); due.setHours(0, 0, 0, 0);
-        const diff = Math.ceil((due - today) / 86400000);
-        const fmtDue = due.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        if (diff < 0) {
-            notifs.push({
-                icon: '🔴', type: 'danger', unread: true,
-                title: 'PMS Overdue',
-                msg: `${a.assetDescription} (${a.plateNumber}) — overdue by ${Math.abs(diff)} day(s)`,
-                time: `Was due ${fmtDue}`,
-                action: () => switchAdminSection('assets')
-            });
-        } else if (diff <= 14) {
-            notifs.push({
-                icon: '🟡', type: 'warning', unread: true,
-                title: 'PMS Due Soon',
-                msg: `${a.assetDescription} (${a.plateNumber}) — due in ${diff} day(s)`,
-                time: `Due ${fmtDue}`,
-                action: () => switchAdminSection('assets')
-            });
-        }
-    });
-
     // Under maintenance
     (window.assets || []).filter(a => a.status === 'maintenance').forEach(a => {
         notifs.push({
@@ -137,6 +112,18 @@ function renderAdminNotifications() {
         badge.textContent = unread;
         badge.style.display = unread > 0 ? 'inline-flex' : 'none';
     }
+
+    // ── Also update the header badge to include local PMS/stock alerts ──
+    const headerBadge = document.getElementById('adminHeaderNotifBadge');
+    if (headerBadge) {
+        const fbUnread = (window._fbNotifications || []).filter(n => {
+            const uid = (firebase.auth().currentUser || {}).uid;
+            return uid && (n.readBy || {})[uid] !== true;
+        }).length;
+        const totalUnread = unread + fbUnread;
+        headerBadge.textContent = totalUnread > 9 ? '9+' : totalUnread;
+        headerBadge.style.display = totalUnread > 0 ? 'flex' : 'none';
+    }
     if (countEl) countEl.textContent = notifs.length + ' alert' + (notifs.length !== 1 ? 's' : '');
 
     if (!listEl) return;
@@ -173,8 +160,52 @@ window.toggleAdminNotifPanel = function () {
     const isOpen = panel.style.display === 'block';
     panel.style.display = isOpen ? 'none' : 'block';
     if (!isOpen) {
-        // Merge Firestore notifications with local-data alerts
-        _renderAdminNotifPanel();
+        // If _fbNotifications is already loaded, render immediately
+        if (window._fbNotifications && window._fbNotifications.length > 0) {
+            _renderAdminNotifPanel();
+        } else {
+            // Fetch directly from Firestore (handles profile page where snapshot may not have fired yet)
+            const user = typeof firebase !== 'undefined' && firebase.auth().currentUser;
+            if (user) {
+                firebase.firestore().collection('notifications')
+                    .where('targetRole', '==', 'admin')
+                    .limit(50)
+                    .get()
+                    .then(function(snap) {
+                        window._fbNotifications = snap.docs
+                            .map(function(d) { return Object.assign({ _id: d.id }, d.data()); })
+                            .sort(function(a, b) {
+                                const aMs = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+                                const bMs = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+                                return bMs - aMs;
+                            });
+                        _renderAdminNotifPanel();
+                        // Update badge
+                        const uid = user.uid;
+                        const unread = window._fbNotifications.filter(function(n) {
+                            return (n.readBy || {})[uid] !== true;
+                        }).length;
+                        window._adminUnreadCount = unread;
+                        const badge = document.getElementById('adminHeaderNotifBadge');
+                        if (badge) {
+                            badge.textContent = unread > 9 ? '9+' : unread;
+                            badge.style.display = unread > 0 ? 'flex' : 'none';
+                        }
+                    })
+                    .catch(function() { _renderAdminNotifPanel(); });
+            } else {
+                _renderAdminNotifPanel();
+            }
+        }
+        // Re-apply badge in case it was missed during async header load
+        if (typeof window._adminUnreadCount !== 'undefined') {
+            const badge = document.getElementById('adminHeaderNotifBadge');
+            if (badge) {
+                const u = window._adminUnreadCount;
+                badge.textContent = u > 9 ? '9+' : u;
+                badge.style.display = u > 0 ? 'flex' : 'none';
+            }
+        }
     }
 };
 
@@ -183,7 +214,7 @@ function _renderAdminNotifPanel() {
     const countEl = document.getElementById('adminNotifPanelCount');
     if (!listEl) return;
 
-    // Local-data alerts (PMS, stock, services)
+    // Local-data alerts (PMS, stock, services) — from Firestore-backed window.assets
     const localNotifs = buildAdminNotifications();
 
     // Firestore notifications
@@ -215,14 +246,15 @@ function _renderAdminNotifPanel() {
     }
 
     listEl.innerHTML = all.map((n, i) => `
-        <div class="admin-notif-item${n.unread ? ' unread' : ''}" onclick="_adminNotifClick(${i})">
+        <div class="admin-notif-item${n.unread ? ' unread' : ''}" style="position:relative;padding-right:2rem;" onclick="_adminNotifClick(${i})">
             <div class="admin-notif-icon">${n.icon}</div>
-            <div>
+            <div style="flex:1;min-width:0;">
                 <div class="admin-notif-title">${n.title}</div>
                 <div class="admin-notif-msg">${n.msg}</div>
                 <div class="admin-notif-time">${n.time}</div>
             </div>
             ${n.unread ? '<div style="width:8px;height:8px;border-radius:50%;background:#E8001C;flex-shrink:0;margin-top:4px;"></div>' : ''}
+            ${n._docId ? `<button onclick="event.stopPropagation();_adminDeleteNotif('${n._docId}')" title="Delete" style="position:absolute;top:0.5rem;right:0.4rem;background:none;border:none;cursor:pointer;color:#a0aec0;font-size:1rem;line-height:1;padding:2px 4px;border-radius:4px;" onmouseover="this.style.color='#e53e3e'" onmouseout="this.style.color='#a0aec0'">&times;</button>` : ''}
         </div>`).join('');
 
     window._adminNotifAll = all;
@@ -257,19 +289,25 @@ window._adminNotifClick = function(i) {
     document.getElementById('adminNotifPanel').style.display = 'none';
 };
 
-window.clearAdminNotifications = function () {
-    const uid = (firebase.auth().currentUser || {}).uid;
-    // Mark all Firestore notifications as read
-    if (uid && window._fbNotifications) {
-        const batch = firebase.firestore().batch();
-        window._fbNotifications.forEach(n => {
-            if ((n.readBy || {})[uid] !== true) {
-                batch.update(firebase.firestore().collection('notifications').doc(n._id),
-                    { [`readBy.${uid}`]: true });
-            }
-        });
-        batch.commit().catch(() => {});
+window._adminDeleteNotif = function(docId) {
+    firebase.firestore().collection('notifications').doc(docId).delete().catch(() => {});
+    // Remove from local cache and re-render
+    if (window._fbNotifications) {
+        window._fbNotifications = window._fbNotifications.filter(n => n._id !== docId);
     }
+    _renderAdminNotifPanel();
+};
+
+window.clearAdminNotifications = function () {
+    // Delete ALL Firestore notifications shown in the panel
+    const db = firebase.firestore();
+    const batch = db.batch();
+    (window._fbNotifications || []).forEach(n => {
+        batch.delete(db.collection('notifications').doc(n._id));
+    });
+    batch.commit().catch(() => {});
+    window._fbNotifications = [];
+
     const listEl  = document.getElementById('adminNotifList');
     const countEl = document.getElementById('adminNotifPanelCount');
     const badge   = document.getElementById('adminHeaderNotifBadge');

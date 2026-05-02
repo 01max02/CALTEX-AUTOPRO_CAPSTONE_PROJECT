@@ -81,9 +81,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ]),
       ]),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AppNotifications(role: NotificationRole.admin))),
+        Padding(
+          padding: const EdgeInsets.only(right: 4),
+          child: NotifBadge(
+            role: NotificationRole.admin,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AppNotifications(role: NotificationRole.admin))),
+          ),
         ),
         GestureDetector(
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UserProfile(role: UserRole.admin)))

@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Management – AutoPro Admin</title>
+    <title>User Management</title>
+    <link rel="icon" type="image/png" href="../static/img/LOGO_CALTEX.png" />
     <link rel="stylesheet" href="../static/css/style.css">
     <link rel="stylesheet" href="../static/css/admin.css">
 <style>
@@ -61,11 +62,32 @@
                 </div>
             </div>
 
-            <div class="data-table">
-                <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:40px 1.5fr 1fr 1.5fr 1fr 1fr 140px;">
-                    <div>#</div><div>Full Name</div><div>Username</div><div>Email</div><div>Role</div><div>Status</div><div>Actions</div>
+            <!-- ── Tabs ── -->
+            <div style="display:flex;gap:0;border-bottom:2px solid #e2e8f0;margin-bottom:1.25rem;">
+                <button id="tabAllBtn" onclick="switchTab('all')"
+                    style="padding:0.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:0.88rem;font-weight:700;color:#E31E24;border-bottom:2px solid #E31E24;margin-bottom:-2px;transition:all 0.2s;">
+                    All Users
+                </button>
+                <button id="tabPendingBtn" onclick="switchTab('pending')"
+                    style="padding:0.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:0.88rem;font-weight:700;color:#718096;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s;display:flex;align-items:center;gap:0.4rem;">
+                    Pending
+                    <span id="pendingBadge" style="display:none;background:#f6ad55;color:white;font-size:0.7rem;font-weight:800;padding:1px 7px;border-radius:10px;"></span>
+                </button>
+            </div>
+
+            <!-- ── All Users Tab ── -->
+            <div id="tabAll">
+                <div class="data-table">
+                    <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:40px 2fr 2fr 1fr 1fr 140px;">
+                        <div>#</div><div>Full Name</div><div>Email</div><div>Role</div><div>Status</div><div>Actions</div>
+                    </div>
+                    <div id="userCardsList"></div>
                 </div>
-                <div id="userCardsList"></div>
+            </div>
+
+            <!-- ── Pending Tab ── -->
+            <div id="tabPending" style="display:none;">
+                <div id="pendingCardsList"></div>
             </div>
         </div>
     </div>
@@ -115,13 +137,15 @@
             <button onclick="closeModal('addUserModal')" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">&times;</button>
         </div>
         <form id="addUserForm" style="padding:1.25rem 1.5rem;background:#f8fafc;display:flex;flex-direction:column;gap:0.85rem;">
-            <div class="form-group" style="margin:0;">
-                <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Full Name *</label>
-                <input type="text" name="name" required style="margin-top:0.3rem;">
-            </div>
-            <div class="form-group" style="margin:0;">
-                <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Username *</label>
-                <input type="text" name="username" required style="margin-top:0.3rem;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">First Name *</label>
+                    <input type="text" name="firstName" required style="margin-top:0.3rem;">
+                </div>
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Last Name *</label>
+                    <input type="text" name="lastName" required style="margin-top:0.3rem;">
+                </div>
             </div>
             <div class="form-group" style="margin:0;">
                 <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Email *</label>
@@ -158,6 +182,21 @@
 
 <div id="toast"></div>
 
+<!-- ── Confirm Dialog ── -->
+<div id="confirmDialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:10000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:16px;padding:0;max-width:400px;width:90%;box-shadow:0 12px 40px rgba(0,0,0,0.18);overflow:hidden;">
+    <div id="confirmHeader" style="padding:1.1rem 1.4rem;display:flex;align-items:center;gap:0.75rem;">
+      <div id="confirmIconWrap" style="width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;"></div>
+      <div id="confirmTitle" style="font-size:1rem;font-weight:700;color:#1a202c;"></div>
+    </div>
+    <div id="confirmBody" style="padding:0 1.4rem 1.2rem;font-size:0.88rem;color:#4a5568;line-height:1.6;"></div>
+    <div style="padding:0.85rem 1.4rem 1.1rem;display:flex;gap:0.65rem;justify-content:flex-end;border-top:1px solid #e2e8f0;">
+      <button id="confirmCancelBtn" style="padding:0.55rem 1.2rem;border:1.5px solid #e2e8f0;border-radius:8px;background:white;cursor:pointer;font-size:0.85rem;font-weight:600;color:#718096;">Cancel</button>
+      <button id="confirmOkBtn" style="padding:0.55rem 1.4rem;border:none;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:700;color:white;"></button>
+    </div>
+  </div>
+</div>
+
 <script src="../static/js/data.js"></script>
 
 <!-- Firebase SDK -->
@@ -183,6 +222,22 @@
 <script src="../static/js/admin_sidebar.js"></script>
 <script>
 var _editingUserId = null;
+var _currentTab = 'all';
+
+function switchTab(tab) {
+    _currentTab = tab;
+    document.getElementById('tabAll').style.display     = tab === 'all'     ? 'block' : 'none';
+    document.getElementById('tabPending').style.display = tab === 'pending' ? 'block' : 'none';
+    var allBtn     = document.getElementById('tabAllBtn');
+    var pendingBtn = document.getElementById('tabPendingBtn');
+    if (tab === 'all') {
+        allBtn.style.color = '#E31E24'; allBtn.style.borderBottom = '2px solid #E31E24';
+        pendingBtn.style.color = '#718096'; pendingBtn.style.borderBottom = '2px solid transparent';
+    } else {
+        pendingBtn.style.color = '#E31E24'; pendingBtn.style.borderBottom = '2px solid #E31E24';
+        allBtn.style.color = '#718096'; allBtn.style.borderBottom = '2px solid transparent';
+    }
+}
 
 function _generateTempPassword() {
     var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
@@ -198,14 +253,158 @@ function _sendWelcomeEmail(toEmail, toName, tempPassword, role) {
         body: JSON.stringify({ to_email: toEmail, to_name: toName, temp_password: tempPassword, role: role })
     })
     .then(function(r){ return r.json(); })
-    .then(function(data){
-        console.log('Email result:', data);
-        return data.ok === true;
+    .then(function(data){ return data.ok === true; })
+    .catch(function(err){ console.error('Email send error:', err); return false; });
+}
+
+function _sendApprovalEmail(toEmail, toName) {
+    return fetch('/api/send-approval-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to_email: toEmail, to_name: toName })
     })
-    .catch(function(err){
-        console.error('Email send error:', err);
-        return false;
+    .then(function(r){ return r.json(); })
+    .then(function(data){ return data.ok === true; })
+    .catch(function(err){ console.error('Approval email error:', err); return false; });
+}
+
+function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ── Styled confirm dialog ──
+function showConfirm(opts) {
+    // opts: { title, body, icon, iconBg, okLabel, okColor, onOk }
+    var dialog     = document.getElementById('confirmDialog');
+    var header     = document.getElementById('confirmHeader');
+    var iconWrap   = document.getElementById('confirmIconWrap');
+    var titleEl    = document.getElementById('confirmTitle');
+    var bodyEl     = document.getElementById('confirmBody');
+    var okBtn      = document.getElementById('confirmOkBtn');
+    var cancelBtn  = document.getElementById('confirmCancelBtn');
+
+    iconWrap.textContent      = opts.icon   || '❓';
+    iconWrap.style.background = opts.iconBg || '#f0f4ff';
+    titleEl.textContent       = opts.title  || 'Confirm';
+    bodyEl.innerHTML          = opts.body   || '';
+    okBtn.textContent         = opts.okLabel || 'OK';
+    okBtn.style.background    = opts.okColor || '#E31E24';
+
+    dialog.style.display = 'flex';
+
+    function close() { dialog.style.display = 'none'; okBtn.onclick = null; cancelBtn.onclick = null; }
+    okBtn.onclick     = function() { close(); if (opts.onOk) opts.onOk(); };
+    cancelBtn.onclick = function() { close(); };
+}
+
+// ── Approve user ──
+function approveUser(uid, email, name) {
+    showConfirm({
+        title:   'Approve Account',
+        body:    'Approve <strong>' + escHtml(name) + '</strong>?<br/><br/>They will receive an email notification and can sign in immediately.',
+        icon:    '✅',
+        iconBg:  '#f0fff4',
+        okLabel: 'Approve',
+        okColor: '#38a169',
+        onOk: function() {
+            var db = firebase.firestore();
+            db.collection('users').doc(uid).update({ status: 'Active' })
+                .then(function() {
+                    return db.collection('notifications').add({
+                        title:      '✅ Account Approved',
+                        message:    name + ' (' + email + ') has been approved and can now sign in.',
+                        type:       'success',
+                        targetRole: 'admin',
+                        targetUid:  '',
+                        createdAt:  firebase.firestore.FieldValue.serverTimestamp(),
+                        readBy:     {},
+                        isRead:     false,
+                    });
+                })
+                .then(function() { return _sendApprovalEmail(email, name); })
+                .then(function(sent) {
+                    showToast(name + ' approved!' + (sent ? ' Email sent.' : ' (Email not sent — check server.)'), 'success');
+                })
+                .catch(function(err) { showToast('Error: ' + err.message, 'error'); });
+        }
     });
+}
+
+// ── Reject user (delete from Firestore + Firebase Auth) ──
+function rejectUser(uid, name) {
+    showConfirm({
+        title:   'Reject & Delete Account',
+        body:    'Reject <strong>' + escHtml(name) + '</strong>\'s account?<br/><br/>This will <strong>permanently delete</strong> their account.',
+        icon:    '🗑️',
+        iconBg:  '#fff5f5',
+        okLabel: 'Delete Account',
+        okColor: '#e53e3e',
+        onOk: function() {
+            // 1. Delete Firestore document
+            firebase.firestore().collection('users').doc(uid).delete()
+                .then(function() {
+                    // 2. Delete Firebase Auth account via Flask Admin SDK
+                    return fetch('/api/delete-user', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ uid: uid })
+                    })
+                    .then(function(r){ return r.json(); })
+                    .catch(function(){ return { ok: false }; });
+                })
+                .then(function(result) {
+                    showToast(name + "'s account has been deleted.", 'success');
+                })
+                .catch(function(err) { showToast('Error: ' + err.message, 'error'); });
+        }
+    });
+}
+
+// ── Toggle active/inactive (non-pending only) ──
+function toggleUserStatus(uid, currentStatus) {
+    if (currentStatus === 'pending') return;
+    var newStatus = currentStatus === 'active' ? 'Inactive' : 'Active';
+    var label     = newStatus === 'Inactive' ? 'Deactivate' : 'Activate';
+    showConfirm({
+        title:   label + ' User',
+        body:    'Are you sure you want to <strong>' + label.toLowerCase() + '</strong> this user?',
+        icon:    newStatus === 'Inactive' ? '🚫' : '✅',
+        iconBg:  newStatus === 'Inactive' ? '#fffbeb' : '#f0fff4',
+        okLabel: label,
+        okColor: newStatus === 'Inactive' ? '#dd6b20' : '#38a169',
+        onOk: function() {
+            firebase.firestore().collection('users').doc(uid).update({ status: newStatus })
+                .then(function() { showToast('User ' + label.toLowerCase() + 'd successfully.', 'success'); })
+                .catch(function(err) { showToast('Error: ' + err.message, 'error'); });
+        }
+    });
+}
+
+// ── Render pending cards ──
+function renderPendingCards(pending) {
+    var list = document.getElementById('pendingCardsList');
+    if (!list) return;
+    if (!pending.length) {
+        list.innerHTML = '<div style="padding:3rem;text-align:center;color:#718096;">'
+            + '<div style="margin-bottom:0.75rem;"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#cbd5e0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>'
+            + '<div style="font-weight:600;">No pending registrations</div></div>';
+        return;
+    }
+    list.innerHTML = pending.map(function(u) {
+        var initials = (u.name||'?').split(' ').map(function(n){ return n[0]||''; }).join('').toUpperCase().slice(0,2);
+        return '<div style="background:white;border:1px solid #fbd38d;border-radius:14px;padding:1.1rem 1.25rem;margin-bottom:0.85rem;display:flex;align-items:center;gap:1rem;">'
+            + '<div style="width:44px;height:44px;border-radius:50%;background:#fff3cd;display:flex;align-items:center;justify-content:center;font-weight:800;color:#c05621;font-size:1rem;flex-shrink:0;">'+initials+'</div>'
+            + '<div style="flex:1;min-width:0;">'
+            +   '<div style="font-weight:700;color:#1a202c;font-size:0.92rem;">'+escHtml(u.name||'—')+'</div>'
+            +   '<div style="color:#718096;font-size:0.8rem;margin-top:0.1rem;">'+escHtml(u.email||'—')+'</div>'
+            + '</div>'
+            + '<span style="background:#fff3cd;color:#c05621;padding:0.2rem 0.7rem;border-radius:20px;font-size:0.75rem;font-weight:700;flex-shrink:0;">Pending</span>'
+            + '<div style="display:flex;gap:0.5rem;flex-shrink:0;">'
+            +   '<button onclick="rejectUser(\''+u.id+'\',\''+escHtml(u.name||'')+'\')" style="padding:0.45rem 1rem;background:white;border:1.5px solid #fc8181;border-radius:8px;cursor:pointer;font-size:0.82rem;font-weight:700;color:#e53e3e;">Reject</button>'
+            +   '<button onclick="approveUser(\''+u.id+'\',\''+escHtml(u.email||'')+'\',\''+escHtml(u.name||'')+'\')" style="padding:0.45rem 1rem;background:#38a169;border:none;border-radius:8px;cursor:pointer;font-size:0.82rem;font-weight:700;color:white;">Approve</button>'
+            + '</div>'
+            + '</div>';
+    }).join('');
 }
 
 function openAddUserModal() {
@@ -230,7 +429,8 @@ function viewUser(userId) {
     var rc = roleColors[(u.role||'').toLowerCase()] || '#718096';
     document.getElementById('vuAvatar').textContent = (u.name||'?').split(' ').map(function(n){ return n[0]; }).join('').toUpperCase().slice(0,2);
     document.getElementById('vuName').textContent = u.name || '—';
-    document.getElementById('vuUsername').textContent = u.username || '—';
+    document.getElementById('vuUsername').textContent = '';
+    document.getElementById('vuUsername').style.display = 'none';
     var roleLabel = (u.role||''); roleLabel = roleLabel.charAt(0).toUpperCase() + roleLabel.slice(1);
     var statusLower = (u.status||'').toLowerCase();
     var statusColor = statusLower === 'active' ? '#38a169' : '#718096';
@@ -239,7 +439,6 @@ function viewUser(userId) {
         ['Email', u.email||'—'],
         ['Role', '<span style="background:'+rc+'20;color:'+rc+';padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">'+roleLabel+'</span>'],
         ['Status', '<span style="background:'+statusColor+'20;color:'+statusColor+';padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">'+statusLabel+'</span>'],
-        ['Username', u.username||'—'],
     ].map(function(item){
         return '<div style="background:white;border-radius:10px;padding:0.85rem;border:1px solid #e2e8f0;">'
             + '<div style="font-size:0.7rem;color:#718096;font-weight:700;text-transform:uppercase;margin-bottom:0.3rem;">'+item[0]+'</div>'
@@ -258,8 +457,10 @@ function editUser(userId) {
     document.getElementById('userModalTitle').textContent = 'Edit User';
     document.getElementById('userModalIcon').innerHTML = '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>';
     var form = document.getElementById('addUserForm');
-    form.elements.name.value = u.name || '';
-    form.elements.username.value = u.username || '';
+    // Split name into first/last
+    var nameParts = (u.name || '').split(' ');
+    form.elements.firstName.value = nameParts[0] || '';
+    form.elements.lastName.value  = nameParts.slice(1).join(' ') || '';
     form.elements.email.value = u.email || '';
     form.elements.role.value = (u.role||'staff').toLowerCase();
     // Switch button to Update state
@@ -287,19 +488,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
     form.addEventListener('submit', function(e) {
         e.preventDefault();
-        var name     = form.elements.name.value.trim();
-        var username = form.elements.username.value.trim();
-        var email    = form.elements.email.value.trim();
-        var role     = form.elements.role.value;
-        if (!name || !username || !email) { showToast('Please fill all required fields.', 'error'); return; }
+        var firstName = form.elements.firstName.value.trim();
+        var lastName  = form.elements.lastName.value.trim();
+        var fullName  = (firstName + ' ' + lastName).trim();
+        var email     = form.elements.email.value.trim();
+        var role      = form.elements.role.value;
+        if (!firstName || !lastName || !email) { showToast('Please fill all required fields.', 'error'); return; }
 
-        var isEdit = !!_editingUserId;
         setLoading(true);
 
         var db = firebase.firestore();
         if (_editingUserId) {
             // Edit — update fields, preserve existing status
-            db.collection('users').doc(_editingUserId).update({ name: name, username: username, email: email, role: role })
+            db.collection('users').doc(_editingUserId).update({
+                firstName: firstName,
+                lastName:  lastName,
+                name:      fullName,
+                email:     email,
+                role:      role
+            })
                 .then(function(){
                     closeModal('addUserModal');
                     showToast('User updated successfully!', 'success');
@@ -310,14 +517,12 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add — check for existing email first, then auto-generate password, create via Firebase Auth REST, save to Firestore, send email
             var tempPass = _generateTempPassword();
             var apiKey = 'AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs';
-            
-            // First check if email already exists in Firestore
+
             db.collection('users').where('email', '==', email).limit(1).get()
                 .then(function(snap) {
                     if (!snap.empty) {
                         throw new Error('A user with this email already exists in the system.');
                     }
-                    // Email doesn't exist, proceed with Auth creation
                     return fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + apiKey, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -325,19 +530,21 @@ document.addEventListener('DOMContentLoaded', function() {
                     })
                     .then(function(r){ return r.json(); })
                     .then(function(data) {
-                        if (data.error) {
-                            throw new Error(data.error.message);
-                        }
+                        if (data.error) throw new Error(data.error.message);
                         var uid = data.localId;
                         return db.collection('users').doc(uid).set({
-                            name: name, username: username, email: email,
-                            role: role, status: 'active',
+                            firstName: firstName,
+                            lastName:  lastName,
+                            name:      fullName,
+                            email:     email,
+                            role:      role,
+                            status:    'Active',
                             createdAt: firebase.firestore.FieldValue.serverTimestamp()
                         }).then(function(){ return tempPass; });
                     });
                 })
                 .then(function(pass) {
-                    return _sendWelcomeEmail(email, name, pass, role)
+                    return _sendWelcomeEmail(email, fullName, pass, role)
                         .then(function(sent) {
                             closeModal('addUserModal');
                             showToast('User added!' + (sent ? ' Credentials sent to ' + email + '.' : ' (Email not sent — check server.)'), 'success');

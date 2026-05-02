@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notifications – AutoPro</title>
+    <title>Notifications</title>
+    <link rel="icon" type="image/png" href="../static/img/LOGO_CALTEX.png" />
     <link rel="stylesheet" href="../static/css/notifications.css">
 </head>
 <body class="portal-body" data-page="notifications">
@@ -77,11 +78,12 @@ var _notifUid  = null;
 
 // ── Defaults ──
 var _prefs = {
-    pmsOverdue:    true,
-    pmsDueSoon:    true,
-    serviceUpdate: true,
-    newAssignment: true,
-    lowStock:      true,
+    pmsOverdue:     true,
+    pmsDueSoon:     true,
+    pmsDueThisWeek: true,
+    serviceUpdate:  true,
+    newAssignment:  true,
+    lowStock:       true,
 };
 
 (function () {
@@ -114,13 +116,14 @@ firebase.auth().onAuthStateChanged(function (user) {
         .collection('settings').doc('alerts').get()
         .then(function (doc) {
             var data = doc.exists ? doc.data() : {};
-            _prefs.pmsOverdue    = data.pmsOverdue    !== undefined ? data.pmsOverdue    : true;
-            _prefs.pmsDueSoon    = data.pmsDueSoon    !== undefined ? data.pmsDueSoon    : true;
-            _prefs.serviceUpdate = data.serviceUpdate !== undefined ? data.serviceUpdate : true;
-            _prefs.newAssignment = data.newAssignment !== undefined ? data.newAssignment : true;
-            _prefs.lowStock      = data.lowStock      !== undefined ? data.lowStock      : true;
+            _prefs.pmsOverdue     = data.pmsOverdue     !== undefined ? data.pmsOverdue     : true;
+            _prefs.pmsDueSoon     = data.pmsDueSoon     !== undefined ? data.pmsDueSoon     : true;
+            _prefs.pmsDueThisWeek = data.pmsDueThisWeek !== undefined ? data.pmsDueThisWeek : true;
+            _prefs.serviceUpdate  = data.serviceUpdate  !== undefined ? data.serviceUpdate  : true;
+            _prefs.newAssignment  = data.newAssignment  !== undefined ? data.newAssignment  : true;
+            _prefs.lowStock       = data.lowStock       !== undefined ? data.lowStock       : true;
             // Update toggle states without full re-render
-            ['pmsOverdue','pmsDueSoon','serviceUpdate','newAssignment','lowStock'].forEach(function (k) {
+            ['pmsOverdue','pmsDueSoon','pmsDueThisWeek','serviceUpdate','newAssignment','lowStock'].forEach(function (k) {
                 var el = document.getElementById('nt_' + k);
                 if (el) el.checked = _prefs[k];
             });
@@ -145,11 +148,15 @@ function _renderContent() {
         +   '</div>'
         +   _alertTile('rgba(232,0,28,0.1)', '#E8001C',
               '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
-              'PMS Overdue', 'Notify when a vehicle is overdue for PMS', 'pmsOverdue', false)
+              'PMS Overdue', 'Notify when a vehicle is overdue for maintenance (< 0 days)', 'pmsOverdue', false)
         +   '<div class="notif-divider"></div>'
         +   _alertTile('rgba(237,137,54,0.1)', '#ed8936',
+              '<path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>',
+              'PMS Due This Week', 'Notify when PMS is due within 7 days', 'pmsDueThisWeek', false)
+        +   '<div class="notif-divider"></div>'
+        +   _alertTile('rgba(214,158,46,0.1)', '#d69e2e',
               '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
-              'PMS Due Soon', 'Notify when PMS is due within 30 days', 'pmsDueSoon', true)
+              'PMS Due Soon', 'Notify when PMS is due within 14 days', 'pmsDueSoon', true)
         + '</div>'
         + '</div>';
 
@@ -252,9 +259,10 @@ window.saveNotifPrefs = function () {
     var isAdmin        = _notifRole === 'admin';
 
     var payload = {
-        pmsOverdue: _prefs.pmsOverdue,
-        pmsDueSoon: _prefs.pmsDueSoon,
-        updatedAt:  firebase.firestore.FieldValue.serverTimestamp(),
+        pmsOverdue:     _prefs.pmsOverdue,
+        pmsDueSoon:     _prefs.pmsDueSoon,
+        pmsDueThisWeek: _prefs.pmsDueThisWeek,
+        updatedAt:      firebase.firestore.FieldValue.serverTimestamp(),
     };
     if (isStaffOrAdmin) {
         payload.serviceUpdate = _prefs.serviceUpdate;

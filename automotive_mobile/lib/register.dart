@@ -1,0 +1,457 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
+
+// ── OneSignal push (same credentials as notifications.dart) ──
+const _kOneSignalAppId  = 'c4f82ac7-5340-4e7a-877d-1d38a6f6f8ea';
+const _kOneSignalApiKey = 'os_v7_app_yt4cvr2f1hkhvh5ldu4k637i51snjeyuythen3fd61ae1yhnprpy6kbxvn9kjd1pqdhygsqmlrouas4kfuydft32nkgj5flbra3oo5q';
+
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
+
+  @override
+  State<RegisterScreen> createState() => _RegisterScreenState();
+}
+
+class _RegisterScreenState extends State<RegisterScreen> {
+  final _firstNameCtrl  = TextEditingController();
+  final _lastNameCtrl   = TextEditingController();
+  final _emailCtrl      = TextEditingController();
+  final _passwordCtrl   = TextEditingController();
+  final _confirmCtrl    = TextEditingController();
+
+  bool _passVisible        = false;
+  bool _confirmVisible     = false;
+  bool _showPassToggle     = false;
+  bool _showConfirmToggle  = false;
+  bool _loading            = false;
+
+  static const _red = Color(0xFFE8001C);
+
+  @override
+  void dispose() {
+    _firstNameCtrl.dispose();
+    _lastNameCtrl.dispose();
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleRegister() async {
+    final firstName = _firstNameCtrl.text.trim();
+    final lastName  = _lastNameCtrl.text.trim();
+    final email     = _emailCtrl.text.trim();
+    final password  = _passwordCtrl.text.trim();
+    final confirm   = _confirmCtrl.text.trim();
+
+    if (firstName.isEmpty || lastName.isEmpty || email.isEmpty ||
+        password.isEmpty || confirm.isEmpty) {
+      _showError('Please fill in all fields.');
+      return;
+    }
+
+    if (password != confirm) {
+      _showError('Passwords do not match.');
+      return;
+    }
+
+    if (password.length < 6) {
+      _showError('Password must be at least 6 characters.');
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      // Create Firebase Auth account
+      final cred = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(email: email, password: password);
+
+      final uid = cred.user!.uid;
+
+      // Update display name
+      await cred.user!.updateDisplayName('$firstName $lastName');
+
+      // Save user document to Firestore — status 'pending' until admin approves
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'uid':        uid,
+        'firstName':  firstName,
+        'lastName':   lastName,
+        'name':       '$firstName $lastName',
+        'email':      email,
+        'role':       'customer',
+        'status':     'pending',
+        'createdAt':  FieldValue.serverTimestamp(),
+      });
+
+      // Notify all admins in Firestore so it shows in their notification list
+      final adminSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'admin')
+          .get();
+
+      await FirebaseFirestore.instance.collection('notifications').add({
+        'title':      '🆕 New Account Registration',
+        'message':    '$firstName $lastName ($email) has registered and is awaiting approval.',
+        'type':       'info',
+        'targetRole': 'admin',
+        'targetUid':  '',
+        'createdAt':  FieldValue.serverTimestamp(),
+        'readBy':     <String, bool>{},
+        'isRead':     false,
+      });
+
+      // Also push OneSignal notification to each admin device
+      for (final adminDoc in adminSnap.docs) {
+        final subId = adminDoc.data()['oneSignalId'] as String?;
+        if (subId != null && subId.isNotEmpty) {
+          try {
+            await http.post(
+              Uri.parse('https://onesignal.com/api/v1/notifications'),
+              headers: {
+                'Authorization': 'Basic $_kOneSignalApiKey',
+                'Content-Type': 'application/json; charset=utf-8',
+              },
+              body: jsonEncode({
+                'app_id': _kOneSignalAppId,
+                'include_subscription_ids': [subId],
+                'headings': {'en': '🆕 New Account Registration'},
+                'contents': {'en': '$firstName $lastName ($email) is awaiting approval.'},
+                'data': {'type': 'new_registration'},
+              }),
+            );
+          } catch (_) {}
+        }
+      }
+
+      if (!mounted) return;
+      // Sign out — they can't use the app until approved
+      await FirebaseAuth.instance.signOut();
+      _showPendingDialog();
+    } on FirebaseAuthException catch (e) {
+      final msg = switch (e.code) {
+        'email-already-in-use' => 'An account with this email already exists.',
+        'invalid-email'        => 'Please enter a valid email address.',
+        'weak-password'        => 'Password is too weak. Use at least 6 characters.',
+        _                      => e.message ?? 'Registration failed.',
+      };
+      _showError(msg);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _showPendingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 64, height: 64,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF3CD),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.hourglass_top_rounded, size: 36, color: Color(0xFFF6AD55)),
+          ),
+          const SizedBox(height: 16),
+          const Text('Registration Submitted!',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1a202c))),
+          const SizedBox(height: 10),
+          const Text(
+            'Your account is pending admin approval.\n\nYou will receive an email once your account has been approved.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: Color(0xFF718096), height: 1.5),
+          ),
+        ]),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+              ),
+              onPressed: () {
+                Navigator.pop(context);   // close dialog
+                Navigator.pop(context);   // go back to login
+              },
+              child: const Text('Back to Login', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showError(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: Colors.redAccent),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(children: [
+            // ── Header ──
+            Stack(children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 50, 20, 60),
+                color: _red,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Image.asset('assets/img/LOGO_CALTEX.png',
+                        width: 72, height: 72, fit: BoxFit.contain),
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Image.asset('assets/img/CALTEX_LETTER.png',
+                            height: 44, fit: BoxFit.contain),
+                        const SizedBox(height: 4),
+                        const Text('AutoPro',
+                            style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 4)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Positioned(
+                bottom: 0, left: 0, right: 0,
+                child: Container(
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(32),
+                      topRight: Radius.circular(32),
+                    ),
+                  ),
+                ),
+              ),
+            ]),
+
+            // ── Form ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Center(
+                    child: Text('Create Account',
+                        style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1a202c))),
+                  ),
+                  const SizedBox(height: 4),
+                  const Center(
+                    child: Text('Sign up to get started',
+                        style: TextStyle(
+                            fontSize: 13, color: Color(0xFF718096))),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // First Name & Last Name (side by side)
+                  Row(children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _label('First Name'),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _firstNameCtrl,
+                            textCapitalization: TextCapitalization.words,
+                            style: _inputTextStyle,
+                            decoration: _inputDecoration('First name', Icons.person_outline),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _label('Last Name'),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _lastNameCtrl,
+                            textCapitalization: TextCapitalization.words,
+                            style: _inputTextStyle,
+                            decoration: _inputDecoration('Last name', Icons.person_outline),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 16),
+
+                  // Email
+                  _label('Email Address'),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    style: _inputTextStyle,
+                    decoration: _inputDecoration('Enter your email', Icons.email_outlined),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Password
+                  _label('Password'),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _passwordCtrl,
+                    obscureText: !_passVisible,
+                    style: _inputTextStyle,
+                    onChanged: (_) => setState(
+                        () => _showPassToggle = _passwordCtrl.text.isNotEmpty),
+                    decoration: _inputDecoration(
+                      'Create a password',
+                      Icons.lock_outline,
+                      suffix: _showPassToggle
+                          ? IconButton(
+                              icon: Icon(
+                                  _passVisible
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
+                                  color: const Color(0xFF718096)),
+                              onPressed: () =>
+                                  setState(() => _passVisible = !_passVisible),
+                            )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Confirm Password
+                  _label('Confirm Password'),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _confirmCtrl,
+                    obscureText: !_confirmVisible,
+                    style: _inputTextStyle,
+                    onSubmitted: (_) => _handleRegister(),
+                    onChanged: (_) => setState(
+                        () => _showConfirmToggle = _confirmCtrl.text.isNotEmpty),
+                    decoration: _inputDecoration(
+                      'Confirm your password',
+                      Icons.lock_outline,
+                      suffix: _showConfirmToggle
+                          ? IconButton(
+                              icon: Icon(
+                                  _confirmVisible
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
+                                  color: const Color(0xFF718096)),
+                              onPressed: () => setState(
+                                  () => _confirmVisible = !_confirmVisible),
+                            )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // Register button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _loading ? null : _handleRegister,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _red,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30)),
+                        elevation: 4,
+                      ),
+                      child: _loading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2))
+                          : const Text('Create Account',
+                              style: TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Already have an account
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    const Text('Already have an account? ',
+                        style: TextStyle(
+                            fontSize: 13, color: Color(0xFF718096))),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: const Text('Sign In',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: _red)),
+                    ),
+                  ]),
+                ],
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  static const _inputTextStyle =
+      TextStyle(fontSize: 14, color: Color(0xFF1a202c));
+
+  Widget _label(String text) => Text(text,
+      style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: Color(0xFF4a5568)));
+
+  InputDecoration _inputDecoration(String hint, IconData icon,
+      {Widget? suffix}) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: Color(0xFFa0aec0), fontSize: 14),
+      prefixIcon: Icon(icon, color: const Color(0xFF718096), size: 20),
+      suffixIcon: suffix,
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFe2e8f0))),
+      enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFe2e8f0))),
+      focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _red, width: 1.5)),
+      filled: true,
+      fillColor: const Color(0xFFF7F8FA),
+    );
+  }
+}

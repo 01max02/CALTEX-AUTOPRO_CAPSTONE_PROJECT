@@ -88,10 +88,12 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
         ],
       ),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-          onPressed: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const AppNotifications(role: NotificationRole.customer))),
+        Padding(
+          padding: const EdgeInsets.only(right: 4),
+          child: NotifBadge(
+            role: NotificationRole.customer,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AppNotifications(role: NotificationRole.customer))),
+          ),
         ),
         GestureDetector(
           onTap: () => Navigator.push(context,

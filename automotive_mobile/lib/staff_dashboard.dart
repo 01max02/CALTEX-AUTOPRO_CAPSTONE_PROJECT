@@ -77,9 +77,12 @@ class _StaffDashboardState extends State<StaffDashboard> {
         ],
       ),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AppNotifications(role: NotificationRole.staff))),
+        Padding(
+          padding: const EdgeInsets.only(right: 4),
+          child: NotifBadge(
+            role: NotificationRole.staff,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AppNotifications(role: NotificationRole.staff))),
+          ),
         ),
         CircleAvatar(
           radius: 16,

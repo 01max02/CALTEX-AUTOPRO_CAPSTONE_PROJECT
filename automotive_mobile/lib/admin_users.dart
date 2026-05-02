@@ -7,13 +7,14 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:http/http.dart' as http;
 import 'firebase_options.dart';
 
-// ── EmailJS config ────────────────────────────────────────────────────────
-// Same service as forgot_password.dart — no server needed, works on any network.
-const _ejsServiceId  = 'service_i906b4o';
-const _ejsPublicKey  = 'DqRrjCkUnf9w2L_sv';
-// Template for welcome / credentials email.
-// See setup instructions below in _sendWelcomeEmail.
+// ── EmailJS config (welcome + approval emails) ───────────────────────────
+const _ejsServiceId         = 'service_i906b4o';
+const _ejsPublicKey         = 'DqRrjCkUnf9w2L_sv';
 const _ejsWelcomeTemplateId = 'template_ovrow3w';
+
+// ── OneSignal credentials ──
+const _kOneSignalAppId  = 'c4f82ac7-5340-4e7a-877d-1d38a6f6f8ea';
+const _kOneSignalApiKey = 'os_v7_app_yt4cvr2f1hkhvh5ldu4k637i51snjeyuythen3fd61ae1yhnprpy6kbxvn9kjd1pqdhygsqmlrouas4kfuydft32nkgj5flbra3oo5q';
 
 class AdminUsers extends StatefulWidget {
   const AdminUsers({super.key});
@@ -50,18 +51,39 @@ class _AdminUsersState extends State<AdminUsers> {
     return '${base}@1'; // ensures uppercase, lowercase, digit, special char
   }
 
+  // ── HTML blocks injected via {{{dynamic_block}}} (triple-brace raw HTML) ──
+
+  static String _welcomeBlock({
+    required String toName,
+    required String toEmail,
+    required String tempPassword,
+    required String roleLabel,
+  }) => '''
+<div style="text-align:center;margin-bottom:18px;"><div style="display:inline-block;width:64px;height:64px;background:#fff0f0;border-radius:16px;line-height:64px;font-size:32px;">&#x1F44B;</div></div>
+<h1 style="margin:0 0 8px;text-align:center;font-size:22px;font-weight:800;color:#1a202c;">Welcome to Caltex AutoPro!</h1>
+<p style="margin:0 0 26px;text-align:center;font-size:13px;color:#718096;line-height:1.6;">Hi <strong>$toName</strong>, your account has been created.<br/>Here are your login credentials:</p>
+<div style="background:#f7f8fa;border:1px solid #e2e8f0;border-radius:12px;padding:20px 24px;margin-bottom:26px;"><table cellpadding="0" cellspacing="0" width="100%"><tr><td style="padding:6px 0;font-size:12px;color:#718096;width:110px;">Email</td><td style="padding:6px 0;font-size:13px;font-weight:600;color:#1a202c;">$toEmail</td></tr><tr><td style="padding:6px 0;font-size:12px;color:#718096;">Temp Password</td><td style="padding:6px 0;"><span style="background:#E8001C;color:#fff;font-size:13px;font-weight:700;padding:4px 12px;border-radius:6px;letter-spacing:1px;">$tempPassword</span></td></tr><tr><td style="padding:6px 0;font-size:12px;color:#718096;">Role</td><td style="padding:6px 0;font-size:13px;font-weight:600;color:#1a202c;">$roleLabel</td></tr></table></div>
+<div style="background:#fffbeb;border-left:4px solid #f6ad55;border-radius:8px;padding:13px 16px;margin-bottom:26px;"><p style="margin:0;font-size:12px;color:#744210;line-height:1.6;">&#x1F512; For your security, please <strong>change your password</strong> after your first login.<br/>Go to <strong>Profile &rarr; Change Password</strong> in the app.</p></div>
+<p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#4a5568;">Getting started:</p>
+<table cellpadding="0" cellspacing="0" width="100%"><tr><td style="padding:5px 0;"><span style="display:inline-block;width:22px;height:22px;background:#E8001C;border-radius:50%;color:#fff;font-size:11px;font-weight:700;text-align:center;line-height:22px;margin-right:10px;">1</span><span style="font-size:13px;color:#4a5568;">Open the <strong>Caltex AutoPro</strong> mobile app</span></td></tr><tr><td style="padding:5px 0;"><span style="display:inline-block;width:22px;height:22px;background:#E8001C;border-radius:50%;color:#fff;font-size:11px;font-weight:700;text-align:center;line-height:22px;margin-right:10px;">2</span><span style="font-size:13px;color:#4a5568;">Sign in with your email and temporary password above</span></td></tr><tr><td style="padding:5px 0;"><span style="display:inline-block;width:22px;height:22px;background:#E8001C;border-radius:50%;color:#fff;font-size:11px;font-weight:700;text-align:center;line-height:22px;margin-right:10px;">3</span><span style="font-size:13px;color:#4a5568;">Go to <strong>Profile &rarr; Change Password</strong> to set your own password</span></td></tr></table>''';
+
+  static String _approvalBlock({
+    required String toName,
+    required String toEmail,
+  }) => '''
+<div style="text-align:center;margin-bottom:18px;"><div style="display:inline-block;width:64px;height:64px;background:#f0fff4;border-radius:16px;line-height:64px;font-size:32px;">&#x2705;</div></div>
+<h1 style="margin:0 0 8px;text-align:center;font-size:22px;font-weight:800;color:#1a202c;">Account Approved!</h1>
+<p style="margin:0 0 26px;text-align:center;font-size:13px;color:#718096;line-height:1.6;">Hi <strong>$toName</strong>, great news!<br/>Your Caltex AutoPro account has been approved by the administrator.</p>
+<div style="background:#f0fff4;border:1px solid #9ae6b4;border-radius:12px;padding:24px;margin-bottom:26px;text-align:center;"><div style="font-size:28px;margin-bottom:10px;">&#x1F389;</div><p style="margin:0;font-size:15px;font-weight:700;color:#276749;">You\'re all set!</p><p style="margin:8px 0 0;font-size:13px;color:#2f855a;">Your account <strong>$toEmail</strong> is now active.<br/>You can sign in to the Caltex AutoPro app right now.</p></div>
+<p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#4a5568;">Getting started:</p>
+<table cellpadding="0" cellspacing="0" width="100%"><tr><td style="padding:5px 0;"><span style="display:inline-block;width:22px;height:22px;background:#E8001C;border-radius:50%;color:#fff;font-size:11px;font-weight:700;text-align:center;line-height:22px;margin-right:10px;">1</span><span style="font-size:13px;color:#4a5568;">Open the <strong>Caltex AutoPro</strong> mobile app</span></td></tr><tr><td style="padding:5px 0;"><span style="display:inline-block;width:22px;height:22px;background:#E8001C;border-radius:50%;color:#fff;font-size:11px;font-weight:700;text-align:center;line-height:22px;margin-right:10px;">2</span><span style="font-size:13px;color:#4a5568;">Sign in with your registered email and password</span></td></tr><tr><td style="padding:5px 0;"><span style="display:inline-block;width:22px;height:22px;background:#E8001C;border-radius:50%;color:#fff;font-size:11px;font-weight:700;text-align:center;line-height:22px;margin-right:10px;">3</span><span style="font-size:13px;color:#4a5568;">Explore your dashboard and manage your vehicles &#x2713;</span></td></tr></table>''';
+
   Future<bool> _sendWelcomeEmail({
     required String toEmail,
     required String toName,
     required String tempPassword,
     required String role,
   }) async {
-    // Uses EmailJS — no local server required, works on any network.
-    // Variable mapping matches the "Welcome" template in EmailJS dashboard:
-    //   To Email field:  {{email}}
-    //   Subject:         {{name}}
-    //   Body variables:  {{to_name}}, {{to_email}}, {{temp_password}}, {{role}}
-
     final roleLabel = role[0].toUpperCase() + role.substring(1);
     try {
       final res = await http.post(
@@ -75,16 +97,18 @@ class _AdminUsersState extends State<AdminUsers> {
           'template_id': _ejsWelcomeTemplateId,
           'user_id':     _ejsPublicKey,
           'template_params': {
-            'email':         toEmail,      // → To Email field: {{email}}
-            'name':          toName,       // → Subject: {{name}}
-            'to_name':       toName,       // → Body greeting: {{to_name}}
-            'to_email':      toEmail,      // → Credentials box: {{to_email}}
-            'temp_password': tempPassword, // → {{temp_password}}
-            'role':          roleLabel,    // → {{role}}
+            'email':         toEmail,
+            'name':          toName,
+            'subject':       'Welcome to Caltex AutoPro',
+            'dynamic_block': _welcomeBlock(
+              toName:       toName,
+              toEmail:      toEmail,
+              tempPassword: tempPassword,
+              roleLabel:    roleLabel,
+            ),
           },
         }),
       );
-
       debugPrint('EmailJS welcome ${res.statusCode}: ${res.body}');
       return res.statusCode == 200;
     } catch (e) {
@@ -93,7 +117,39 @@ class _AdminUsersState extends State<AdminUsers> {
     }
   }
 
-  @override
+  Future<bool> _sendApprovalEmail({
+    required String toEmail,
+    required String toName,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
+        headers: {
+          'Content-Type': 'application/json',
+          'origin': 'https://dashboard.emailjs.com',
+        },
+        body: jsonEncode({
+          'service_id':  _ejsServiceId,
+          'template_id': _ejsWelcomeTemplateId,
+          'user_id':     _ejsPublicKey,
+          'template_params': {
+            'email':         toEmail,
+            'name':          'Account Approved — $toName',
+            'subject':       'Your AutoPro Account Has Been Approved',
+            'dynamic_block': _approvalBlock(
+              toName:  toName,
+              toEmail: toEmail,
+            ),
+          },
+        }),
+      );
+      debugPrint('EmailJS approval ${res.statusCode}: ${res.body}');
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('Approval email error: $e');
+      return false;
+    }
+  }
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
@@ -165,30 +221,83 @@ class _AdminUsersState extends State<AdminUsers> {
           final staff = users.where((u) => u['role'] == 'staff').length;
           final admins = users.where((u) => u['role'] == 'admin').length;
 
-          return Column(children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Row(children: [
-                _statChip('Total', '$total', Colors.blue),
-                const SizedBox(width: 8),
-                _statChip('Admin', '$admins', _red),
-                const SizedBox(width: 8),
-                _statChip('Customer', '$customers', Colors.green),
-                const SizedBox(width: 8),
-                _statChip('Staff', '$staff', const Color(0xFF003087)),
-              ]),
-            ),
-            Expanded(
-              child: filtered.isEmpty
-                  ? const Center(child: Text('No users found.', style: TextStyle(color: Color(0xFF718096))))
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (_, i) => _userCard(filtered[i]),
-                    ),
-            ),
-          ]);
+          // Split pending vs active/inactive
+          final pending  = filtered.where((u) => u['status']?.toLowerCase() == 'pending').toList();
+          final nonPending = filtered.where((u) => u['status']?.toLowerCase() != 'pending').toList();
+
+          return DefaultTabController(
+            length: 2,
+            child: Column(children: [
+              // ── Stat chips ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: Row(children: [
+                  _statChip('Total', '$total', Colors.blue),
+                  const SizedBox(width: 8),
+                  _statChip('Admin', '$admins', _red),
+                  const SizedBox(width: 8),
+                  _statChip('Customer', '$customers', Colors.green),
+                  const SizedBox(width: 8),
+                  _statChip('Staff', '$staff', const Color(0xFF003087)),
+                ]),
+              ),
+              // ── Tabs ──
+              TabBar(
+                labelColor: _red,
+                unselectedLabelColor: const Color(0xFF718096),
+                indicatorColor: _red,
+                tabs: [
+                  const Tab(text: 'All Users'),
+                  Tab(
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Text('Pending'),
+                      if (pending.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.orange,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text('${pending.length}',
+                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ]),
+                  ),
+                ],
+              ),
+              // ── Tab views ──
+              Expanded(
+                child: TabBarView(children: [
+                  // ── All Users tab ──
+                  nonPending.isEmpty
+                      ? const Center(child: Text('No users found.', style: TextStyle(color: Color(0xFF718096))))
+                      : ListView.separated(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: nonPending.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (_, i) => _userCard(nonPending[i]),
+                        ),
+                  // ── Pending tab ──
+                  pending.isEmpty
+                      ? const Center(
+                          child: Column(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.check_circle_outline, size: 48, color: Color(0xFFcbd5e0)),
+                            SizedBox(height: 12),
+                            Text('No pending registrations', style: TextStyle(color: Color(0xFF718096))),
+                          ]),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: pending.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (_, i) => _pendingCard(pending[i]),
+                        ),
+                ]),
+              ),
+            ]),
+          );
         },
       ),
     );
@@ -235,7 +344,6 @@ class _AdminUsersState extends State<AdminUsers> {
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(u['name']!, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-            Text('${u['username']}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
             Text(u['email']!, style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -247,7 +355,11 @@ class _AdminUsersState extends State<AdminUsers> {
             const SizedBox(height: 4),
             Text(u['status']!,
               style: TextStyle(fontSize: 10,
-                color: u['status'] == 'Active' ? Colors.green : const Color(0xFF718096),
+                color: u['status']?.toLowerCase() == 'active'
+                    ? Colors.green
+                    : u['status']?.toLowerCase() == 'pending'
+                        ? Colors.orange
+                        : const Color(0xFF718096),
                 fontWeight: FontWeight.w500)),
           ]),
           PopupMenuButton<String>(
@@ -258,29 +370,231 @@ class _AdminUsersState extends State<AdminUsers> {
             },
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text('Edit')])),
-              PopupMenuItem(
-                value: 'toggle',
-                child: Row(children: [
-                  Icon(
-                    u['status']?.toLowerCase() == 'active'
-                        ? Icons.block_outlined
-                        : Icons.check_circle_outline,
-                    size: 16,
-                    color: u['status']?.toLowerCase() == 'active' ? Colors.orange : Colors.green,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    u['status']?.toLowerCase() == 'active' ? 'Deactivate' : 'Activate',
-                    style: TextStyle(
+              // Only show Activate/Deactivate for non-pending users
+              if ((u['status']?.toLowerCase() ?? '') != 'pending')
+                PopupMenuItem(
+                  value: 'toggle',
+                  child: Row(children: [
+                    Icon(
+                      u['status']?.toLowerCase() == 'active'
+                          ? Icons.block_outlined
+                          : Icons.check_circle_outline,
+                      size: 16,
                       color: u['status']?.toLowerCase() == 'active' ? Colors.orange : Colors.green,
                     ),
-                  ),
-                ]),
-              ),
+                    const SizedBox(width: 8),
+                    Text(
+                      u['status']?.toLowerCase() == 'active' ? 'Deactivate' : 'Activate',
+                      style: TextStyle(
+                        color: u['status']?.toLowerCase() == 'active' ? Colors.orange : Colors.green,
+                      ),
+                    ),
+                  ]),
+                ),
             ],
           ),
         ]),
       ),
+    );
+  }
+
+  Future<void> _approveUser(Map<String, String> u) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(children: [
+          Icon(Icons.check_circle_outline, color: Colors.green, size: 22),
+          SizedBox(width: 8),
+          Text('Approve Account'),
+        ]),
+        content: Text('Approve "${u['name']}"?\n\nThey will receive an email notification and can sign in immediately.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Approve'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(u['uid'])
+          .update({'status': 'Active'});
+
+      // Send approval email — fire and forget, don't block the UI
+      if (u['email']!.isNotEmpty) {
+        _sendApprovalEmail(toEmail: u['email']!, toName: u['name']!).then((sent) {
+          debugPrint(sent
+              ? '✅ Approval email sent to ${u['email']}'
+              : '⚠️ Approval email failed for ${u['email']}');
+        });
+      }
+
+      // Push OneSignal notification to the user's device if they have one
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users').doc(u['uid']).get();
+      final subId = userDoc.data()?['oneSignalId'] as String?;
+      if (subId != null && subId.isNotEmpty) {
+        try {
+          await http.post(
+            Uri.parse('https://onesignal.com/api/v1/notifications'),
+            headers: {
+              'Authorization': 'Basic $_kOneSignalApiKey',
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: jsonEncode({
+              'app_id': _kOneSignalAppId,
+              'include_subscription_ids': [subId],
+              'headings': {'en': '✅ Account Approved!'},
+              'contents': {'en': 'Your AutoPro account has been approved. You can now sign in.'},
+              'data': {'type': 'account_approved'},
+            }),
+          );
+        } catch (_) {}
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Row(children: [
+            const Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Expanded(child: Text('${u['name']} approved! Notification sent.')),
+          ]),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  Future<void> _rejectUser(Map<String, String> u) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(children: [
+          Icon(Icons.delete_outline, color: Colors.red, size: 22),
+          SizedBox(width: 8),
+          Text('Reject & Delete'),
+        ]),
+        content: Text('Reject "${u['name']}"?\n\nThis will permanently delete their account.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete Account'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final uid = u['uid']!;
+
+      // 1. Delete Firestore document
+      await FirebaseFirestore.instance.collection('users').doc(uid).delete();
+
+      // 2. Delete Firebase Auth account via Flask Admin SDK endpoint
+      try {
+        await http.post(
+          Uri.parse('http://10.0.2.2:5000/api/delete-user'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'uid': uid}),
+        );
+      } catch (authErr) {
+        debugPrint('⚠️ Auth deletion failed (Firestore already deleted): $authErr');
+      }
+
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Account rejected and deleted.'),
+        backgroundColor: Colors.red,
+      ));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  Widget _pendingCard(Map<String, String> u) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.shade200),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: Colors.orange.withOpacity(0.15),
+            child: Text(u['name']![0].toUpperCase(),
+              style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 16)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(u['name']!, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            Text(u['email']!, style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+          ])),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text('Pending',
+              style: TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.w600)),
+          ),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () => _rejectUser(u),
+              icon: const Icon(Icons.close, size: 15, color: Colors.red),
+              label: const Text('Reject', style: TextStyle(color: Colors.red, fontSize: 13)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.red),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () => _approveUser(u),
+              icon: const Icon(Icons.check, size: 15),
+              label: const Text('Approve', style: TextStyle(fontSize: 13)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+        ]),
+      ]),
     );
   }
 
@@ -306,7 +620,6 @@ class _AdminUsersState extends State<AdminUsers> {
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(u['name']!, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                  Text('${u['username']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
                 ])),
                 GestureDetector(onTap: () => Navigator.pop(context),
                   child: const Icon(Icons.close, color: Colors.white)),
@@ -316,7 +629,6 @@ class _AdminUsersState extends State<AdminUsers> {
               padding: const EdgeInsets.all(20),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 _detailRow('Full Name', u['name']!),
-                _detailRow('Username', '${u['username']}'),
                 _detailRow('Email', u['email']!),
                 _detailRow('Role', _roleLabel(u['role']!)),
                 _detailRow('Status', u['status']!),
@@ -347,9 +659,12 @@ class _AdminUsersState extends State<AdminUsers> {
 
   void _showAddUserModal({Map<String, String>? user}) {
     final isEdit = user != null;
-    final nameCtrl     = TextEditingController(text: user?['name']     ?? '');
-    final usernameCtrl = TextEditingController(text: user?['username'] ?? '');
-    final emailCtrl    = TextEditingController(text: user?['email']    ?? '');
+    // Split existing name into first/last for edit mode
+    final existingName  = user?['name'] ?? '';
+    final nameParts     = existingName.split(' ');
+    final firstNameCtrl = TextEditingController(text: nameParts.isNotEmpty ? nameParts.first : '');
+    final lastNameCtrl  = TextEditingController(text: nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '');
+    final emailCtrl     = TextEditingController(text: user?['email'] ?? '');
     String selectedRole   = isEdit
         ? (user!['role']![0].toUpperCase() + user['role']!.substring(1))
         : 'Staff';
@@ -413,17 +728,26 @@ class _AdminUsersState extends State<AdminUsers> {
                     left: 20, right: 20, top: 20,
                     bottom: MediaQuery.of(ctx).viewInsets.bottom + 24),
                 child: Column(children: [
-                  TextField(
-                    controller: nameCtrl,
-                    decoration: const InputDecoration(
-                        labelText: 'Full Name *',
-                        border: OutlineInputBorder())),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: usernameCtrl,
-                    decoration: const InputDecoration(
-                        labelText: 'Username *',
-                        border: OutlineInputBorder())),
+                  // First Name & Last Name side by side
+                  Row(children: [
+                    Expanded(
+                      child: TextField(
+                        controller: firstNameCtrl,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                            labelText: 'First Name *',
+                            border: OutlineInputBorder())),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: lastNameCtrl,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                            labelText: 'Last Name *',
+                            border: OutlineInputBorder())),
+                    ),
+                  ]),
                   const SizedBox(height: 10),
                   TextField(
                     controller: emailCtrl,
@@ -482,9 +806,10 @@ class _AdminUsersState extends State<AdminUsers> {
                           foregroundColor: Colors.white),
                       onPressed: saving ? null : () async {
                         // Validate
-                        if (nameCtrl.text.trim().isEmpty ||
-                            usernameCtrl.text.trim().isEmpty ||
-                            emailCtrl.text.trim().isEmpty) {
+                        final firstName = firstNameCtrl.text.trim();
+                        final lastName  = lastNameCtrl.text.trim();
+                        final fullName  = '$firstName $lastName'.trim();
+                        if (firstName.isEmpty || lastName.isEmpty || emailCtrl.text.trim().isEmpty) {
                           ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
                             content: Text('Please fill in all required fields.'),
                             backgroundColor: Colors.orange));
@@ -500,11 +825,12 @@ class _AdminUsersState extends State<AdminUsers> {
                                 .collection('users')
                                 .doc(user!['uid'])
                                 .update({
-                              'name':     nameCtrl.text.trim(),
-                              'username': usernameCtrl.text.trim(),
-                              'email':    emailCtrl.text.trim(),
-                              'role':     selectedRole.toLowerCase(),
-                              'status':   selectedStatus,
+                              'firstName': firstName,
+                              'lastName':  lastName,
+                              'name':      fullName,
+                              'email':     emailCtrl.text.trim(),
+                              'role':      selectedRole.toLowerCase(),
+                              'status':    selectedStatus,
                             });
                             if (ctx.mounted) {
                               Navigator.pop(ctx);
@@ -562,8 +888,9 @@ class _AdminUsersState extends State<AdminUsers> {
                                   .collection('users')
                                   .doc(cred.user!.uid)
                                   .set({
-                                'name':      nameCtrl.text.trim(),
-                                'username':  usernameCtrl.text.trim(),
+                                'firstName': firstName,
+                                'lastName':  lastName,
+                                'name':      fullName,
                                 'email':     emailCtrl.text.trim(),
                                 'role':      selectedRole.toLowerCase(),
                                 'status':    selectedStatus,
@@ -583,7 +910,7 @@ class _AdminUsersState extends State<AdminUsers> {
                             try {
                               sent = await _sendWelcomeEmail(
                                 toEmail:      emailCtrl.text.trim(),
-                                toName:       nameCtrl.text.trim(),
+                                toName:       fullName,
                                 tempPassword: tempPass,
                                 role:         selectedRole,
                               );
@@ -688,6 +1015,7 @@ class _AdminUsersState extends State<AdminUsers> {
             onPressed: () async {
               Navigator.pop(context);
               try {
+                // Only toggle between Active ↔ Inactive — never touch 'pending' status here
                 final newStatus = isActive ? 'Inactive' : 'Active';
                 await FirebaseFirestore.instance
                     .collection('users')

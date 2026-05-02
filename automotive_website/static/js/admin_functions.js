@@ -1685,12 +1685,28 @@ function deleteIssuance(id) {
 
 // ── Users ───────────────────────────────────────────────────
 function renderUsersList() {
-    var users = window.users || [];
+    var allUsers = window.users || [];
     var search = (document.getElementById('userSearch')||{}).value || '';
-    var filtered = users;
+
+    // Split pending vs non-pending
+    var pending    = allUsers.filter(function(u){ return (u.status||'').toLowerCase() === 'pending'; });
+    var nonPending = allUsers.filter(function(u){ return (u.status||'').toLowerCase() !== 'pending'; });
+
+    // Update pending badge
+    var badge = document.getElementById('pendingBadge');
+    if (badge) {
+        if (pending.length > 0) { badge.textContent = pending.length; badge.style.display = 'inline-block'; }
+        else { badge.style.display = 'none'; }
+    }
+
+    // Render pending cards
+    if (typeof renderPendingCards === 'function') renderPendingCards(pending);
+
+    // Filter non-pending by search
+    var filtered = nonPending;
     if (search.trim()) {
         var q = search.toLowerCase();
-        filtered = users.filter(function(u){
+        filtered = nonPending.filter(function(u){
             return (u.name||'').toLowerCase().includes(q)
                 || (u.username||'').toLowerCase().includes(q)
                 || (u.email||'').toLowerCase().includes(q);
@@ -1698,10 +1714,10 @@ function renderUsersList() {
     }
 
     var s = function(id,val){ var el=document.getElementById(id); if(el) el.textContent=val; };
-    s('userStatTotal', users.length);
-    s('userStatAdmin', users.filter(function(u){ return u.role==='admin'; }).length);
-    s('userStatCustomer', users.filter(function(u){ return u.role==='customer'; }).length);
-    s('userStatStaff', users.filter(function(u){ return u.role==='staff'; }).length);
+    s('userStatTotal', allUsers.length);
+    s('userStatAdmin', allUsers.filter(function(u){ return u.role==='admin'; }).length);
+    s('userStatCustomer', allUsers.filter(function(u){ return u.role==='customer'; }).length);
+    s('userStatStaff', allUsers.filter(function(u){ return u.role==='staff'; }).length);
 
     var container = document.getElementById('userCardsList');
     if (!container) return;
@@ -1715,22 +1731,23 @@ function renderUsersList() {
     container.innerHTML = filtered.map(function(u, idx) {
         var roleColor = roleColors[(u.role||'').toLowerCase()] || '#718096';
         var statusLower = (u.status||'').toLowerCase();
-        var statusBadge = statusLower === 'active'
-            ? '<span style="background:rgba(56,161,105,0.1);color:#38a169;padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">Active</span>'
-            : '<span style="background:rgba(113,128,150,0.1);color:#718096;padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">Inactive</span>';
+        var statusColor = statusLower === 'active' ? '#38a169' : '#718096';
+        var statusLabel = statusLower === 'active' ? 'Active' : 'Inactive';
+        var statusBadge = '<span style="background:'+statusColor+'20;color:'+statusColor+';padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">'+statusLabel+'</span>';
         var roleLabel = (u.role||'');
         roleLabel = roleLabel.charAt(0).toUpperCase() + roleLabel.slice(1);
-        return '<div class="table-row" style="grid-template-columns:40px 1.5fr 1fr 1.5fr 1fr 1fr 140px;">'
+        return '<div class="table-row" style="grid-template-columns:40px 2fr 2fr 1fr 1fr 140px;">'
             + '<div style="color:#a0aec0;font-size:0.85rem;">' + (idx+1) + '</div>'
-            + '<div><strong>' + u.name + '</strong></div>'
-            + '<div>' + u.username + '</div>'
-            + '<div>' + (u.email||'-') + '</div>'
+            + '<div><strong>' + (u.name||'—') + '</strong></div>'
+            + '<div style="color:#718096;font-size:0.85rem;">' + (u.email||'—') + '</div>'
             + '<div><span style="background:'+roleColor+'20;color:'+roleColor+';padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">' + roleLabel + '</span></div>'
             + '<div>' + statusBadge + '</div>'
             + '<div style="display:flex;gap:0.4rem;">'
             +   '<button class="btn-small btn-primary" onclick="viewUser(\''+u.id+'\')" title="View" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>'
             +   '<button class="btn-small btn-secondary" onclick="editUser(\''+u.id+'\')" title="Edit" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
-            +   '<button class="btn-small btn-danger" onclick="toggleUserStatus(\''+u.id+'\')" title="'+(statusLower==='active'?'Deactivate':'Activate')+'" style="display:inline-flex;align-items:center;justify-content:center;">'+(statusLower==='active'?'<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>':'<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>')+'</button>'
+            +   (statusLower !== 'pending'
+                ? '<button class="btn-small btn-danger" onclick="toggleUserStatus(\''+u.id+'\',\''+statusLower+'\')" title="'+(statusLower==='active'?'Deactivate':'Activate')+'" style="display:inline-flex;align-items:center;justify-content:center;">'+(statusLower==='active'?'<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>':'<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>')+'</button>'
+                : '')
             + '</div></div>';
     }).join('');
 }
@@ -2250,3 +2267,238 @@ function searchItemMasterByScan() {
         alert('⚠️ No item found for: "' + val + '"');
     }
 }
+
+
+// ── Generate PMS Notifications → Firestore ──────────────────────────────────
+// Mirrors the mobile app's generateDSSAlerts() PMS section.
+// Notifies BOTH admins (targetRole:'admin') AND the vehicle owner/customer
+// (targetUid: ownerId) with personal messages about their own vehicle.
+// Respects each user's alert prefs (pmsOverdue / pmsDueThisWeek / pmsDueSoon).
+window.generateWebPMSNotifications = async function () {
+    if (typeof firebase === 'undefined') return;
+    const db    = firebase.firestore();
+    const now   = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayStr = today.toISOString().split('T')[0]; // e.g. "2026-05-02"
+
+    // ── Dedup guard: only generate once per calendar day ──
+    // Store a marker doc in Firestore so it persists across sessions/logins
+    const markerRef = db.collection('_pmsAlertLog').doc(todayStr);
+    try {
+        const markerDoc = await markerRef.get();
+        if (markerDoc.exists) {
+            console.log('ℹ️ PMS notifications already generated today (' + todayStr + '), skipping.');
+            return;
+        }
+        // Write the marker immediately to prevent race conditions
+        await markerRef.set({ generatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    } catch (e) {
+        console.warn('generateWebPMSNotifications: marker check failed', e);
+        return; // fail safe — don't generate if we can't check
+    }
+
+    // ── Load all admins + their prefs ──
+    let adminSnap;
+    try {
+        adminSnap = await db.collection('users').where('role', '==', 'admin').get();
+    } catch (e) {
+        console.warn('generateWebPMSNotifications: could not fetch admins', e);
+        return;
+    }
+    const adminDocs = adminSnap.docs;
+
+    const adminPrefs = {};
+    await Promise.all(adminDocs.map(async function (d) {
+        try {
+            const prefDoc = await db.collection('users').doc(d.id)
+                .collection('settings').doc('alerts').get();
+            const data = prefDoc.exists ? prefDoc.data() : {};
+            adminPrefs[d.id] = {
+                pmsOverdue:     data.pmsOverdue     !== false,
+                pmsDueThisWeek: data.pmsDueThisWeek !== false,
+                pmsDueSoon:     data.pmsDueSoon     !== false,
+            };
+        } catch (_) {
+            adminPrefs[d.id] = { pmsOverdue: true, pmsDueThisWeek: true, pmsDueSoon: true };
+        }
+    }));
+
+    // ── Helper: push OneSignal via Flask ──
+    async function _pushOneSignal(subIds, title, message, type) {
+        if (!subIds.length) return;
+        try {
+            await fetch('/api/send-push-notification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subscription_ids: subIds, title, message, type })
+            });
+        } catch (e) {
+            console.warn('generateWebPMSNotifications: push failed', e);
+        }
+    }
+
+    // ── Helper: write admin notification ──
+    async function _notifyAdmins(title, message, type, prefKey) {
+        const eligible = adminDocs.filter(d => adminPrefs[d.id]?.[prefKey] !== false);
+        if (!eligible.length) return;
+
+        try {
+            await db.collection('notifications').add({
+                title, message, type,
+                targetRole: 'admin',
+                targetUid:  '',
+                createdAt:  firebase.firestore.FieldValue.serverTimestamp(),
+                readBy:     {},
+                isRead:     false,
+            });
+        } catch (e) {
+            console.warn('generateWebPMSNotifications: admin Firestore write failed', e);
+        }
+
+        const subIds = eligible.map(d => d.data().oneSignalId).filter(Boolean);
+        await _pushOneSignal(subIds, title, message, type);
+    }
+
+    // ── Helper: write customer/owner notification ──
+    async function _notifyOwner(ownerId, ownerSubId, title, message, type, prefKey) {
+        let ownerPref = true;
+        try {
+            const prefDoc = await db.collection('users').doc(ownerId)
+                .collection('settings').doc('alerts').get();
+            if (prefDoc.exists) {
+                const d = prefDoc.data();
+                ownerPref = d[prefKey] !== false;
+            }
+        } catch (_) {}
+        if (!ownerPref) return;
+
+        try {
+            await db.collection('notifications').add({
+                title, message, type,
+                targetRole: '',
+                targetUid:  ownerId,
+                createdAt:  firebase.firestore.FieldValue.serverTimestamp(),
+                readBy:     {},
+                isRead:     false,
+            });
+        } catch (e) {
+            console.warn('generateWebPMSNotifications: owner Firestore write failed', e);
+        }
+
+        if (ownerSubId) {
+            await _pushOneSignal([ownerSubId], title, message, type);
+        }
+    }
+
+    // ── Read vehicles ──
+    let vehiclesSnap;
+    try {
+        vehiclesSnap = await db.collection('vehicles').get();
+    } catch (e) {
+        console.warn('generateWebPMSNotifications: could not fetch vehicles', e);
+        return;
+    }
+
+    for (const vDoc of vehiclesSnap.docs) {
+        const data        = vDoc.data();
+        const plate       = data.plate || data.plateNumber || '';
+        const desc        = data.desc  || data.assetDescription || plate;
+        const lastSvcDate = data.lastSvcDate || data.lastServiceDate || '';
+        const svcFreqRaw  = data.svcFreq || data.serviceFrequency;
+        const svcFreq     = parseInt(String(svcFreqRaw || '')) || 0;
+        // Try UID fields first, fall back to name-based lookup
+        let ownerId       = data.ownerId || data.customerId || '';
+        const ownerName   = data.owner  || data.ownerName  || '';
+
+        if (!plate || !lastSvcDate || !svcFreq) continue;
+
+        const lastDate = new Date(lastSvcDate);
+        if (isNaN(lastDate)) continue;
+
+        const nextDate     = new Date(lastDate.getFullYear(), lastDate.getMonth() + svcFreq, lastDate.getDate());
+        const nextMidnight = new Date(nextDate.getFullYear(), nextDate.getMonth(), nextDate.getDate());
+        const daysUntil    = Math.round((nextMidnight - today) / 86400000);
+
+        // Resolve ownerId from name if not stored as UID
+        if (!ownerId && ownerName) {
+            try {
+                // Try exact name match first
+                let ownerSnap = await db.collection('users')
+                    .where('name', '==', ownerName)
+                    .where('role', '==', 'customer')
+                    .limit(1).get();
+                if (!ownerSnap.empty) {
+                    ownerId = ownerSnap.docs[0].id;
+                } else {
+                    // Fallback: scan all customers and match case-insensitively
+                    const allCustomers = await db.collection('users')
+                        .where('role', '==', 'customer').get();
+                    const ownerLower = ownerName.trim().toLowerCase();
+                    for (const cu of allCustomers.docs) {
+                        const cuName = (cu.data().name || '').trim().toLowerCase();
+                        if (cuName === ownerLower) { ownerId = cu.id; break; }
+                    }
+                }
+                if (ownerId) console.log('✅ Resolved owner UID for', ownerName, '→', ownerId);
+                else console.warn('⚠️ Could not resolve owner UID for vehicle', plate, '(owner:', ownerName + ')');
+            } catch (e) {
+                console.warn('generateWebPMSNotifications: owner lookup failed', e);
+            }
+        }
+
+        // Fetch owner's oneSignalId if they exist
+        let ownerSubId = null;
+        if (ownerId) {
+            try {
+                const ownerDoc = await db.collection('users').doc(ownerId).get();
+                if (ownerDoc.exists) ownerSubId = ownerDoc.data().oneSignalId || null;
+            } catch (_) {}
+        }
+
+        if (daysUntil < 0) {
+            const abs = Math.abs(daysUntil);
+            // Admin alert
+            await _notifyAdmins(
+                '🚨 PMS Overdue',
+                desc + ' (' + plate + ') is ' + abs + ' day(s) overdue for maintenance.',
+                'warning', 'pmsOverdue'
+            );
+            // Customer alert
+            if (ownerId) {
+                await _notifyOwner(ownerId, ownerSubId,
+                    '🚨 Your PMS is Overdue',
+                    'Your ' + plate + ' is ' + abs + ' day(s) overdue for maintenance.',
+                    'warning', 'pmsOverdue'
+                );
+            }
+        } else if (daysUntil <= 7) {
+            await _notifyAdmins(
+                '📅 PMS Due This Week',
+                desc + ' (' + plate + ') is due for maintenance this week (' + daysUntil + ' day(s)).',
+                'warning', 'pmsDueThisWeek'
+            );
+            if (ownerId) {
+                await _notifyOwner(ownerId, ownerSubId,
+                    '📅 Your PMS is Due This Week',
+                    'Your ' + plate + ' is due for maintenance this week (' + daysUntil + ' day(s)).',
+                    'warning', 'pmsDueThisWeek'
+                );
+            }
+        } else if (daysUntil <= 14) {
+            await _notifyAdmins(
+                '⚠️ PMS Due Soon',
+                desc + ' (' + plate + ') is due for maintenance in ' + daysUntil + ' day(s).',
+                'info', 'pmsDueSoon'
+            );
+            if (ownerId) {
+                await _notifyOwner(ownerId, ownerSubId,
+                    '⚠️ Your PMS is Due Soon',
+                    'Your ' + plate + ' is due for maintenance in ' + daysUntil + ' day(s).',
+                    'info', 'pmsDueSoon'
+                );
+            }
+        }
+    }
+
+    console.log('✅ Web PMS notifications generated (admin + customers)');
+};

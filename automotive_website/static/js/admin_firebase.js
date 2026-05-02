@@ -118,6 +118,13 @@
         };
       });
       if (typeof renderAssetsList === 'function') renderAssetsList();
+      // Update header notification badge with PMS alerts from Firestore vehicles
+      if (typeof renderAdminNotifications === 'function') renderAdminNotifications();
+      // Generate PMS notifications → Firestore once per session (not on every snapshot update)
+      if (typeof generateWebPMSNotifications === 'function' && !window._pmsNotifGenerated) {
+        window._pmsNotifGenerated = true;
+        generateWebPMSNotifications();
+      }
       _updateOverviewStats();
       // DSS-PMS readiness: vehicles loaded
       window._dssVehiclesReady = true;
@@ -315,22 +322,42 @@
       }
     });
 
-    // Notifications — update badge from Firestore + re-render panel
-    db.collection('notifications').orderBy('createdAt', 'desc').limit(30).onSnapshot(snap => {
-      window._fbNotifications = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-      if (typeof renderAdminNotifications === 'function') renderAdminNotifications();
-      // Update header badge from Firestore unread count
-      const uid = user.uid;
-      const unread = window._fbNotifications.filter(n => {
-        const readBy = n.readBy || {};
-        return readBy[uid] !== true;
-      }).length;
-      const badge = document.getElementById('adminHeaderNotifBadge');
-      if (badge) {
-        badge.textContent = unread > 9 ? '9+' : unread;
-        badge.style.display = unread > 0 ? 'flex' : 'none';
-      }
-    });
+    // Notifications — only fetch admin-targeted ones (targetRole:'admin')
+    // Customer personal notifications (targetUid) are excluded from admin panel
+    // No orderBy to avoid requiring a composite index — sorted client-side instead
+    db.collection('notifications')
+      .where('targetRole', '==', 'admin')
+      .limit(50)
+      .onSnapshot(snap => {
+        window._fbNotifications = snap.docs
+          .map(d => ({ _id: d.id, ...d.data() }))
+          .sort((a, b) => {
+            const aMs = a.createdAt?.toMillis?.() ?? 0;
+            const bMs = b.createdAt?.toMillis?.() ?? 0;
+            return bMs - aMs; // newest first
+          });
+        if (typeof renderAdminNotifications === 'function') renderAdminNotifications();
+
+        // Update header badge — retry until the element exists (header loads async)
+        const uid = user.uid;
+        const unread = window._fbNotifications.filter(n => {
+          const readBy = n.readBy || {};
+          return readBy[uid] !== true;
+        }).length;
+        window._adminUnreadCount = unread; // cache for retry
+
+        function _applyBadge() {
+          const badge = document.getElementById('adminHeaderNotifBadge');
+          if (badge) {
+            badge.textContent = unread > 9 ? '9+' : unread;
+            badge.style.display = unread > 0 ? 'flex' : 'none';
+          } else {
+            // Header not loaded yet — retry after a short delay
+            setTimeout(_applyBadge, 300);
+          }
+        }
+        _applyBadge();
+      });
 
   } // end _initFirestore
 

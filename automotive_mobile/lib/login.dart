@@ -7,6 +7,7 @@ import 'staff_dashboard.dart';
 import 'customer_dashboard.dart';
 import 'admin_dashboard.dart';
 import 'forgot_password.dart';
+import 'register.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -91,6 +92,13 @@ class _LoginScreenState extends State<LoginScreen> {
       if (status == 'inactive') {
         await FirebaseAuth.instance.signOut();
         _showError('Your account has been deactivated. Please contact the administrator.');
+        return;
+      }
+
+      // Block pending users
+      if (status == 'pending') {
+        await FirebaseAuth.instance.signOut();
+        _showError('Your account is pending admin approval. You will be notified by email once approved.');
         return;
       }
 
@@ -343,6 +351,24 @@ class _LoginScreenState extends State<LoginScreen> {
                           ]),
                   ),
                 ),
+                const SizedBox(height: 20),
+                // ── Sign Up link ──
+                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const Text("Don't have an account? ",
+                    style: TextStyle(fontSize: 13, color: Color(0xFF718096))),
+                  GestureDetector(
+                    onTap: _loading ? null : () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                    ),
+                    child: const Text('Sign Up',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: _red,
+                      )),
+                  ),
+                ]),
               ]),
             ),
           ]),

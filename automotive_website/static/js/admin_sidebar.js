@@ -73,6 +73,17 @@ function bindHeaderControls() {
     const overlay = document.getElementById('adminSidebarOverlay');
     if (overlay) overlay.addEventListener('click', toggleAdminSidebar);
 
+    // Apply cached notification badge count (set by admin_firebase.js onSnapshot)
+    // This handles the case where the snapshot fired before the header was injected
+    if (typeof window._adminUnreadCount !== 'undefined') {
+        const badge = document.getElementById('adminHeaderNotifBadge');
+        if (badge) {
+            const unread = window._adminUnreadCount;
+            badge.textContent = unread > 9 ? '9+' : unread;
+            badge.style.display = unread > 0 ? 'flex' : 'none';
+        }
+    }
+
     if (typeof firebase !== 'undefined') {
         firebase.auth().onAuthStateChanged(user => {
             if (user) {

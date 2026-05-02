@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vehicle List – AutoPro Admin</title>
+    <title>Vehicle List</title>
+    <link rel="icon" type="image/png" href="../static/img/LOGO_CALTEX.png" />
     <link rel="stylesheet" href="../static/css/style.css">
     <link rel="stylesheet" href="../static/css/admin.css">
 </head>
@@ -297,11 +298,12 @@
       if (!plate) return;
       var lastSvcDate = form.elements.lastServiceDate.value;
       var svcFreq = form.elements.serviceFrequency.value;
+      var ownerName = form.elements.ownerName.value.trim();
       var data = {
         plate: plate,
         desc: form.elements.assetDescription.value.trim(),
         type: form.elements.assetType.value,
-        owner: form.elements.ownerName.value.trim(),
+        owner: ownerName,
         odo: form.elements.currentOdometer.value ? form.elements.currentOdometer.value + ' km' : '',
         lastSvcOdo: form.elements.lastServiceOdometer.value,
         lastSvcDate: lastSvcDate,
@@ -320,26 +322,45 @@
       }
 
       var db = firebase.firestore();
-      if (_editingVehicleId) {
-        var vBtn = document.getElementById('assetSubmitBtn');
-        if (vBtn) { vBtn.disabled = true; vBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 0.8s linear infinite"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.49"/></svg> Updating…'; }
-        db.collection('vehicles').doc(_editingVehicleId).update(data)
-          .then(function() { closeModal('addAssetModal'); showToast('Vehicle updated successfully!', 'success'); })
-          .catch(function(err) { showToast('Update failed: ' + err.message, 'error'); })
-          .finally(function() { if (vBtn) { vBtn.disabled = false; vBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Update'; } });
+
+      // Resolve ownerId from owner name so PMS notifications can target the customer
+      function _saveVehicle(extraData) {
+        var finalData = Object.assign({}, data, extraData || {});
+        if (_editingVehicleId) {
+          var vBtn = document.getElementById('assetSubmitBtn');
+          if (vBtn) { vBtn.disabled = true; vBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 0.8s linear infinite"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.49"/></svg> Updating…'; }
+          db.collection('vehicles').doc(_editingVehicleId).update(finalData)
+            .then(function() { closeModal('addAssetModal'); showToast('Vehicle updated successfully!', 'success'); })
+            .catch(function(err) { showToast('Update failed: ' + err.message, 'error'); })
+            .finally(function() { if (vBtn) { vBtn.disabled = false; vBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Update'; } });
+        } else {
+          var vBtn2 = document.getElementById('assetSubmitBtn');
+          db.collection('vehicles').where('plate', '==', plate).limit(1).get().then(function(snap) {
+            if (!snap.empty) { showToast('A vehicle with this plate already exists.', 'error'); return; }
+            if (vBtn2) { vBtn2.disabled = true; vBtn2.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 0.8s linear infinite"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.49"/></svg> Saving…'; }
+            finalData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            finalData.status = 'Active';
+            return db.collection('vehicles').add(finalData);
+          }).then(function(ref) {
+            if (ref) { closeModal('addAssetModal'); showToast('Vehicle added successfully!', 'success'); }
+          }).catch(function(err) { showToast('Save failed: ' + err.message, 'error'); })
+          .finally(function() { if (vBtn2) { vBtn2.disabled = false; vBtn2.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save'; } });
+        }
+      }
+
+      // Look up customer UID by name and attach as ownerId
+      if (ownerName) {
+        db.collection('users')
+          .where('name', '==', ownerName)
+          .where('role', '==', 'customer')
+          .limit(1).get()
+          .then(function(snap) {
+            var ownerId = snap.empty ? '' : snap.docs[0].id;
+            _saveVehicle({ ownerId: ownerId });
+          })
+          .catch(function() { _saveVehicle({}); });
       } else {
-        // Check duplicate plate
-        var vBtn2 = document.getElementById('assetSubmitBtn');
-        db.collection('vehicles').where('plate', '==', plate).limit(1).get().then(function(snap) {
-          if (!snap.empty) { showToast('A vehicle with this plate already exists.', 'error'); return; }
-          if (vBtn2) { vBtn2.disabled = true; vBtn2.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 0.8s linear infinite"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.49"/></svg> Saving…'; }
-          data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-          data.status = 'Active';
-          return db.collection('vehicles').add(data);
-        }).then(function(ref) {
-          if (ref) { closeModal('addAssetModal'); showToast('Vehicle added successfully!', 'success'); }
-        }).catch(function(err) { showToast('Save failed: ' + err.message, 'error'); })
-        .finally(function() { if (vBtn2) { vBtn2.disabled = false; vBtn2.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save'; } });
+        _saveVehicle({});
       }
     });
   });

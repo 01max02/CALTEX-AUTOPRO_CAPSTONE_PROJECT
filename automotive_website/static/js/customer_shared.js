@@ -131,6 +131,7 @@
 
         listEl.innerHTML = _cuNotifs.map(function (n, i) {
             return '<div class="admin-notif-item' + (!n.read ? ' unread' : '') + '" '
+                + 'style="position:relative;padding-right:2rem;" '
                 + 'onclick="_cuMarkRead(\'' + n.id + '\',' + i + ')">'
                 + '<div class="admin-notif-icon">' + _typeIcon(n.type) + '</div>'
                 + '<div style="flex:1;min-width:0;">'
@@ -139,6 +140,9 @@
                 +   '<div class="admin-notif-time">' + _timeAgo(n.createdAt) + '</div>'
                 + '</div>'
                 + (!n.read ? '<div style="width:8px;height:8px;border-radius:50%;background:#E8001C;flex-shrink:0;margin-top:4px;"></div>' : '')
+                + '<button onclick="event.stopPropagation();_cuDeleteNotif(\'' + n.id + '\')" title="Delete" '
+                + 'style="position:absolute;top:0.5rem;right:0.4rem;background:none;border:none;cursor:pointer;color:#a0aec0;font-size:1rem;line-height:1;padding:2px 4px;border-radius:4px;" '
+                + 'onmouseover="this.style.color=\'#e53e3e\'" onmouseout="this.style.color=\'#a0aec0\'">&times;</button>'
                 + '</div>';
         }).join('');
     }
@@ -153,16 +157,20 @@
         var _a;
     };
 
+    window._cuDeleteNotif = function (docId) {
+        firebase.firestore().collection('notifications').doc(docId).delete().catch(function () {});
+        _cuNotifs = _cuNotifs.filter(function (n) { return n.id !== docId; });
+        _renderNotifPanel();
+    };
+
     window.clearCuNotifications = function () {
-        if (!_cuUid) return;
-        var batch = firebase.firestore().batch();
+        var db = firebase.firestore();
+        var batch = db.batch();
         _cuNotifs.forEach(function (n) {
-            var upd = {};
-            upd['readBy.' + _cuUid] = true;
-            batch.update(firebase.firestore().collection('notifications').doc(n.id), upd);
-            n.read = true;
+            batch.delete(db.collection('notifications').doc(n.id));
         });
         batch.commit().catch(function () {});
+        _cuNotifs = [];
         _renderNotifPanel();
     };
 
@@ -209,10 +217,10 @@
 
         var roleQuery = db.collection('notifications')
             .where('targetRole', 'in', ['customer', 'all'])
-            .orderBy('createdAt', 'desc').limit(30);
+            .limit(30);
         var personalQuery = db.collection('notifications')
             .where('targetUid', '==', uid)
-            .orderBy('createdAt', 'desc').limit(20);
+            .limit(20);
 
         roleQuery.onSnapshot(function (snap) {
             _roleDocs = snap.docs;

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Account</title>
+  <link rel="icon" type="image/png" href="../static/img/LOGO_CALTEX.png" />
+  <link rel="stylesheet" href="../static/css/login.css" />
+  <style>
+    /* ── Two-column name row ── */
+    .name-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .name-row .field-group { display: flex; flex-direction: column; }
+
+    /* ── Sign-in link row ── */
+    .signin-row {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 13px;
+      color: #718096;
+    }
+    .signin-row a {
+      color: #E8001C;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .signin-row a:hover { text-decoration: underline; }
+
+    /* ── Pending dialog overlay ── */
+    .pending-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 9998;
+      align-items: center;
+      justify-content: center;
+    }
+    .pending-overlay.show { display: flex; }
+    .pending-box {
+      background: #fff;
+      border-radius: 20px;
+      padding: 32px 28px 24px;
+      max-width: 360px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+    }
+    .pending-icon {
+      width: 64px; height: 64px;
+      background: #FFF3CD;
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px;
+      margin: 0 auto 16px;
+    }
+    .pending-title {
+      font-size: 18px; font-weight: 700; color: #1a202c; margin-bottom: 10px;
+    }
+    .pending-msg {
+      font-size: 13px; color: #718096; line-height: 1.6; margin-bottom: 24px;
+    }
+    .btn-back {
+      width: 100%;
+      padding: 13px;
+      background: #E8001C;
+      color: #fff;
+      border: none;
+      border-radius: 30px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(232,0,28,0.3);
+      transition: opacity .2s;
+    }
+    .btn-back:hover { opacity: .88; }
+
+    @media (max-width: 640px) {
+      .name-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <!-- Left Panel -->
+  <div class="header">
+    <div class="header-content">
+      <img class="logo" src="../static/img/LOGO_CALTEX.png" alt="Caltex Logo" />
+      <div class="header-text">
+        <img class="wordmark-img" src="../static/img/CALTEX_LETTER.png" alt="Caltex" />
+        <span class="tagline">AutoPro</span>
+      </div>
+      <p class="header-desc">Your trusted automotive service partner.</p>
+    </div>
+  </div>
+
+  <!-- Right Panel / Form -->
+  <div class="form-area">
+    <p class="form-title">Create Account</p>
+    <p class="form-sub">Sign up to get started</p>
+
+    <!-- First Name & Last Name -->
+    <div class="name-row">
+      <div class="field-group">
+        <label for="firstName">First Name</label>
+        <div class="input-wrap" style="margin-bottom:0;">
+          <span class="icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none"
+                 viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"/>
+            </svg>
+          </span>
+          <input id="firstName" type="text" placeholder="First name" autocomplete="given-name" />
+        </div>
+      </div>
+      <div class="field-group">
+        <label for="lastName">Last Name</label>
+        <div class="input-wrap" style="margin-bottom:0;">
+          <span class="icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none"
+                 viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"/>
+            </svg>
+          </span>
+          <input id="lastName" type="text" placeholder="Last name" autocomplete="family-name" />
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px;"></div>
+
+    <label for="email">Email Address</label>
+    <div class="input-wrap">
+      <span class="icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none"
+             viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/>
+        </svg>
+      </span>
+      <input id="email" type="email" placeholder="Enter your email" autocomplete="email" />
+    </div>
+
+    <label for="password">Password</label>
+    <div class="input-wrap" style="margin-bottom:0;">
+      <span class="icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none"
+             viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"/>
+        </svg>
+      </span>
+      <input id="password" type="password" placeholder="Create a password" autocomplete="new-password" />
+    </div>
+    <div style="margin-bottom:16px;"></div>
+
+    <label for="confirmPassword">Confirm Password</label>
+    <div class="input-wrap" style="margin-bottom:0;">
+      <span class="icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none"
+             viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"/>
+        </svg>
+      </span>
+      <input id="confirmPassword" type="password" placeholder="Confirm your password" autocomplete="new-password" />
+    </div>
+    <div style="margin-bottom:28px;"></div>
+
+    <button class="btn-signin" id="registerBtn" type="button">Create Account</button>
+
+    <div class="signin-row">
+      Already have an account? <a href="login.html">Sign In</a>
+    </div>
+  </div>
+</div>
+
+<!-- Pending approval dialog -->
+<div class="pending-overlay" id="pendingOverlay">
+  <div class="pending-box">
+    <div class="pending-icon">⏳</div>
+    <div class="pending-title">Registration Submitted!</div>
+    <div class="pending-msg">
+      Your account is pending admin approval.<br/><br/>
+      You will receive an email once your account has been approved.
+    </div>
+    <button class="btn-back" onclick="window.location.href='login.html'">Back to Login</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+  // ── Helpers ──
+  function showToast(msg, type = 'error') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = type === 'success' ? 'show success' : 'show';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.className = ''; }, 3500);
+  }
+
+  function setLoading(loading) {
+    const btn = document.getElementById('registerBtn');
+    btn.disabled = loading;
+    btn.innerHTML = loading
+      ? '<span class="spinner"></span>'
+      : 'Create Account';
+  }
+
+  // ── Register ──
+  const registerBtn = document.getElementById('registerBtn');
+
+  document.getElementById('confirmPassword').addEventListener('keydown', e => {
+    if (e.key === 'Enter') registerBtn.click();
+  });
+
+  registerBtn.addEventListener('click', async () => {
+    const firstName = document.getElementById('firstName').value.trim();
+    const lastName  = document.getElementById('lastName').value.trim();
+    const email     = document.getElementById('email').value.trim();
+    const password  = document.getElementById('password').value;
+    const confirm   = document.getElementById('confirmPassword').value;
+
+    if (!firstName || !lastName || !email || !password || !confirm) {
+      showToast('Please fill in all fields.');
+      return;
+    }
+    if (password !== confirm) {
+      showToast('Passwords do not match.');
+      return;
+    }
+    if (password.length < 6) {
+      showToast('Password must be at least 6 characters.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // 1. Create Firebase Auth account
+      const cred = await firebase.auth().createUserWithEmailAndPassword(email, password);
+      const uid  = cred.user.uid;
+      const name = `${firstName} ${lastName}`;
+
+      // 2. Update display name
+      await cred.user.updateProfile({ displayName: name });
+
+      // 3. Save Firestore doc — status 'pending' until admin approves
+      const db = firebase.firestore();
+      await db.collection('users').doc(uid).set({
+        uid:       uid,
+        firstName: firstName,
+        lastName:  lastName,
+        name:      name,
+        email:     email,
+        role:      'customer',
+        status:    'pending',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // 4. Write in-app notification for admins
+      await db.collection('notifications').add({
+        title:      '🆕 New Account Registration',
+        message:    `${name} (${email}) has registered and is awaiting approval.`,
+        type:       'info',
+        targetRole: 'admin',
+        targetUid:  '',
+        createdAt:  firebase.firestore.FieldValue.serverTimestamp(),
+        readBy:     {},
+        isRead:     false,
+      });
+
+      // 5. Sign out — can't use app until approved
+      await firebase.auth().signOut();
+
+      // 6. Show pending dialog
+      document.getElementById('pendingOverlay').classList.add('show');
+
+    } catch (e) {
+      let msg = 'Registration failed. Please try again.';
+      if (e.code === 'auth/email-already-in-use') msg = 'An account with this email already exists.';
+      else if (e.code === 'auth/invalid-email')   msg = 'Please enter a valid email address.';
+      else if (e.code === 'auth/weak-password')   msg = 'Password is too weak. Use at least 6 characters.';
+      showToast(msg);
+    } finally {
+      setLoading(false);
+    }
+  });
+</script>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+  firebase.initializeApp({
+    apiKey:            "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
+    authDomain:        "caltex-autopro-1e664.firebaseapp.com",
+    projectId:         "caltex-autopro-1e664",
+    storageBucket:     "caltex-autopro-1e664.firebasestorage.app",
+    messagingSenderId: "930140433367",
+    appId:             "1:930140433367:web:cf67bfa388fa517422b992"
+  });
+</script>
+</body>
+</html>

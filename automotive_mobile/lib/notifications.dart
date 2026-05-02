@@ -8,6 +8,96 @@ import 'alert_prefs.dart';
 
 enum NotificationRole { admin, staff, customer }
 
+/// Bell icon with a live unread-count badge.
+/// Drop-in replacement for the plain IconButton in the AppBar.
+class NotifBadge extends StatelessWidget {
+  final NotificationRole role;
+  final VoidCallback onTap;
+
+  const NotifBadge({super.key, required this.role, required this.onTap});
+
+  String get _roleString {
+    switch (role) {
+      case NotificationRole.admin:    return 'admin';
+      case NotificationRole.staff:    return 'staff';
+      case NotificationRole.customer: return 'customer';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    // Stream role-targeted + personal notifications, merge, count unread
+    final roleStream = FirebaseFirestore.instance
+        .collection('notifications')
+        .where('targetRole', isEqualTo: _roleString)
+        .snapshots();
+
+    final personalStream = uid.isEmpty
+        ? const Stream<QuerySnapshot>.empty()
+        : FirebaseFirestore.instance
+            .collection('notifications')
+            .where('targetUid', isEqualTo: uid)
+            .snapshots();
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: roleStream,
+      builder: (context, roleSnap) {
+        return StreamBuilder<QuerySnapshot>(
+          stream: personalStream,
+          builder: (context, personalSnap) {
+            // Merge both streams, deduplicate by doc ID
+            final Map<String, QueryDocumentSnapshot> merged = {};
+            for (final doc in roleSnap.data?.docs ?? []) merged[doc.id] = doc;
+            for (final doc in personalSnap.data?.docs ?? []) merged[doc.id] = doc;
+
+            final unread = merged.values.where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final readBy = data['readBy'] as Map<String, dynamic>? ?? {};
+              return readBy[uid] != true;
+            }).length;
+
+            return GestureDetector(
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
+                    if (unread > 0)
+                      Positioned(
+                        top: -4, right: -4,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                          decoration: const BoxDecoration(
+                            color: Colors.amber,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            unread > 99 ? '99+' : '$unread',
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
 // ── OneSignal credentials ──
 const _kOneSignalAppId  = 'c4f82ac7-5340-4e7a-877d-1d38a6f6f8ea';
 const _kOneSignalApiKey = 'os_v7_app_yt4cvr2f1hkhvh5ldu4k637i51snjeyuythen3fd61ae1yhnprpy6kbxvn9kjd1pqdhygsqmlrouas4kfuydft32nkgj5flbra3oo5q';
@@ -174,7 +264,28 @@ class _AppNotificationsState extends State<AppNotifications> {
     final uid = _uid;
     if (uid == null) return;
 
-    final db = FirebaseFirestore.instance;
+    final db  = FirebaseFirestore.instance;
+    final now = DateTime.now();
+
+    // ── Dedup guard: only generate once per calendar day ──
+    final todayStr = '${now.year}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}';
+    final markerRef = db.collection('_pmsAlertLog').doc(todayStr);
+    try {
+      final markerDoc = await markerRef.get();
+      if (markerDoc.exists) {
+        debugPrint('ℹ️ DSS alerts already generated today ($todayStr), skipping.');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Alerts already sent today.')));
+        }
+        return;
+      }
+      // Write marker immediately to prevent race conditions
+      await markerRef.set({'generatedAt': FieldValue.serverTimestamp()});
+    } catch (e) {
+      debugPrint('⚠️ DSS marker check failed: $e — skipping to avoid duplicates');
+      return;
+    }
 
     try {
       // Get admin UIDs for push targeting
@@ -297,7 +408,40 @@ class _AppNotificationsState extends State<AppNotifications> {
         }
 
         // Customer PMS alerts — gated by their own prefs
-        final ownerId = data['ownerId'] as String? ?? data['customerId'] as String?;
+        // Try UID fields first, then fall back to name-based lookup
+        String? ownerId = data['ownerId'] as String? ?? data['customerId'] as String?;
+        if ((ownerId == null || ownerId.isEmpty)) {
+          final ownerName = data['owner'] as String? ?? data['ownerName'] as String? ?? '';
+          if (ownerName.isNotEmpty) {
+            // Try exact name match
+            QuerySnapshot ownerSnap = await db.collection('users')
+                .where('name', isEqualTo: ownerName)
+                .where('role', isEqualTo: 'customer')
+                .limit(1)
+                .get();
+            if (ownerSnap.docs.isNotEmpty) {
+              ownerId = ownerSnap.docs.first.id;
+            } else {
+              // Fallback: case-insensitive scan of all customers
+              final allCustomers = await db.collection('users')
+                  .where('role', isEqualTo: 'customer')
+                  .get();
+              final ownerLower = ownerName.trim().toLowerCase();
+              for (final cu in allCustomers.docs) {
+                final cuName = ((cu.data() as Map<String, dynamic>)['name'] as String? ?? '').trim().toLowerCase();
+                if (cuName == ownerLower) {
+                  ownerId = cu.id;
+                  break;
+                }
+              }
+            }
+            if (ownerId != null && ownerId.isNotEmpty) {
+              debugPrint('✅ Resolved owner UID for $ownerName → $ownerId');
+            } else {
+              debugPrint('⚠️ Could not resolve owner UID for vehicle $plate (owner: $ownerName)');
+            }
+          }
+        }
         if (ownerId != null && ownerId.isNotEmpty) {
           final ownerDoc = await db.collection('users').doc(ownerId).get();
           if (!ownerDoc.exists) continue;
@@ -439,13 +583,32 @@ class _AppNotificationsState extends State<AppNotifications> {
   Color _typeColor(String type) {
     if (type == 'warning') return Colors.orange;
     if (type == 'success') return const Color(0xFF2c7a7b);
+    if (type == 'danger')  return const Color(0xFFE8001C);
     return _blue;
   }
 
   IconData _typeIcon(String type) {
-    if (type == 'warning') return Icons.warning_amber_outlined;
-    if (type == 'success') return Icons.check_circle_outline;
-    return Icons.info_outline;
+    if (type == 'warning') return Icons.warning_amber_rounded;
+    if (type == 'success') return Icons.check_circle_rounded;
+    if (type == 'danger')  return Icons.error_rounded;
+    return Icons.notifications_rounded;
+  }
+
+  // Map notification title keywords to specific emoji icons (matches website style)
+  String _titleEmoji(String title, String type) {
+    final t = title.toLowerCase();
+    if (t.contains('overdue'))        return '🚨';
+    if (t.contains('due this week'))  return '📅';
+    if (t.contains('due soon'))       return '⚠️';
+    if (t.contains('out of stock'))   return '🚨';
+    if (t.contains('low stock'))      return '⚠️';
+    if (t.contains('approved'))       return '✅';
+    if (t.contains('registration'))   return '🆕';
+    if (t.contains('maintenance'))    return '🔧';
+    if (type == 'success')            return '✅';
+    if (type == 'warning')            return '⚠️';
+    if (type == 'danger')             return '🚨';
+    return '🔔';
   }
 
   String _timeAgo(Timestamp? ts) {
@@ -692,16 +855,17 @@ class _AppNotificationsState extends State<AppNotifications> {
                           itemCount: docs.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 10),
                           itemBuilder: (_, i) {
-                            final doc      = docs[i];
-                            final data     = doc.data() as Map<String, dynamic>;
-                            final type     = data['type'] as String? ?? 'info';
-                            final color    = _typeColor(type);
-                            final isUnread = _isUnread(data);
-                            final ts       = data['createdAt'] as Timestamp?;
+                            final doc       = docs[i];
+                            final data      = doc.data() as Map<String, dynamic>;
+                            final type      = data['type'] as String? ?? 'info';
+                            final title     = data['title'] as String? ?? '';
+                            final message   = data['message'] as String? ?? '';
+                            final emoji     = _titleEmoji(title, type);
+                            final isUnread  = _isUnread(data);
+                            final ts        = data['createdAt'] as Timestamp?;
                             final isChecked = _selected.contains(doc.id);
 
                             return GestureDetector(
-                              // Normal tap: mark read (or toggle selection in select mode)
                               onTap: () {
                                 if (_isSelecting) {
                                   _toggleSelect(doc.id);
@@ -709,72 +873,101 @@ class _AppNotificationsState extends State<AppNotifications> {
                                   _markRead(doc.id);
                                 }
                               },
-                              // Long press: enter selection mode
                               onLongPress: () => _toggleSelect(doc.id),
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 150),
                                 padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
                                   color: isChecked
-                                      ? _blue.withOpacity(0.07)
+                                      ? _red.withOpacity(0.06)
                                       : isUnread
-                                          ? color.withOpacity(0.04)
+                                          ? const Color(0xFFFFF5F5)
                                           : Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(14),
                                   border: isChecked
-                                      ? Border.all(color: _blue.withOpacity(0.4), width: 1.5)
-                                      : isUnread
-                                          ? Border.all(color: color.withOpacity(0.2))
-                                          : null,
+                                      ? Border.all(color: _red.withOpacity(0.4), width: 1.5)
+                                      : Border.all(color: const Color(0xFFe2e8f0)),
                                   boxShadow: [
-                                    BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6),
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(isUnread ? 0.06 : 0.03),
+                                      blurRadius: isUnread ? 10 : 6,
+                                      offset: const Offset(0, 2),
+                                    ),
                                   ],
                                 ),
-                                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                  // Checkbox (selection mode) or icon (normal mode)
-                                  if (_isSelecting)
-                                    Padding(
-                                      padding: const EdgeInsets.only(right: 10, top: 2),
-                                      child: AnimatedSwitcher(
-                                        duration: const Duration(milliseconds: 150),
-                                        child: isChecked
-                                            ? Icon(Icons.check_circle, color: _blue, size: 22, key: const ValueKey('checked'))
-                                            : Icon(Icons.radio_button_unchecked, color: const Color(0xFFcbd5e0), size: 22, key: const ValueKey('unchecked')),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // ── Emoji icon (matches website style) ──
+                                    if (_isSelecting)
+                                      Padding(
+                                        padding: const EdgeInsets.only(right: 10, top: 2),
+                                        child: AnimatedSwitcher(
+                                          duration: const Duration(milliseconds: 150),
+                                          child: isChecked
+                                              ? Icon(Icons.check_circle, color: _red, size: 22, key: const ValueKey('checked'))
+                                              : Icon(Icons.radio_button_unchecked, color: const Color(0xFFcbd5e0), size: 22, key: const ValueKey('unchecked')),
+                                        ),
+                                      )
+                                    else
+                                      Padding(
+                                        padding: const EdgeInsets.only(right: 12, top: 2),
+                                        child: Text(emoji, style: const TextStyle(fontSize: 22)),
                                       ),
-                                    )
-                                  else
-                                    Container(
-                                      width: 40, height: 40,
-                                      margin: const EdgeInsets.only(right: 12),
-                                      decoration: BoxDecoration(
-                                          color: color.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(10)),
-                                      child: Icon(_typeIcon(type), color: color, size: 20),
+                                    // ── Text ──
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  title,
+                                                  style: TextStyle(
+                                                    fontWeight: isUnread ? FontWeight.w700 : FontWeight.w600,
+                                                    fontSize: 13,
+                                                    color: const Color(0xFF1a202c),
+                                                    height: 1.3,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                _timeAgo(ts),
+                                                style: const TextStyle(fontSize: 10, color: Color(0xFF718096)),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            message,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Color(0xFF4a5568),
+                                              height: 1.4,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                                      Expanded(
-                                        child: Text(data['title'] as String? ?? '',
-                                            style: TextStyle(
-                                                fontWeight: isUnread ? FontWeight.bold : FontWeight.w600,
-                                                fontSize: 13,
-                                                color: const Color(0xFF1a202c))),
+                                    // ── Unread dot (right side, red) ──
+                                    if (!_isSelecting && isUnread) ...[
+                                      const SizedBox(width: 8),
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Container(
+                                          width: 8, height: 8,
+                                          decoration: const BoxDecoration(
+                                            color: _red,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
                                       ),
-                                      Text(_timeAgo(ts),
-                                          style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
-                                    ]),
-                                    const SizedBox(height: 3),
-                                    Text(data['message'] as String? ?? '',
-                                        style: const TextStyle(fontSize: 12, color: Color(0xFF4a5568))),
-                                  ])),
-                                  // Unread dot (only in normal mode)
-                                  if (!_isSelecting && isUnread) ...[
-                                    const SizedBox(width: 8),
-                                    Container(
-                                        width: 8, height: 8,
-                                        decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                                    ],
                                   ],
-                                ]),
+                                ),
                               ),
                             );
                           },
