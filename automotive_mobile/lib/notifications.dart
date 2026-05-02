@@ -766,7 +766,7 @@ class _AppNotificationsState extends State<AppNotifications> {
               appBar: _isSelecting
                   // ── Selection mode AppBar ──
                   ? AppBar(
-                      backgroundColor: _blue,
+                      backgroundColor: _red,
                       elevation: 0,
                       leading: IconButton(
                         icon: const Icon(Icons.close, color: Colors.white),
@@ -912,7 +912,11 @@ class _AppNotificationsState extends State<AppNotifications> {
                                     else
                                       Padding(
                                         padding: const EdgeInsets.only(right: 12, top: 2),
-                                        child: Text(emoji, style: const TextStyle(fontSize: 22)),
+                                        child: Icon(
+                                          _typeIcon(type),
+                                          color: _typeColor(type),
+                                          size: 24,
+                                        ),
                                       ),
                                     // ── Text ──
                                     Expanded(
