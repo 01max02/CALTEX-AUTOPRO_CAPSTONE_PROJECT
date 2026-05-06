@@ -160,9 +160,15 @@ window.adminAvatarLogout = function() {
     sessionStorage.removeItem('spUser');
     sessionStorage.removeItem('cpUser');
     if (typeof firebase !== 'undefined' && firebase.auth) {
-        firebase.auth().signOut().finally(() => { window.location.href = '/login.html'; });
+        firebase.auth().signOut().finally(() => {
+            // Replace the entire history stack with login page so back button
+            // cannot return to any authenticated page
+            history.replaceState(null, '', '/login.html');
+            window.location.replace('/login.html');
+        });
     } else {
-        window.location.href = '/login.html';
+        history.replaceState(null, '', '/login.html');
+        window.location.replace('/login.html');
     }
 };
 
@@ -176,4 +182,29 @@ document.addEventListener('click', function(e) {
     menus.forEach(m   => { if (m.contains(e.target))   inside = true; });
     avatars.forEach(a => { if (a.contains(e.target))   inside = true; });
     if (!inside) menus.forEach(m => m.style.display = 'none');
+});
+
+// ── Back/Forward navigation guard ───────────────────────────
+// If the user presses the browser back button after logout,
+// check auth state and redirect to login if no session exists.
+window.addEventListener('pageshow', function(e) {
+    // pageshow fires on back-forward cache restore too (e.persisted === true)
+    const hasSession = sessionStorage.getItem('apUser') ||
+                       sessionStorage.getItem('spUser') ||
+                       sessionStorage.getItem('cpUser');
+    if (!hasSession) {
+        window.location.replace('/login.html');
+        return;
+    }
+    // Also verify Firebase auth is still active
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (!user) {
+                sessionStorage.removeItem('apUser');
+                sessionStorage.removeItem('spUser');
+                sessionStorage.removeItem('cpUser');
+                window.location.replace('/login.html');
+            }
+        });
+    }
 });

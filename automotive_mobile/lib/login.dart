@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'google_sign_in.dart';
 import 'staff_dashboard.dart';
@@ -8,6 +9,7 @@ import 'customer_dashboard.dart';
 import 'admin_dashboard.dart';
 import 'forgot_password.dart';
 import 'register.dart';
+import 'change_password.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -104,10 +106,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
       // Register this device with OneSignal using Firebase UID
-      OneSignal.login(uid);
-      debugPrint('✅ OneSignal login: $uid');
-      // Save OneSignal subscription ID to Firestore so we can target this device
-      _saveOneSignalId(uid);
+      if (!kIsWeb) {
+        OneSignal.login(uid);
+        debugPrint('✅ OneSignal login: $uid');
+        _saveOneSignalId(uid);
+      }
+
+      // Check first-login flag — force password change before entering app
+      if (data['mustChangePassword'] == true) {
+        Navigator.pushReplacement(context,
+          MaterialPageRoute(builder: (_) => ChangePasswordScreen(role: role)));
+        return;
+      }
 
       switch (role) {
         case 'admin':
@@ -150,10 +160,21 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // Register this device with OneSignal using Firebase UID
       final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid != null) {
+      if (uid != null && !kIsWeb) {
         OneSignal.login(uid);
         debugPrint('✅ OneSignal login (Google): $uid');
         _saveOneSignalId(uid);
+      }
+
+      // Check first-login flag for Google sign-in users too
+      if (uid != null) {
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+        if (userDoc.exists && userDoc.data()?['mustChangePassword'] == true) {
+          if (!mounted) return;
+          Navigator.pushReplacement(context,
+            MaterialPageRoute(builder: (_) => ChangePasswordScreen(role: role.toLowerCase())));
+          return;
+        }
       }
 
       // Navigate based on role

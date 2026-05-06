@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -114,6 +115,10 @@ Future<void> _sendViaOneSignal({
   String type = 'info',
 }) async {
   if (userIds.isEmpty) return;
+  if (kIsWeb) {
+    debugPrint('ℹ️ OneSignal push skipped on web');
+    return;
+  }
   try {
     // Look up OneSignal subscription IDs from Firestore
     final subIds = <String>[];
@@ -171,6 +176,7 @@ class _AppNotificationsState extends State<AppNotifications> {
   }
 
   void _setupListeners() {
+    if (kIsWeb) return; // OneSignal not supported on web
     OneSignal.Notifications.addForegroundWillDisplayListener((event) {
       debugPrint('🔔 Foreground: ${event.notification.title}');
       event.preventDefault(); // prevent auto-display so we show our own dialog

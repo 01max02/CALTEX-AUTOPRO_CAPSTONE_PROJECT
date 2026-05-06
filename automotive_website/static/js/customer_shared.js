@@ -47,11 +47,33 @@
         sessionStorage.removeItem('cpUser');
         sessionStorage.removeItem('spUser');
         if (typeof firebase !== 'undefined' && firebase.auth) {
-            firebase.auth().signOut().finally(function () { window.location.href = '/login.html'; });
+            firebase.auth().signOut().finally(function () {
+                history.replaceState(null, '', '/login.html');
+                window.location.replace('/login.html');
+            });
         } else {
-            window.location.href = '/login.html';
+            history.replaceState(null, '', '/login.html');
+            window.location.replace('/login.html');
         }
     };
+
+    // ── Back/Forward navigation guard ──────────────────────
+    window.addEventListener('pageshow', function () {
+        var hasSession = sessionStorage.getItem('cpUser') || sessionStorage.getItem('spUser');
+        if (!hasSession) {
+            window.location.replace('/login.html');
+            return;
+        }
+        if (typeof firebase !== 'undefined' && firebase.auth) {
+            firebase.auth().onAuthStateChanged(function (user) {
+                if (!user) {
+                    sessionStorage.removeItem('cpUser');
+                    sessionStorage.removeItem('spUser');
+                    window.location.replace('/login.html');
+                }
+            });
+        }
+    });
 
     // ── Notification panel toggle ───────────────────────────
     window.toggleCuNotifPanel = function () {

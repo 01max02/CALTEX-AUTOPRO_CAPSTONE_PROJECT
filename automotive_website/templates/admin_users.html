@@ -539,6 +539,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             email:     email,
                             role:      role,
                             status:    'Active',
+                            mustChangePassword: true,
                             createdAt: firebase.firestore.FieldValue.serverTimestamp()
                         }).then(function(){ return tempPass; });
                     });

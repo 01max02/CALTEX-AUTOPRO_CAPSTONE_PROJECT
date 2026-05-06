@@ -137,9 +137,6 @@ def send_approval_email():
       </tr>
       <tr>
         <td style="padding:8px 40px 40px;">
-          <div style="text-align:center;margin-bottom:18px;">
-            <div style="display:inline-block;width:64px;height:64px;background:#f0fff4;border-radius:16px;line-height:64px;font-size:32px;">&#x2705;</div>
-          </div>
           <h1 style="margin:0 0 8px;text-align:center;font-size:22px;font-weight:800;color:#1a202c;">Account Approved!</h1>
           <p style="margin:0 0 26px;text-align:center;font-size:13px;color:#718096;line-height:1.6;">
             Hi <strong>{to_name}</strong>, great news!<br/>
@@ -250,12 +247,6 @@ def send_welcome_email():
       <tr>
         <td style="padding:8px 40px 40px;">
 
-          <!-- Icon -->
-          <div style="text-align:center;margin-bottom:18px;">
-            <div style="display:inline-block;width:64px;height:64px;background:#fff0f0;
-                        border-radius:16px;line-height:64px;font-size:32px;">👋</div>
-          </div>
-
           <!-- Title -->
           <h1 style="margin:0 0 8px;text-align:center;font-size:22px;
                      font-weight:800;color:#1a202c;">Welcome to Caltex AutoPro!</h1>
@@ -303,49 +294,47 @@ def send_welcome_email():
             </table>
           </div>
 
-          <!-- Security Warning -->
-          <div style="background:#fffbeb;border-left:4px solid #f6ad55;
-                      border-radius:8px;padding:13px 16px;margin-bottom:26px;">
-            <p style="margin:0;font-size:12px;color:#744210;line-height:1.6;">
-              🔒 For your security, please <strong>change your password</strong>
-              after your first login.<br/>
-              Go to <strong>Profile → Change Password</strong> in the app.
-            </p>
-          </div>
-
-          <!-- Getting Started Steps -->
-          <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#4a5568;">
-            Getting started:
-          </p>
-          <table cellpadding="0" cellspacing="0" width="100%">
+          <!-- What's Next -->
+          <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:26px;">
             <tr>
-              <td style="padding:6px 0;">
-                <span style="display:inline-block;width:22px;height:22px;background:#E8001C;
-                             border-radius:50%;color:#fff;font-size:11px;font-weight:700;
-                             text-align:center;line-height:22px;margin-right:10px;">1</span>
-                <span style="font-size:13px;color:#4a5568;">
-                  Open the <strong>Caltex AutoPro</strong> mobile app
-                </span>
+              <td style="padding:0 0 12px;">
+                <div style="font-size:13px;font-weight:700;color:#1a202c;">What happens next?</div>
               </td>
             </tr>
             <tr>
-              <td style="padding:6px 0;">
-                <span style="display:inline-block;width:22px;height:22px;background:#E8001C;
-                             border-radius:50%;color:#fff;font-size:11px;font-weight:700;
-                             text-align:center;line-height:22px;margin-right:10px;">2</span>
-                <span style="font-size:13px;color:#4a5568;">
-                  Sign in with your email and temporary password above
-                </span>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:6px 0;">
-                <span style="display:inline-block;width:22px;height:22px;background:#E8001C;
-                             border-radius:50%;color:#fff;font-size:11px;font-weight:700;
-                             text-align:center;line-height:22px;margin-right:10px;">3</span>
-                <span style="font-size:13px;color:#4a5568;">
-                  Go to <strong>Profile → Change Password</strong> to set your own password
-                </span>
+              <td>
+                <table cellpadding="0" cellspacing="0" width="100%">
+                  <tr>
+                    <td style="width:40px;vertical-align:top;padding:0 12px 14px 0;">
+                      <div style="width:36px;height:36px;background:#fff0f0;border-radius:10px;
+                                  text-align:center;line-height:36px;font-size:18px;">📱</div>
+                    </td>
+                    <td style="vertical-align:top;padding-bottom:14px;">
+                      <div style="font-size:13px;font-weight:700;color:#1a202c;margin-bottom:2px;">Open the app</div>
+                      <div style="font-size:12px;color:#718096;line-height:1.5;">Download or open the <strong>Caltex AutoPro</strong> mobile app on your device.</div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="width:40px;vertical-align:top;padding:0 12px 14px 0;">
+                      <div style="width:36px;height:36px;background:#fff0f0;border-radius:10px;
+                                  text-align:center;line-height:36px;font-size:18px;">🔑</div>
+                    </td>
+                    <td style="vertical-align:top;padding-bottom:14px;">
+                      <div style="font-size:13px;font-weight:700;color:#1a202c;margin-bottom:2px;">Sign in with your credentials</div>
+                      <div style="font-size:12px;color:#718096;line-height:1.5;">Use the email and temporary password above to log in for the first time.</div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="width:40px;vertical-align:top;padding:0 12px 0 0;">
+                      <div style="width:36px;height:36px;background:#fff0f0;border-radius:10px;
+                                  text-align:center;line-height:36px;font-size:18px;">🔒</div>
+                    </td>
+                    <td style="vertical-align:top;">
+                      <div style="font-size:13px;font-weight:700;color:#1a202c;margin-bottom:2px;">Set your own password</div>
+                      <div style="font-size:12px;color:#718096;line-height:1.5;">You'll be prompted to change your password immediately after your first login.</div>
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
           </table>

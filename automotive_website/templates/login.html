@@ -238,6 +238,13 @@
         sessionStorage.setItem('cpUser', JSON.stringify(userData));
       }
       
+      // Check if user must change password on first login
+      if (data.mustChangePassword === true) {
+        console.log('Step 15: First login — redirecting to change password');
+        window.location.href = 'change_password.html';
+        return;
+      }
+
       console.log('Step 15: Redirecting to dashboard');
       redirectByRole(role);
     } catch (e) {

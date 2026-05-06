@@ -59,7 +59,7 @@ class _AdminUsersState extends State<AdminUsers> {
     required String tempPassword,
     required String roleLabel,
   }) => '''
-<div style="text-align:center;margin-bottom:18px;"><div style="display:inline-block;width:64px;height:64px;background:#fff0f0;border-radius:16px;line-height:64px;font-size:32px;">&#x1F44B;</div></div>
+<div style="text-align:center;margin-bottom:18px;"><div style="display:inline-block;background:#E8001C;border-radius:16px;padding:14px 22px;box-shadow:0 2px 8px rgba(232,0,28,0.25);"><div style="font-size:11px;font-weight:800;letter-spacing:4px;color:rgba(255,255,255,0.85);margin-bottom:3px;">CALTEX</div><div style="font-size:18px;font-weight:900;color:#fff;letter-spacing:2px;line-height:1;">AutoPro</div></div></div>
 <h1 style="margin:0 0 8px;text-align:center;font-size:22px;font-weight:800;color:#1a202c;">Welcome to Caltex AutoPro!</h1>
 <p style="margin:0 0 26px;text-align:center;font-size:13px;color:#718096;line-height:1.6;">Hi <strong>$toName</strong>, your account has been created.<br/>Here are your login credentials:</p>
 <div style="background:#f7f8fa;border:1px solid #e2e8f0;border-radius:12px;padding:20px 24px;margin-bottom:26px;"><table cellpadding="0" cellspacing="0" width="100%"><tr><td style="padding:6px 0;font-size:12px;color:#718096;width:110px;">Email</td><td style="padding:6px 0;font-size:13px;font-weight:600;color:#1a202c;">$toEmail</td></tr><tr><td style="padding:6px 0;font-size:12px;color:#718096;">Temp Password</td><td style="padding:6px 0;"><span style="background:#E8001C;color:#fff;font-size:13px;font-weight:700;padding:4px 12px;border-radius:6px;letter-spacing:1px;">$tempPassword</span></td></tr><tr><td style="padding:6px 0;font-size:12px;color:#718096;">Role</td><td style="padding:6px 0;font-size:13px;font-weight:600;color:#1a202c;">$roleLabel</td></tr></table></div>
@@ -71,7 +71,6 @@ class _AdminUsersState extends State<AdminUsers> {
     required String toName,
     required String toEmail,
   }) => '''
-<div style="text-align:center;margin-bottom:18px;"><div style="display:inline-block;width:64px;height:64px;background:#f0fff4;border-radius:16px;line-height:64px;font-size:32px;">&#x2705;</div></div>
 <h1 style="margin:0 0 8px;text-align:center;font-size:22px;font-weight:800;color:#1a202c;">Account Approved!</h1>
 <p style="margin:0 0 26px;text-align:center;font-size:13px;color:#718096;line-height:1.6;">Hi <strong>$toName</strong>, great news!<br/>Your Caltex AutoPro account has been approved by the administrator.</p>
 <div style="background:#f0fff4;border:1px solid #9ae6b4;border-radius:12px;padding:24px;margin-bottom:26px;text-align:center;"><div style="font-size:28px;margin-bottom:10px;">&#x1F389;</div><p style="margin:0;font-size:15px;font-weight:700;color:#276749;">You\'re all set!</p><p style="margin:8px 0 0;font-size:13px;color:#2f855a;">Your account <strong>$toEmail</strong> is now active.<br/>You can sign in to the Caltex AutoPro app right now.</p></div>
@@ -888,13 +887,14 @@ class _AdminUsersState extends State<AdminUsers> {
                                   .collection('users')
                                   .doc(cred.user!.uid)
                                   .set({
-                                'firstName': firstName,
-                                'lastName':  lastName,
-                                'name':      fullName,
-                                'email':     emailCtrl.text.trim(),
-                                'role':      selectedRole.toLowerCase(),
-                                'status':    selectedStatus,
-                                'createdAt': FieldValue.serverTimestamp(),
+                                'firstName':          firstName,
+                                'lastName':           lastName,
+                                'name':               fullName,
+                                'email':              emailCtrl.text.trim(),
+                                'role':               selectedRole.toLowerCase(),
+                                'status':             selectedStatus,
+                                'mustChangePassword': true,
+                                'createdAt':          FieldValue.serverTimestamp(),
                               });
 
                               // 3. Sign out from secondary app

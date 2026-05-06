@@ -126,6 +126,8 @@
         generateWebPMSNotifications();
       }
       _updateOverviewStats();
+      // Render dashboard charts whenever vehicle/service data updates
+      if (typeof window.renderDashboardCharts === 'function') window.renderDashboardCharts();
       // DSS-PMS readiness: vehicles loaded
       window._dssVehiclesReady = true;
       if (window._dssDataReady && typeof renderDSSPMS === 'function') {
@@ -182,6 +184,7 @@
       }
       _updateServiceStats();
       _updateOverviewStats();
+      if (typeof window.renderDashboardCharts === 'function') window.renderDashboardCharts();
     });
 
     // Stock Inventory

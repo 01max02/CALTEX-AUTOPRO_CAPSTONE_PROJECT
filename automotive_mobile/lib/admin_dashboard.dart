@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'login.dart';
 import 'admin_inventory_itemaster.dart';
 import 'admin_inventory_stock.dart';
@@ -374,11 +375,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   final data = d.data() as Map<String, dynamic>;
                   return (data['status'] as String? ?? '') == 'Low';
                 }).length;
-                final dueForPms = vehicleSnap.data?.docs.where((d) {
+                final vehicleDocs = vehicleSnap.data?.docs ?? [];
+                final dueForPms = vehicleDocs.where((d) {
                   final data = d.data() as Map<String, dynamic>;
                   final status = data['status'] as String? ?? '';
                   return status == 'Overdue' || status == 'PMS Due Soon';
-                }).length ?? 0;
+                }).length;
 
                 // Services today
                 final now = DateTime.now();
@@ -387,16 +389,43 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 final servicesToday = allServices.where((s) =>
                   (s['date'] as String? ?? '') == todayFormatted).length;
 
-                // Recent services (last 5)
-                final recentServices = allServices.take(5).toList();
-
                 final isLoading = maintSnap.connectionState == ConnectionState.waiting ||
                     stockSnap.connectionState == ConnectionState.waiting ||
                     vehicleSnap.connectionState == ConnectionState.waiting;
 
+                // ── Chart data: services per day (last 7 days) ──
+                final Map<String, int> servicesByDay = {};
+                for (int i = 6; i >= 0; i--) {
+                  final d = now.subtract(Duration(days: i));
+                  final key = '${months[d.month - 1]} ${d.day}, ${d.year}';
+                  servicesByDay[key] = 0;
+                }
+                for (final s in allServices) {
+                  final date = s['date'] as String? ?? '';
+                  if (servicesByDay.containsKey(date)) {
+                    servicesByDay[date] = (servicesByDay[date] ?? 0) + 1;
+                  }
+                }
+                final barData = servicesByDay.values.toList();
+                final dayLabels = servicesByDay.keys.map((k) {
+                  final parts = k.split(' ');
+                  return '${parts[0].substring(0, 3)}\n${parts[1].replaceAll(',', '')}';
+                }).toList();
+
+                // ── Chart data: vehicle status donut ──
+                int activeCount = 0, overdueCount = 0, dueSoonCount = 0, maintenanceCount = 0;
+                for (final d in vehicleDocs) {
+                  final status = ((d.data() as Map<String, dynamic>)['status'] as String? ?? '').toLowerCase();
+                  if (status == 'overdue' || status == 'pms overdue') overdueCount++;
+                  else if (status == 'pms due soon' || status == 'due soon') dueSoonCount++;
+                  else if (status == 'maintenance' || status == 'under maintenance') maintenanceCount++;
+                  else activeCount++;
+                }
+
                 return SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    // ── Stat cards ──
                     GridView.count(
                       crossAxisCount: 2, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
                       crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.4,
@@ -408,6 +437,151 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ],
                     ),
                     const SizedBox(height: 20),
+
+                    // ── Bar chart: Services last 7 days ──
+                    _chartCard(
+                      title: 'Services — Last 7 Days',
+                      icon: Icons.bar_chart_rounded,
+                      child: isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : SizedBox(
+                              height: 160,
+                              child: BarChart(
+                                BarChartData(
+                                  maxY: (barData.isEmpty ? 5 : (barData.reduce((a, b) => a > b ? a : b) + 2)).toDouble(),
+                                  gridData: FlGridData(
+                                    show: true,
+                                    drawVerticalLine: false,
+                                    getDrawingHorizontalLine: (_) => FlLine(color: const Color(0xFFe2e8f0), strokeWidth: 1),
+                                  ),
+                                  borderData: FlBorderData(show: false),
+                                  titlesData: FlTitlesData(
+                                    leftTitles: AxisTitles(
+                                      sideTitles: SideTitles(
+                                        showTitles: true,
+                                        reservedSize: 24,
+                                        getTitlesWidget: (v, _) => Text(
+                                          v.toInt().toString(),
+                                          style: const TextStyle(fontSize: 9, color: Color(0xFF718096)),
+                                        ),
+                                      ),
+                                    ),
+                                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                    bottomTitles: AxisTitles(
+                                      sideTitles: SideTitles(
+                                        showTitles: true,
+                                        reservedSize: 32,
+                                        getTitlesWidget: (v, _) {
+                                          final i = v.toInt();
+                                          if (i < 0 || i >= dayLabels.length) return const SizedBox.shrink();
+                                          return Padding(
+                                            padding: const EdgeInsets.only(top: 4),
+                                            child: Text(
+                                              dayLabels[i],
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(fontSize: 8, color: Color(0xFF718096)),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                  barGroups: List.generate(barData.length, (i) {
+                                    final isToday = i == barData.length - 1;
+                                    return BarChartGroupData(
+                                      x: i,
+                                      barRods: [
+                                        BarChartRodData(
+                                          toY: barData[i].toDouble(),
+                                          color: isToday ? _red : const Color(0xFF003087),
+                                          width: 18,
+                                          borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                                          backDrawRodData: BackgroundBarChartRodData(
+                                            show: true,
+                                            toY: (barData.isEmpty ? 5 : (barData.reduce((a, b) => a > b ? a : b) + 2)).toDouble(),
+                                            color: const Color(0xFFF7F8FA),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  }),
+                                ),
+                              ),
+                            ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ── Donut chart: Vehicle status ──
+                    _chartCard(
+                      title: 'Vehicle Status',
+                      icon: Icons.donut_large_rounded,
+                      child: isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : totalVehicles == 0
+                              ? const Center(child: Padding(
+                                  padding: EdgeInsets.all(20),
+                                  child: Text('No vehicles yet.', style: TextStyle(color: Color(0xFF718096))),
+                                ))
+                              : Row(children: [
+                                  SizedBox(
+                                    width: 130,
+                                    height: 130,
+                                    child: PieChart(
+                                      PieChartData(
+                                        sectionsSpace: 2,
+                                        centerSpaceRadius: 36,
+                                        sections: [
+                                          if (activeCount > 0)
+                                            PieChartSectionData(
+                                              value: activeCount.toDouble(),
+                                              color: const Color(0xFF003087),
+                                              radius: 28,
+                                              title: '',
+                                            ),
+                                          if (dueSoonCount > 0)
+                                            PieChartSectionData(
+                                              value: dueSoonCount.toDouble(),
+                                              color: Colors.orange,
+                                              radius: 28,
+                                              title: '',
+                                            ),
+                                          if (overdueCount > 0)
+                                            PieChartSectionData(
+                                              value: overdueCount.toDouble(),
+                                              color: _red,
+                                              radius: 28,
+                                              title: '',
+                                            ),
+                                          if (maintenanceCount > 0)
+                                            PieChartSectionData(
+                                              value: maintenanceCount.toDouble(),
+                                              color: Colors.teal,
+                                              radius: 28,
+                                              title: '',
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 20),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        _legendItem('Active', activeCount, const Color(0xFF003087)),
+                                        _legendItem('Due Soon', dueSoonCount, Colors.orange),
+                                        _legendItem('Overdue', overdueCount, _red),
+                                        _legendItem('Maintenance', maintenanceCount, Colors.teal),
+                                      ],
+                                    ),
+                                  ),
+                                ]),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Today's service schedule ──
                     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                       _sectionTitle("Today's Service Schedule"),
                       TextButton(
@@ -448,6 +622,42 @@ class _AdminDashboardState extends State<AdminDashboard> {
           },
         );
       },
+    );
+  }
+
+  Widget _chartCard({required String title, required IconData icon, required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 30, height: 30,
+            decoration: BoxDecoration(color: _red.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, color: _red, size: 16),
+          ),
+          const SizedBox(width: 10),
+          Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1a202c))),
+        ]),
+        const SizedBox(height: 16),
+        child,
+      ]),
+    );
+  }
+
+  Widget _legendItem(String label, int count, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(children: [
+        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 8),
+        Expanded(child: Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF4a5568)))),
+        Text('$count', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
+      ]),
     );
   }
 

@@ -274,7 +274,9 @@ class _UserProfileState extends State<UserProfile> {
                           builder: (_) => ManageAlertsScreen(role: alertRole)));
                       }),
                       _actionTile(Icons.lock_outline, 'Change Password', 'Update credentials', () {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => ChangePasswordScreen(
+                          role: widget.role.name, // 'admin', 'staff', or 'customer'
+                        )));
                       }),
                       _actionTile(Icons.help_outline, 'Help & Support', 'Get assistance', () {
                         final helpRole = switch (widget.role) {

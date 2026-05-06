@@ -18,157 +18,252 @@
         <span class="nav-autopro">AutoPro</span>
       </div>
     </div>
-    <a href="login.html" class="nav-btn">Sign In</a>
+    <div class="nav-actions">
+      <a href="regsiter.html" class="nav-btn-outline">Sign Up</a>
+      <a href="login.html" class="nav-btn">Sign In</a>
+    </div>
   </nav>
 
   <!-- Hero -->
   <section class="hero">
     <div class="hero-content">
-      <div class="hero-badge">Automotive Service Management</div>
+      <div class="hero-badge">⛽ Caltex Authorized Service Center</div>
       <h1 class="hero-title">
-        Smart Fleet &amp;<br/>Maintenance Platform
+        Your Car Deserves<br/>the Best Care
       </h1>
       <p class="hero-sub">
-        Manage your vehicles, inventory, and service records in one place.
-        Built for JA Noble Enterprise — powered by Caltex AutoPro.
+        Professional automotive services you can trust — from routine maintenance
+        to full vehicle care. Book your service, track your PMS schedule, and
+        stay on top of your vehicle's health, all in one place.
       </p>
       <div class="hero-actions">
-        <a href="login.html" class="btn-primary">Get Started</a>
-        <a href="#features" class="btn-outline">Learn More</a>
+        <a href="regsiter.html" class="btn-primary">Book a Service</a>
+        <a href="#services" class="btn-outline">Our Services</a>
+      </div>
+      <div class="hero-trust">
+        <div class="hero-trust-item">
+          <span class="hero-trust-icon">✅</span>
+          <span>Certified Mechanics</span>
+        </div>
+        <div class="hero-trust-item">
+          <span class="hero-trust-icon">✅</span>
+          <span>Genuine Parts</span>
+        </div>
+        <div class="hero-trust-item">
+          <span class="hero-trust-icon">✅</span>
+          <span>Real-Time Updates</span>
+        </div>
       </div>
     </div>
     <div class="hero-visual">
-      <div class="hero-card">
-        <div class="hc-header">
-          <img src="../static/img/LOGO_CALTEX.png" alt="" class="hc-logo" />
-          <div>
-            <div class="hc-title">AutoPro Dashboard</div>
-            <div class="hc-sub">Fleet Overview</div>
-          </div>
-        </div>
-        <div class="hc-stats">
-          <div class="hc-stat">
-            <div class="hc-stat-num blue">24</div>
-            <div class="hc-stat-label">Vehicles</div>
-          </div>
-          <div class="hc-stat">
-            <div class="hc-stat-num orange">5</div>
-            <div class="hc-stat-label">PMS Due</div>
-          </div>
-          <div class="hc-stat">
-            <div class="hc-stat-num green">18</div>
-            <div class="hc-stat-label">Services</div>
-          </div>
-          <div class="hc-stat">
-            <div class="hc-stat-num red">3</div>
-            <div class="hc-stat-label">Low Stock</div>
-          </div>
-        </div>
-        <div class="hc-bar-row">
-          <span class="hc-bar-label">Fleet Health</span>
-          <div class="hc-bar-track"><div class="hc-bar-fill" style="width:78%"></div></div>
-          <span class="hc-bar-pct">78%</span>
-        </div>
-        <div class="hc-bar-row">
-          <span class="hc-bar-label">Stock Level</span>
-          <div class="hc-bar-track"><div class="hc-bar-fill orange" style="width:55%"></div></div>
-          <span class="hc-bar-pct">55%</span>
-        </div>
+      <div class="hero-illustration">
+
+        <!-- Combined scene: truck + car on one road -->
+        <svg class="scene-svg" viewBox="0 0 600 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+
+          <!-- ── ROAD ── -->
+          <rect x="0" y="230" width="600" height="50" rx="0" fill="#1e293b"/>
+          <!-- Road edge lines -->
+          <line x1="0" y1="232" x2="600" y2="232" stroke="#E8001C" stroke-width="2.5"/>
+          <line x1="0" y1="278" x2="600" y2="278" stroke="#374151" stroke-width="1.5"/>
+          <!-- Dashed center line -->
+          <line x1="0"   y1="255" x2="80"  y2="255" stroke="rgba(255,255,255,0.25)" stroke-width="2" stroke-dasharray="50 30"/>
+          <line x1="110" y1="255" x2="220" y2="255" stroke="rgba(255,255,255,0.25)" stroke-width="2" stroke-dasharray="50 30"/>
+          <line x1="250" y1="255" x2="360" y2="255" stroke="rgba(255,255,255,0.25)" stroke-width="2" stroke-dasharray="50 30"/>
+          <line x1="390" y1="255" x2="500" y2="255" stroke="rgba(255,255,255,0.25)" stroke-width="2" stroke-dasharray="50 30"/>
+          <line x1="530" y1="255" x2="600" y2="255" stroke="rgba(255,255,255,0.25)" stroke-width="2" stroke-dasharray="50 30"/>
+
+          <!-- ══════════════════════════════════════ -->
+          <!-- TRUCK (left side, larger)              -->
+          <!-- ══════════════════════════════════════ -->
+
+          <!-- Trailer body -->
+          <rect x="8" y="80" width="240" height="150" rx="10" fill="#1e293b"/>
+          <rect x="8" y="80" width="240" height="150" rx="10" fill="none" stroke="#E8001C" stroke-width="2.5"/>
+          <!-- Trailer panel lines -->
+          <line x1="8"   y1="118" x2="248" y2="118" stroke="#2d3748" stroke-width="1.5"/>
+          <line x1="68"  y1="80"  x2="68"  y2="230" stroke="#2d3748" stroke-width="1"/>
+          <line x1="128" y1="80"  x2="128" y2="230" stroke="#2d3748" stroke-width="1"/>
+          <line x1="188" y1="80"  x2="188" y2="230" stroke="#2d3748" stroke-width="1"/>
+          <!-- Trailer-cab connector -->
+          <rect x="244" y="168" width="14" height="28" rx="4" fill="#374151"/>
+
+          <!-- Cab body -->
+          <rect x="254" y="100" width="130" height="130" rx="10" fill="#263244"/>
+          <rect x="254" y="100" width="130" height="130" rx="10" fill="none" stroke="#E8001C" stroke-width="2.5"/>
+          <!-- Cab windshield -->
+          <rect x="268" y="112" width="100" height="72" rx="7" fill="#bfdbfe" opacity="0.45"/>
+          <line x1="318" y1="112" x2="318" y2="184" stroke="#93c5fd" stroke-width="1.5" opacity="0.5"/>
+          <!-- Cab door -->
+          <line x1="310" y1="184" x2="310" y2="230" stroke="#374151" stroke-width="1.5"/>
+          <!-- Exhaust stack -->
+          <rect x="366" y="52" width="9" height="56" rx="4" fill="#4b5563"/>
+          <ellipse cx="370" cy="50" rx="6" ry="3.5" fill="#6b7280"/>
+          <!-- Smoke -->
+          <circle cx="370" cy="38" r="6"  fill="rgba(255,255,255,0.12)"/>
+          <circle cx="374" cy="27" r="5"  fill="rgba(255,255,255,0.08)"/>
+          <circle cx="367" cy="18" r="4"  fill="rgba(255,255,255,0.05)"/>
+          <!-- Headlights -->
+          <rect x="380" y="138" width="16" height="9"  rx="3" fill="#fef08a"/>
+          <rect x="380" y="151" width="16" height="6"  rx="2" fill="#fde047" opacity="0.55"/>
+          <!-- Grille -->
+          <rect x="380" y="162" width="16" height="22" rx="3" fill="#374151"/>
+          <line x1="380" y1="168" x2="396" y2="168" stroke="#4b5563" stroke-width="1"/>
+          <line x1="380" y1="174" x2="396" y2="174" stroke="#4b5563" stroke-width="1"/>
+          <line x1="380" y1="180" x2="396" y2="180" stroke="#4b5563" stroke-width="1"/>
+
+          <!-- Truck wheels -->
+          <!-- Trailer wheel 1 -->
+          <circle cx="55"  cy="232" r="20" fill="#0f172a" stroke="#475569" stroke-width="2.5"/>
+          <circle cx="55"  cy="232" r="9"  fill="#1e293b"/>
+          <circle cx="55"  cy="232" r="3.5" fill="#64748b"/>
+          <!-- Trailer wheel 2 -->
+          <circle cx="140" cy="232" r="20" fill="#0f172a" stroke="#475569" stroke-width="2.5"/>
+          <circle cx="140" cy="232" r="9"  fill="#1e293b"/>
+          <circle cx="140" cy="232" r="3.5" fill="#64748b"/>
+          <!-- Trailer wheel 3 -->
+          <circle cx="215" cy="232" r="20" fill="#0f172a" stroke="#475569" stroke-width="2.5"/>
+          <circle cx="215" cy="232" r="9"  fill="#1e293b"/>
+          <circle cx="215" cy="232" r="3.5" fill="#64748b"/>
+          <!-- Cab wheel 1 -->
+          <circle cx="295" cy="232" r="20" fill="#0f172a" stroke="#475569" stroke-width="2.5"/>
+          <circle cx="295" cy="232" r="9"  fill="#1e293b"/>
+          <circle cx="295" cy="232" r="3.5" fill="#64748b"/>
+          <!-- Cab wheel 2 -->
+          <circle cx="360" cy="232" r="20" fill="#0f172a" stroke="#475569" stroke-width="2.5"/>
+          <circle cx="360" cy="232" r="9"  fill="#1e293b"/>
+          <circle cx="360" cy="232" r="3.5" fill="#64748b"/>
+
+          <!-- ══════════════════════════════════════ -->
+          <!-- CAR (right side, smaller, in front)   -->
+          <!-- ══════════════════════════════════════ -->
+
+          <!-- Car body lower -->
+          <rect x="410" y="178" width="178" height="52" rx="10" fill="#1e3a5f"/>
+          <rect x="410" y="178" width="178" height="52" rx="10" fill="none" stroke="#3b82f6" stroke-width="2"/>
+          <!-- Car cabin -->
+          <path d="M438 178 Q450 148 472 144 L548 144 Q568 148 578 178 Z" fill="#1e3a5f"/>
+          <path d="M438 178 Q450 148 472 144 L548 144 Q568 148 578 178 Z" fill="none" stroke="#3b82f6" stroke-width="2"/>
+          <!-- Windshield -->
+          <path d="M452 176 Q461 152 478 149 L542 149 Q558 152 566 176 Z" fill="#bfdbfe" opacity="0.4"/>
+          <!-- Window divider -->
+          <line x1="510" y1="149" x2="510" y2="176" stroke="#93c5fd" stroke-width="1.5" opacity="0.5"/>
+          <!-- Door lines -->
+          <line x1="476" y1="178" x2="476" y2="230" stroke="#1e40af" stroke-width="1.5"/>
+          <line x1="544" y1="178" x2="544" y2="230" stroke="#1e40af" stroke-width="1.5"/>
+          <!-- Door handles -->
+          <rect x="490" y="200" width="18" height="4" rx="2" fill="#3b82f6" opacity="0.6"/>
+          <rect x="554" y="200" width="18" height="4" rx="2" fill="#3b82f6" opacity="0.6"/>
+          <!-- Headlight -->
+          <rect x="582" y="186" width="14" height="7"  rx="3" fill="#fef08a"/>
+          <rect x="582" y="196" width="14" height="5"  rx="2" fill="#fde047" opacity="0.5"/>
+          <!-- Tail light -->
+          <rect x="412" y="186" width="10" height="7"  rx="3" fill="#E8001C" opacity="0.85"/>
+          <rect x="412" y="196" width="10" height="5"  rx="2" fill="#ef4444" opacity="0.5"/>
+          <!-- Side mirror -->
+          <rect x="574" y="170" width="10" height="6" rx="2" fill="#2563eb"/>
+
+          <!-- Car wheels -->
+          <circle cx="452" cy="232" r="18" fill="#0f172a" stroke="#475569" stroke-width="2.5"/>
+          <circle cx="452" cy="232" r="8"  fill="#1e293b"/>
+          <circle cx="452" cy="232" r="3"  fill="#64748b"/>
+          <circle cx="556" cy="232" r="18" fill="#0f172a" stroke="#475569" stroke-width="2.5"/>
+          <circle cx="556" cy="232" r="8"  fill="#1e293b"/>
+          <circle cx="556" cy="232" r="3"  fill="#64748b"/>
+
+        </svg>
       </div>
     </div>
   </section>
 
-  <!-- Features -->
-  <section class="features" id="features">
+  <!-- Services -->
+  <section class="features" id="services">
     <div class="features-inner">
-      <div class="section-label">What We Offer</div>
-      <h2 class="section-title">Everything you need to manage your fleet</h2>
+      <div class="section-label">Our Services</div>
+      <h2 class="section-title">Complete automotive care for your vehicle</h2>
       <div class="features-grid">
-
-        <div class="feature-card">
-          <div class="feature-icon blue">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-          </div>
-          <h3>Vehicle Management</h3>
-          <p>Track all vehicles, odometer readings, ownership, and PMS schedules in one place.</p>
-        </div>
 
         <div class="feature-card">
           <div class="feature-icon red">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
           </div>
-          <h3>Maintenance Tracking</h3>
-          <p>Log service transactions, materials used, and mechanic assignments with full cost tracking.</p>
+          <h3>Preventive Maintenance (PMS)</h3>
+          <p>Scheduled oil changes, filter replacements, and full vehicle check-ups to keep your car running at its best.</p>
         </div>
 
         <div class="feature-card">
-          <div class="feature-icon green">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          <div class="feature-icon blue">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M8.46 8.46a5 5 0 0 0 0 7.07"/></svg>
           </div>
-          <h3>Inventory Control</h3>
-          <p>Monitor parts stock levels, receive deliveries, and get alerts when items run low.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="feature-icon purple">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
-          </div>
-          <h3>Smart Reports AI</h3>
-          <p>Ask natural language questions about your fleet and get instant AI-powered insights.</p>
+          <h3>Engine Diagnostics</h3>
+          <p>Advanced computer diagnostics to identify engine issues early and prevent costly breakdowns on the road.</p>
         </div>
 
         <div class="feature-card">
           <div class="feature-icon orange">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg>
           </div>
-          <h3>Decision Support</h3>
-          <p>Automated stock replenishment recommendations and preventive maintenance scheduling.</p>
+          <h3>Tire &amp; Brake Service</h3>
+          <p>Tire rotation, balancing, alignment, and brake inspection to ensure your safety on every journey.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon green">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </div>
+          <h3>Lube &amp; Oil Change</h3>
+          <p>Fast and reliable oil and lubricant services using Caltex-grade products for maximum engine protection.</p>
         </div>
 
         <div class="feature-card">
           <div class="feature-icon teal">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
           </div>
-          <h3>Role-Based Access</h3>
-          <p>Separate portals for Admin, Staff, and Customers — each with the right level of access.</p>
+          <h3>Fleet Maintenance</h3>
+          <p>Dedicated fleet management services for businesses — keep your entire vehicle fleet in top condition.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon purple">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <h3>Service History Tracking</h3>
+          <p>Access your complete vehicle service records anytime through the AutoPro app — no more lost receipts.</p>
         </div>
 
       </div>
     </div>
   </section>
 
-  <!-- Roles -->
+  <!-- Why Choose Us -->
   <section class="roles">
     <div class="features-inner">
-      <div class="section-label">Who It's For</div>
-      <h2 class="section-title">Three portals, one system</h2>
+      <div class="section-label">Why Choose Us</div>
+      <h2 class="section-title">Trusted by vehicle owners &amp; fleet operators</h2>
       <div class="roles-grid">
 
         <div class="role-card admin">
           <div class="role-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </div>
-          <h3>Admin</h3>
-          <p>Full control over vehicles, inventory, users, DSS, and smart reports.</p>
-          <a href="login.html" class="role-link">Admin Portal →</a>
+          <h3>Caltex Authorized</h3>
+          <p>We use only genuine Caltex-grade lubricants and parts — so your vehicle gets the quality it deserves every single visit.</p>
         </div>
 
         <div class="role-card staff">
           <div class="role-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
-          <h3>Staff</h3>
-          <p>Log service transactions, manage inventory, and track vehicle maintenance.</p>
-          <a href="login.html" class="role-link">Staff Portal →</a>
+          <h3>Expert Mechanics</h3>
+          <p>Our certified technicians are trained to handle all vehicle types — from daily commuters to heavy-duty fleet trucks.</p>
         </div>
 
         <div class="role-card customer">
           <div class="role-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
           </div>
-          <h3>Customer</h3>
-          <p>View your vehicles, check PMS status, and track maintenance history.</p>
-          <a href="login.html" class="role-link">Customer Portal →</a>
+          <h3>Track via App</h3>
+          <p>Monitor your vehicle's service history, upcoming PMS schedules, and real-time updates — all from your phone.</p>
         </div>
 
       </div>
@@ -195,7 +290,7 @@
           <div class="footer-autopro">AutoPro</div>
         </div>
       </div>
-      <div class="footer-copy">© 2025 JA Noble Enterprise. All rights reserved.</div>
+      <div class="footer-copy">© 2026 JA Noble Enterprise Inc. All rights reserved.</div>
     </div>
   </footer>
 

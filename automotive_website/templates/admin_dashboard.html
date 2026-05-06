@@ -79,6 +79,38 @@
                         </div>
                     </div>
 
+                    <!-- ── Charts Row ── -->
+                    <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:1.25rem;margin-bottom:1.5rem;">
+
+                        <!-- Bar chart: Services last 7 days -->
+                        <div style="background:#fff;border-radius:14px;padding:1.25rem 1.5rem;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:1rem;">
+                                <div style="width:28px;height:28px;background:rgba(232,0,28,0.08);border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E8001C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                                </div>
+                                <span style="font-weight:700;font-size:0.88rem;color:#1a202c;">Services — Last 7 Days</span>
+                            </div>
+                            <div style="position:relative;height:200px;">
+                                <canvas id="servicesBarChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Donut chart: Vehicle status -->
+                        <div style="background:#fff;border-radius:14px;padding:1.25rem 1.5rem;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:1rem;">
+                                <div style="width:28px;height:28px;background:rgba(232,0,28,0.08);border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E8001C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+                                </div>
+                                <span style="font-weight:700;font-size:0.88rem;color:#1a202c;">Vehicle Status</span>
+                            </div>
+                            <div style="position:relative;height:160px;">
+                                <canvas id="vehicleDonutChart"></canvas>
+                            </div>
+                            <div id="vehicleDonutLegend" style="display:flex;flex-wrap:wrap;gap:0.5rem 1rem;margin-top:0.75rem;font-size:0.75rem;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Today's service schedule table -->
                     <div style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
                         <div class="data-table">
                             <div style="padding:0.75rem 1rem;border-bottom:1px solid #e2e8f0;">
@@ -249,6 +281,9 @@
 
     <script src="../static/js/data.js"></script>
 
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -269,6 +304,159 @@
     <script src="../static/js/admin_functions.js"></script>
     <script src="../static/js/admin.js"></script>
     <script src="../static/js/admin_sidebar.js"></script>
+    <script>
+      // ── Dashboard Charts ─────────────────────────────────────────────────
+      // Called by admin_firebase.js after Firestore data loads
+
+      let _barChart   = null;
+      let _donutChart = null;
+
+      // Build last-7-days label array
+      function _last7DayLabels() {
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const labels = [];
+        const keys   = [];
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          labels.push(months[d.getMonth()] + ' ' + d.getDate());
+          keys.push(months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear());
+        }
+        return { labels, keys };
+      }
+
+      window.renderDashboardCharts = function() {
+        const services = window._fbServices || [];
+        const vehicles = window._fbVehicles || [];
+
+        // ── Bar chart data ──
+        const { labels, keys } = _last7DayLabels();
+        const counts = keys.map(k =>
+          services.filter(s => (s.date || s.dateServiced || '') === k).length
+        );
+        const today = labels[labels.length - 1];
+        const barColors = labels.map(l =>
+          l === today ? '#E8001C' : '#003087'
+        );
+
+        const barCtx = document.getElementById('servicesBarChart');
+        if (!barCtx) return;
+
+        if (_barChart) _barChart.destroy();
+        _barChart = new Chart(barCtx, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [{
+              data: counts,
+              backgroundColor: barColors,
+              borderRadius: 6,
+              borderSkipped: false,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: ctx => ' ' + ctx.parsed.y + ' service' + (ctx.parsed.y !== 1 ? 's' : '')
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: { display: false },
+                ticks: { font: { size: 11 }, color: '#718096' }
+              },
+              y: {
+                beginAtZero: true,
+                grid: { color: '#f0f0f0' },
+                ticks: {
+                  stepSize: 1,
+                  font: { size: 11 },
+                  color: '#718096',
+                  callback: v => Number.isInteger(v) ? v : ''
+                }
+              }
+            }
+          }
+        });
+
+        // ── Donut chart data ──
+        let active = 0, dueSoon = 0, overdue = 0, maintenance = 0;
+        vehicles.forEach(v => {
+          const s = (v.status || '').toLowerCase();
+          if (s === 'overdue' || s === 'pms overdue') overdue++;
+          else if (s === 'pms due soon' || s === 'due soon') dueSoon++;
+          else if (s === 'maintenance' || s === 'under maintenance') maintenance++;
+          else active++;
+        });
+
+        const donutCtx = document.getElementById('vehicleDonutChart');
+        if (!donutCtx) return;
+
+        if (_donutChart) _donutChart.destroy();
+
+        const donutLabels = ['Active', 'Due Soon', 'Overdue', 'Maintenance'];
+        const donutData   = [active, dueSoon, overdue, maintenance];
+        const donutColors = ['#003087', '#ed8936', '#E8001C', '#0d9488'];
+
+        _donutChart = new Chart(donutCtx, {
+          type: 'doughnut',
+          data: {
+            labels: donutLabels,
+            datasets: [{
+              data: donutData,
+              backgroundColor: donutColors,
+              borderWidth: 2,
+              borderColor: '#fff',
+              hoverOffset: 6,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '62%',
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: ctx => ' ' + ctx.label + ': ' + ctx.parsed
+                }
+              }
+            }
+          }
+        });
+
+        // Custom legend
+        const legendEl = document.getElementById('vehicleDonutLegend');
+        if (legendEl) {
+          legendEl.innerHTML = donutLabels.map((l, i) =>
+            '<span style="display:flex;align-items:center;gap:5px;">'
+            + '<span style="width:10px;height:10px;border-radius:50%;background:' + donutColors[i] + ';flex-shrink:0;"></span>'
+            + '<span style="color:#4a5568;">' + l + '</span>'
+            + '<strong style="color:' + donutColors[i] + ';">' + donutData[i] + '</strong>'
+            + '</span>'
+          ).join('');
+        }
+      };
+
+      // Hook into existing Firestore snapshot updates
+      // admin_firebase.js calls _updateOverviewStats() — we piggyback on that
+      const _origUpdateOverview = window._updateOverviewStats;
+      document.addEventListener('DOMContentLoaded', function() {
+        // Retry until admin_firebase.js has set up its listeners
+        const _chartInterval = setInterval(function() {
+          if (window._fbServices !== undefined && window._fbVehicles !== undefined) {
+            clearInterval(_chartInterval);
+            window.renderDashboardCharts();
+          }
+        }, 400);
+      });
+    </script>
+
     <script>
       // Load dashboard data on page load
       document.addEventListener('DOMContentLoaded', function() {
