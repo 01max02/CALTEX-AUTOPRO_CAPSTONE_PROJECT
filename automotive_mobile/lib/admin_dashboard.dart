@@ -365,11 +365,28 @@ class _AdminDashboardState extends State<AdminDashboard> {
             return StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance.collection('vehicles').snapshots(),
               builder: (context, vehicleSnap) {
+                return StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('transactions')
+                      .orderBy('createdAt', descending: true)
+                      .snapshots(),
+                  builder: (context, txnSnap) {
+                    return StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('issuances')
+                          .snapshots(),
+                      builder: (context, issSnap) {
+                        return StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('users')
+                              .snapshots(),
+                          builder: (context, usersSnap) {
                 final maintDocs = maintSnap.data?.docs ?? [];
                 final allServices = maintDocs.map((d) => d.data() as Map<String, dynamic>).toList();
 
                 // Stats
                 final totalVehicles = vehicleSnap.data?.docs.length ?? 0;
+                final totalUsers = usersSnap.data?.docs.length ?? 0;
                 final stockDocs = stockSnap.data?.docs ?? [];
                 final lowStock = stockDocs.where((d) {
                   final data = d.data() as Map<String, dynamic>;
@@ -391,28 +408,81 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
                 final isLoading = maintSnap.connectionState == ConnectionState.waiting ||
                     stockSnap.connectionState == ConnectionState.waiting ||
-                    vehicleSnap.connectionState == ConnectionState.waiting;
+                    vehicleSnap.connectionState == ConnectionState.waiting ||
+                    txnSnap.connectionState == ConnectionState.waiting ||
+                    issSnap.connectionState == ConnectionState.waiting ||
+                    usersSnap.connectionState == ConnectionState.waiting;
 
-                // ── Chart data: services per day (last 7 days) ──
-                final Map<String, int> servicesByDay = {};
+                // ── Chart 1: Stacked bar — Services by Type, last 7 days ──
+                final Map<String, String> dayKeyToLabel = {};
+                final List<String> last7Keys = [];
+                final List<String> last7Labels = [];
                 for (int i = 6; i >= 0; i--) {
                   final d = now.subtract(Duration(days: i));
                   final key = '${months[d.month - 1]} ${d.day}, ${d.year}';
-                  servicesByDay[key] = 0;
+                  final label = '${months[d.month - 1].substring(0, 3)}\n${d.day}';
+                  last7Keys.add(key);
+                  last7Labels.add(label);
+                  dayKeyToLabel[key] = label;
                 }
+
+                // Collect all service type names from svcRows
+                final Map<String, int> typeCount = {};
                 for (final s in allServices) {
-                  final date = s['date'] as String? ?? '';
-                  if (servicesByDay.containsKey(date)) {
-                    servicesByDay[date] = (servicesByDay[date] ?? 0) + 1;
+                  final rows = s['svcRows'] as List? ?? [];
+                  if (rows.isNotEmpty) {
+                    for (final r in rows) {
+                      final name = ((r as Map)['name'] as String? ?? '').trim();
+                      if (name.isNotEmpty) typeCount[name] = (typeCount[name] ?? 0) + 1;
+                    }
+                  } else {
+                    final name = (s['desc'] as String? ?? '').trim();
+                    if (name.isNotEmpty) typeCount[name] = (typeCount[name] ?? 0) + 1;
                   }
                 }
-                final barData = servicesByDay.values.toList();
-                final dayLabels = servicesByDay.keys.map((k) {
-                  final parts = k.split(' ');
-                  return '${parts[0].substring(0, 3)}\n${parts[1].replaceAll(',', '')}';
-                }).toList();
+                final topTypes = (typeCount.entries.toList()
+                  ..sort((a, b) => b.value.compareTo(a.value)))
+                  .take(4).map((e) => e.key).toList();
+                final allTypes = [...topTypes, if (typeCount.length > 4) 'Others'];
+                const typeColors = [
+                  Color(0xFF3b82f6), Color(0xFF22c55e),
+                  Color(0xFFf59e0b), Color(0xFFE8001C), Color(0xFF7c3aed),
+                ];
 
-                // ── Chart data: vehicle status donut ──
+                // Count per type per day
+                Map<String, List<double>> typeDataMap = {};
+                for (final type in allTypes) {
+                  typeDataMap[type] = List.generate(7, (di) {
+                    final key = last7Keys[di];
+                    final dayServices = allServices.where((s) =>
+                      (s['date'] as String? ?? '') == key).toList();
+                    return dayServices.fold<double>(0, (acc, s) {
+                      final rows = s['svcRows'] as List? ?? [];
+                      if (rows.isNotEmpty) {
+                        return acc + rows.where((r) {
+                          final n = ((r as Map)['name'] as String? ?? '').trim();
+                          return type == 'Others' ? !topTypes.contains(n) : n == type;
+                        }).length;
+                      } else {
+                        final n = (s['desc'] as String? ?? '').trim();
+                        if (type == 'Others') return acc + (topTypes.contains(n) ? 0 : 1);
+                        return acc + (n == type ? 1 : 0);
+                      }
+                    });
+                  });
+                }
+
+                // Build stacked max Y (still needed for chart scale)
+                double stackedMaxY = 1;
+                for (int di = 0; di < 7; di++) {
+                  double cumulative = 0;
+                  for (final type in allTypes) {
+                    cumulative += typeDataMap[type]![di];
+                  }
+                  if (cumulative > stackedMaxY) stackedMaxY = cumulative;
+                }
+
+                // ── Chart 2: Vehicle status donut ──
                 int activeCount = 0, overdueCount = 0, dueSoonCount = 0, maintenanceCount = 0;
                 for (final d in vehicleDocs) {
                   final status = ((d.data() as Map<String, dynamic>)['status'] as String? ?? '').toLowerCase();
@@ -422,162 +492,672 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   else activeCount++;
                 }
 
+                // ── Chart 3: Stock In vs Stock Out — last 12 months ──
+                final allTxns = txnSnap.data?.docs
+                    .map((d) => d.data() as Map<String, dynamic>).toList() ?? [];
+                final List<String> monthLabels12 = [];
+                final List<({int month, int year})> monthKeys12 = [];
+                for (int i = 11; i >= 0; i--) {
+                  final d = DateTime(now.year, now.month - i, 1);
+                  monthLabels12.add(months[d.month - 1]);
+                  monthKeys12.add((month: d.month - 1, year: d.year));
+                }
+
+                int parseTxnMonth(Map<String, dynamic> t) {
+                  // Try date string first: "Jan 5, 2025"
+                  final dateStr = t['date'] as String? ?? '';
+                  if (dateStr.isNotEmpty) {
+                    final parts = dateStr.split(' ');
+                    if (parts.length >= 3) {
+                      final m = months.indexOf(parts[0]);
+                      if (m != -1) return m;
+                    }
+                  }
+                  // Fallback: createdAt Firestore Timestamp
+                  final ts = t['createdAt'];
+                  if (ts != null) {
+                    DateTime? dt;
+                    if (ts is DateTime) dt = ts;
+                    else {
+                      try { dt = (ts as dynamic).toDate() as DateTime; } catch (_) {}
+                    }
+                    if (dt != null) return dt.month - 1;
+                  }
+                  return -1;
+                }
+                int parseTxnYear(Map<String, dynamic> t) {
+                  final dateStr = t['date'] as String? ?? '';
+                  if (dateStr.isNotEmpty) {
+                    final parts = dateStr.split(' ');
+                    if (parts.length >= 3) {
+                      final y = int.tryParse(parts[2]);
+                      if (y != null) return y;
+                    }
+                  }
+                  final ts = t['createdAt'];
+                  if (ts != null) {
+                    DateTime? dt;
+                    if (ts is DateTime) dt = ts;
+                    else {
+                      try { dt = (ts as dynamic).toDate() as DateTime; } catch (_) {}
+                    }
+                    if (dt != null) return dt.year;
+                  }
+                  return -1;
+                }
+                double parseQty(dynamic raw) {
+                  if (raw is num) return raw.abs().toDouble();
+                  final str = raw?.toString() ?? '0';
+                  // Strip everything except digits and decimal point
+                  return double.tryParse(str.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
+                }
+
+                final stockInByMonth = monthKeys12.map((mk) =>
+                  allTxns.where((t) {
+                    if ((t['type'] as String? ?? '').toUpperCase() != 'IN') return false;
+                    final desc = (t['desc'] as String? ?? '').toLowerCase();
+                    if (desc.contains('initial stock')) return false;
+                    return parseTxnMonth(t) == mk.month && parseTxnYear(t) == mk.year;
+                  }).fold<double>(0, (s, t) => s + parseQty(t['qty'] ?? t['quantity']))
+                ).toList();
+
+                final stockOutByMonth = monthKeys12.map((mk) =>
+                  allTxns.where((t) {
+                    if ((t['type'] as String? ?? '').toUpperCase() != 'OUT') return false;
+                    return parseTxnMonth(t) == mk.month && parseTxnYear(t) == mk.year;
+                  }).fold<double>(0, (s, t) => s + parseQty(t['qty'] ?? t['quantity']))
+                ).toList();
+
+                final lineMaxY = ([...stockInByMonth, ...stockOutByMonth, 1.0]
+                  .reduce((a, b) => a > b ? a : b)) + 2;
+
+                // ── Chart 4: Top 10 Most Used Parts (this month) ──
+                final allIssuances = issSnap.data?.docs
+                    .map((d) => d.data() as Map<String, dynamic>).toList() ?? [];
+                final Map<String, double> partUsage = {};
+                for (final iss in allIssuances) {
+                  if ((iss['itemType'] as String? ?? '').toLowerCase() == 'service') continue;
+                  final dateStr = iss['date'] as String? ?? '';
+                  if (dateStr.isEmpty) continue;
+                  final parts = dateStr.split(' ');
+                  if (parts.length < 3) continue;
+                  final m = months.indexOf(parts[0]);
+                  final y = int.tryParse(parts[2]) ?? -1;
+                  if (m != now.month - 1 || y != now.year) continue;
+                  final name = (iss['itemName'] ?? iss['item'] ?? '—') as String;
+                  final qty = parseQty(iss['quantity'] ?? iss['qty'] ?? 0);
+                  partUsage[name] = (partUsage[name] ?? 0) + qty;
+                }
+                final sortedParts = (partUsage.entries.toList()
+                  ..sort((a, b) => b.value.compareTo(a.value)))
+                  .take(10).toList();
+                final partsMaxY = sortedParts.isEmpty ? 5.0
+                    : sortedParts.first.value + 1;
+
                 return SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    // ── Stat cards ──
+                    // ── Stat cards (5 cards, clickable, matching website) ──
                     GridView.count(
                       crossAxisCount: 2, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
                       crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.4,
                       children: [
-                        _statCard('Total Vehicles', isLoading ? '…' : '$totalVehicles', Icons.directions_car_outlined, const Color(0xFF003087)),
-                        _statCard('Due for PMS', isLoading ? '…' : '$dueForPms', Icons.build_outlined, Colors.orange),
-                        _statCard('Low Stock', isLoading ? '…' : '$lowStock', Icons.warning_amber_outlined, _red),
-                        _statCard('Services Today', isLoading ? '…' : '$servicesToday', Icons.check_circle_outline, const Color(0xFF2c7a7b)),
+                        _clickableStatCard(
+                          label: 'Total Vehicles',
+                          value: isLoading ? '…' : '$totalVehicles',
+                          icon: Icons.directions_car_outlined,
+                          color: const Color(0xFF003087),
+                          onTap: () => setState(() { _currentIndex = 2; _vehTab = 0; }),
+                        ),
+                        _clickableStatCard(
+                          label: 'Due for PMS',
+                          value: isLoading ? '…' : '$dueForPms',
+                          icon: Icons.build_outlined,
+                          color: Colors.orange,
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminDSS(initialTab: 1))),
+                        ),
+                        _clickableStatCard(
+                          label: 'Low Stock',
+                          value: isLoading ? '…' : '$lowStock',
+                          icon: Icons.warning_amber_outlined,
+                          color: _red,
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminInventoryStock())),
+                        ),
+                        _clickableStatCard(
+                          label: 'Services Today',
+                          value: isLoading ? '…' : '$servicesToday',
+                          icon: Icons.check_circle_outline,
+                          color: const Color(0xFF2c7a7b),
+                          onTap: () => setState(() { _currentIndex = 2; _vehTab = 2; }),
+                        ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Total Users — full-width card (5th stat, purple like website)
+                    _clickableStatCard(
+                      label: 'Total Users',
+                      value: isLoading ? '…' : '$totalUsers',
+                      icon: Icons.people_outline,
+                      color: const Color(0xFF7c3aed),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminUsers())),
+                      fullWidth: true,
                     ),
                     const SizedBox(height: 20),
 
-                    // ── Bar chart: Services last 7 days ──
-                    _chartCard(
-                      title: 'Services — Last 7 Days',
-                      icon: Icons.bar_chart_rounded,
-                      child: isLoading
-                          ? const Center(child: CircularProgressIndicator())
-                          : SizedBox(
-                              height: 160,
-                              child: BarChart(
-                                BarChartData(
-                                  maxY: (barData.isEmpty ? 5 : (barData.reduce((a, b) => a > b ? a : b) + 2)).toDouble(),
-                                  gridData: FlGridData(
-                                    show: true,
-                                    drawVerticalLine: false,
-                                    getDrawingHorizontalLine: (_) => FlLine(color: const Color(0xFFe2e8f0), strokeWidth: 1),
-                                  ),
-                                  borderData: FlBorderData(show: false),
-                                  titlesData: FlTitlesData(
-                                    leftTitles: AxisTitles(
-                                      sideTitles: SideTitles(
-                                        showTitles: true,
-                                        reservedSize: 24,
-                                        getTitlesWidget: (v, _) => Text(
-                                          v.toInt().toString(),
-                                          style: const TextStyle(fontSize: 9, color: Color(0xFF718096)),
-                                        ),
-                                      ),
+                    // ── Chart 1: Stacked Bar — Services by Type, last 7 days ──
+                    // Website-style: gradient icon, inline legend+badge header, flat stacked bars
+                    Builder(builder: (context) {
+                      final total7 = last7Keys.fold<int>(0, (s, k) =>
+                        s + allServices.where((sv) => (sv['date'] as String? ?? '') == k).length);
+                      return Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFe2e8f0)),
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 12, offset: const Offset(0, 2))],
+                        ),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          // ── Header row: icon + title/sub + badge ──
+                          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            // Gradient icon
+                            Container(
+                              width: 32, height: 32,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFFE8001C), Color(0xFFc0001a)],
+                                  begin: Alignment.topLeft, end: Alignment.bottomRight),
+                                borderRadius: BorderRadius.circular(9),
+                                boxShadow: [BoxShadow(color: const Color(0xFFE8001C).withOpacity(0.35), blurRadius: 6, offset: const Offset(0, 2))],
+                              ),
+                              child: const Icon(Icons.bar_chart_rounded, color: Colors.white, size: 15),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              const Text('Services by Type — Last 7 Days',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1a202c))),
+                              const Text('Top service types performed per day',
+                                style: TextStyle(fontSize: 10, color: Color(0xFF718096))),
+                            ])),
+                            // Badge: total count
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFfff5f5),
+                                borderRadius: BorderRadius.circular(20)),
+                              child: Text('$total7 total',
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFE8001C))),
+                            ),
+                          ]),
+                          const SizedBox(height: 10),
+                          // ── Inline legend (flex-wrap style) ──
+                          if (allTypes.isNotEmpty)
+                            Wrap(spacing: 12, runSpacing: 4, children: List.generate(allTypes.length, (i) =>
+                              Row(mainAxisSize: MainAxisSize.min, children: [
+                                Container(width: 10, height: 10,
+                                  decoration: BoxDecoration(
+                                    color: typeColors[i % typeColors.length],
+                                    borderRadius: BorderRadius.circular(3))),
+                                const SizedBox(width: 4),
+                                Text(
+                                  allTypes[i].length > 14 ? '${allTypes[i].substring(0, 12)}…' : allTypes[i],
+                                  style: const TextStyle(fontSize: 9, color: Color(0xFF4a5568))),
+                              ]),
+                            )),
+                          const SizedBox(height: 12),
+                          // ── Chart ──
+                          isLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : SizedBox(
+                                height: 210,
+                                child: BarChart(
+                                  BarChartData(
+                                    maxY: stackedMaxY + 1,
+                                    groupsSpace: 8,
+                                    gridData: FlGridData(
+                                      show: true, drawVerticalLine: false,
+                                      getDrawingHorizontalLine: (_) => const FlLine(color: Color(0xFFf7f8fa), strokeWidth: 1.5),
                                     ),
-                                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                    bottomTitles: AxisTitles(
-                                      sideTitles: SideTitles(
-                                        showTitles: true,
-                                        reservedSize: 32,
+                                    borderData: FlBorderData(show: false),
+                                    titlesData: FlTitlesData(
+                                      leftTitles: AxisTitles(sideTitles: SideTitles(
+                                        showTitles: true, reservedSize: 24,
+                                        getTitlesWidget: (v, meta) {
+                                          if (v != v.roundToDouble()) return const SizedBox.shrink();
+                                          return Text(v.toInt().toString(),
+                                            style: const TextStyle(fontSize: 9, color: Color(0xFFa0aec0)));
+                                        },
+                                      )),
+                                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                      bottomTitles: AxisTitles(sideTitles: SideTitles(
+                                        showTitles: true, reservedSize: 28,
                                         getTitlesWidget: (v, _) {
                                           final i = v.toInt();
-                                          if (i < 0 || i >= dayLabels.length) return const SizedBox.shrink();
+                                          if (i < 0 || i >= last7Labels.length) return const SizedBox.shrink();
                                           return Padding(
                                             padding: const EdgeInsets.only(top: 4),
-                                            child: Text(
-                                              dayLabels[i],
-                                              textAlign: TextAlign.center,
-                                              style: const TextStyle(fontSize: 8, color: Color(0xFF718096)),
-                                            ),
+                                            child: Text(last7Labels[i], textAlign: TextAlign.center,
+                                              style: const TextStyle(fontSize: 9, color: Color(0xFFa0aec0))));
+                                        },
+                                      )),
+                                    ),
+                                    barTouchData: BarTouchData(
+                                      touchTooltipData: BarTouchTooltipData(
+                                        getTooltipColor: (_) => const Color(0xFF1a202c),
+                                        tooltipRoundedRadius: 10,
+                                        tooltipPadding: const EdgeInsets.all(10),
+                                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                                          // Build multi-line tooltip showing each type + total
+                                          final di = group.x;
+                                          final lines = <String>[];
+                                          double total = 0;
+                                          for (int ti = 0; ti < allTypes.length; ti++) {
+                                            final val = typeDataMap[allTypes[ti]]![di];
+                                            if (val > 0) {
+                                              lines.add('${allTypes[ti]}: ${val.toInt()}');
+                                              total += val;
+                                            }
+                                          }
+                                          if (total == 0) return null;
+                                          lines.add('─────────');
+                                          lines.add('Total: ${total.toInt()} service${total != 1 ? 's' : ''}');
+                                          return BarTooltipItem(
+                                            last7Labels[di].replaceAll('\n', ' ') + '\n',
+                                            const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                                            children: lines.map((l) => TextSpan(
+                                              text: '$l\n',
+                                              style: TextStyle(
+                                                color: l.startsWith('Total') ? Colors.white : Colors.white70,
+                                                fontWeight: l.startsWith('Total') ? FontWeight.w700 : FontWeight.normal,
+                                                fontSize: 10),
+                                            )).toList(),
                                           );
                                         },
                                       ),
                                     ),
-                                  ),
-                                  barGroups: List.generate(barData.length, (i) {
-                                    final isToday = i == barData.length - 1;
-                                    return BarChartGroupData(
-                                      x: i,
-                                      barRods: [
-                                        BarChartRodData(
-                                          toY: barData[i].toDouble(),
-                                          color: isToday ? _red : const Color(0xFF003087),
-                                          width: 18,
-                                          borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                                          backDrawRodData: BackgroundBarChartRodData(
-                                            show: true,
-                                            toY: (barData.isEmpty ? 5 : (barData.reduce((a, b) => a > b ? a : b) + 2)).toDouble(),
-                                            color: const Color(0xFFF7F8FA),
+                                    barGroups: List.generate(7, (di) {
+                                      double cumulative = 0;
+                                      final rods = <BarChartRodStackItem>[];
+                                      for (int ti = 0; ti < allTypes.length; ti++) {
+                                        final val = typeDataMap[allTypes[ti]]![di];
+                                        if (val > 0) {
+                                          rods.add(BarChartRodStackItem(
+                                            cumulative, cumulative + val,
+                                            typeColors[ti % typeColors.length],
+                                            BorderSide.none,
+                                          ));
+                                          cumulative += val;
+                                        }
+                                      }
+                                      return BarChartGroupData(
+                                        x: di,
+                                        barRods: [
+                                          BarChartRodData(
+                                            toY: cumulative == 0 ? 0.001 : cumulative,
+                                            rodStackItems: rods,
+                                            width: 22,
+                                            // Rounded top only on the topmost segment
+                                            borderRadius: cumulative > 0
+                                              ? const BorderRadius.vertical(top: Radius.circular(5))
+                                              : BorderRadius.zero,
+                                            color: Colors.transparent,
+                                            backDrawRodData: BackgroundBarChartRodData(
+                                              show: true,
+                                              toY: stackedMaxY + 1,
+                                              color: const Color(0xFFF7F8FA),
+                                            ),
                                           ),
-                                        ),
-                                      ],
-                                    );
-                                  }),
+                                        ],
+                                      );
+                                    }),
+                                  ),
                                 ),
                               ),
-                            ),
-                    ),
+                        ]),
+                      );
+                    }),
                     const SizedBox(height: 16),
 
-                    // ── Donut chart: Vehicle status ──
-                    _chartCard(
-                      title: 'Vehicle Status',
-                      icon: Icons.donut_large_rounded,
-                      child: isLoading
+                    // ── Chart 2: Donut — Vehicle Status ──
+                    // Vehicle Status — dark blue gradient icon, center total, website-style legend
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFe2e8f0)),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 12, offset: const Offset(0, 2))],
+                      ),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Container(
+                            width: 32, height: 32,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF003087), Color(0xFF001f5c)],
+                                begin: Alignment.topLeft, end: Alignment.bottomRight),
+                              borderRadius: BorderRadius.circular(9),
+                              boxShadow: [BoxShadow(color: const Color(0xFF003087).withOpacity(0.35), blurRadius: 6, offset: const Offset(0, 2))],
+                            ),
+                            child: const Icon(Icons.donut_large_rounded, color: Colors.white, size: 15),
+                          ),
+                          const SizedBox(width: 10),
+                          const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text('Vehicle Status', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1a202c))),
+                            Text('Fleet health overview', style: TextStyle(fontSize: 10, color: Color(0xFF718096))),
+                          ]),
+                        ]),
+                        const SizedBox(height: 16),
+                        isLoading
                           ? const Center(child: CircularProgressIndicator())
                           : totalVehicles == 0
                               ? const Center(child: Padding(
                                   padding: EdgeInsets.all(20),
                                   child: Text('No vehicles yet.', style: TextStyle(color: Color(0xFF718096))),
                                 ))
-                              : Row(children: [
+                              : Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
                                   SizedBox(
-                                    width: 130,
-                                    height: 130,
-                                    child: PieChart(
-                                      PieChartData(
-                                        sectionsSpace: 2,
-                                        centerSpaceRadius: 36,
+                                    width: 150, height: 150,
+                                    child: Stack(alignment: Alignment.center, children: [
+                                      PieChart(PieChartData(
+                                        sectionsSpace: 3,
+                                        centerSpaceRadius: 46,
                                         sections: [
-                                          if (activeCount > 0)
-                                            PieChartSectionData(
-                                              value: activeCount.toDouble(),
-                                              color: const Color(0xFF003087),
-                                              radius: 28,
-                                              title: '',
-                                            ),
-                                          if (dueSoonCount > 0)
-                                            PieChartSectionData(
-                                              value: dueSoonCount.toDouble(),
-                                              color: Colors.orange,
-                                              radius: 28,
-                                              title: '',
-                                            ),
-                                          if (overdueCount > 0)
-                                            PieChartSectionData(
-                                              value: overdueCount.toDouble(),
-                                              color: _red,
-                                              radius: 28,
-                                              title: '',
-                                            ),
-                                          if (maintenanceCount > 0)
-                                            PieChartSectionData(
-                                              value: maintenanceCount.toDouble(),
-                                              color: Colors.teal,
-                                              radius: 28,
-                                              title: '',
-                                            ),
+                                          if (activeCount > 0) PieChartSectionData(value: activeCount.toDouble(), color: const Color(0xFF003087), radius: 28, title: ''),
+                                          if (dueSoonCount > 0) PieChartSectionData(value: dueSoonCount.toDouble(), color: const Color(0xFFed8936), radius: 28, title: ''),
+                                          if (overdueCount > 0) PieChartSectionData(value: overdueCount.toDouble(), color: _red, radius: 28, title: ''),
+                                          if (maintenanceCount > 0) PieChartSectionData(value: maintenanceCount.toDouble(), color: const Color(0xFF0d9488), radius: 28, title: ''),
                                         ],
-                                      ),
-                                    ),
+                                      )),
+                                      Column(mainAxisSize: MainAxisSize.min, children: [
+                                        Text('$totalVehicles', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF1a202c))),
+                                        const Text('Vehicles', style: TextStyle(fontSize: 9, color: Color(0xFF718096), fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                                      ]),
+                                    ]),
                                   ),
                                   const SizedBox(width: 20),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        _legendItem('Active', activeCount, const Color(0xFF003087)),
-                                        _legendItem('Due Soon', dueSoonCount, Colors.orange),
-                                        _legendItem('Overdue', overdueCount, _red),
-                                        _legendItem('Maintenance', maintenanceCount, Colors.teal),
-                                      ],
+                                  Expanded(child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      _donutLegendRow('Active', activeCount, const Color(0xFF003087)),
+                                      _donutLegendRow('Due Soon', dueSoonCount, const Color(0xFFed8936)),
+                                      _donutLegendRow('Overdue', overdueCount, _red),
+                                      _donutLegendRow('Maintenance', maintenanceCount, const Color(0xFF0d9488)),
+                                    ],
+                                  )),
+                                ]),
+                      ]),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Stock In vs Stock Out — teal gradient icon, year-range sub, inline legend in header
+                    GestureDetector(
+                      onTap: () => setState(() { _currentIndex = 1; _invTab = 1; }),
+                      child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFe2e8f0)),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 12, offset: const Offset(0, 2))],
+                      ),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Container(
+                            width: 32, height: 32,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF0d9488), Color(0xFF0a7a70)],
+                                begin: Alignment.topLeft, end: Alignment.bottomRight),
+                              borderRadius: BorderRadius.circular(9),
+                              boxShadow: [BoxShadow(color: const Color(0xFF0d9488).withOpacity(0.35), blurRadius: 6, offset: const Offset(0, 2))],
+                            ),
+                            child: const Icon(Icons.show_chart_rounded, color: Colors.white, size: 15),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            const Text('Stock In vs Stock Out', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1a202c))),
+                            Text(
+                              '${months[monthKeys12.first.month]} ${monthKeys12.first.year} – ${months[monthKeys12.last.month]} ${monthKeys12.last.year}',
+                              style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
+                          ])),
+                          Row(mainAxisSize: MainAxisSize.min, children: [
+                            _lineLegendDot(const Color(0xFF003087), 'In'),
+                            const SizedBox(width: 10),
+                            _lineLegendDot(_red, 'Out'),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.chevron_right, size: 16, color: Color(0xFFcbd5e0)),
+                          ]),
+                        ]),
+                        const SizedBox(height: 16),
+                        isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : allTxns.isEmpty
+                              ? const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 24),
+                                  child: Center(child: Text('No transactions yet.',
+                                    style: TextStyle(color: Color(0xFF718096), fontSize: 13))),
+                                )
+                              : SizedBox(
+                              height: 220,
+                              child: LineChart(
+                                LineChartData(
+                                  minY: 0,
+                                  maxY: lineMaxY,
+                                  gridData: FlGridData(
+                                    show: true, drawVerticalLine: false,
+                                    getDrawingHorizontalLine: (_) => const FlLine(color: Color(0xFFf7f8fa), strokeWidth: 1.5),
+                                  ),
+                                  borderData: FlBorderData(show: false),
+                                  titlesData: FlTitlesData(
+                                    leftTitles: AxisTitles(sideTitles: SideTitles(
+                                      showTitles: true, reservedSize: 28,
+                                      getTitlesWidget: (v, meta) {
+                                        if (v != v.roundToDouble()) return const SizedBox.shrink();
+                                        return Text(v.toInt().toString(), style: const TextStyle(fontSize: 9, color: Color(0xFFa0aec0)));
+                                      },
+                                    )),
+                                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                    bottomTitles: AxisTitles(sideTitles: SideTitles(
+                                      showTitles: true, reservedSize: 22,
+                                      getTitlesWidget: (v, _) {
+                                        final i = v.toInt();
+                                        if (i < 0 || i >= monthLabels12.length) return const SizedBox.shrink();
+                                        if (i % 2 != 0) return const SizedBox.shrink();
+                                        return Padding(
+                                          padding: const EdgeInsets.only(top: 4),
+                                          child: Text(monthLabels12[i], style: const TextStyle(fontSize: 9, color: Color(0xFFa0aec0))));
+                                      },
+                                    )),
+                                  ),
+                                  lineTouchData: LineTouchData(
+                                    touchTooltipData: LineTouchTooltipData(
+                                      getTooltipColor: (_) => const Color(0xFF1a202c),
+                                      tooltipRoundedRadius: 10,
+                                      tooltipPadding: const EdgeInsets.all(10),
+                                      getTooltipItems: (spots) => spots.map((s) {
+                                        final label = s.barIndex == 0 ? 'Stock In (Receiving)' : 'Stock Out (Usage)';
+                                        return LineTooltipItem(
+                                          '  $label: ${s.y.toInt()} units',
+                                          TextStyle(color: s.barIndex == 0 ? const Color(0xFF003087) : _red, fontSize: 10, fontWeight: FontWeight.w600),
+                                        );
+                                      }).toList(),
                                     ),
                                   ),
-                                ]),
+                                  lineBarsData: [
+                                    LineChartBarData(
+                                      spots: List.generate(12, (i) => FlSpot(i.toDouble(), stockInByMonth[i])),
+                                      isCurved: true, curveSmoothness: 0.4,
+                                      color: const Color(0xFF003087), barWidth: 2.5,
+                                      dotData: FlDotData(show: true,
+                                        getDotPainter: (p, x, bar, idx) => FlDotCirclePainter(radius: 4, color: const Color(0xFF003087), strokeWidth: 2, strokeColor: Colors.white)),
+                                      belowBarData: BarAreaData(show: true, color: const Color(0xFF003087).withOpacity(0.08)),
+                                    ),
+                                    LineChartBarData(
+                                      spots: List.generate(12, (i) => FlSpot(i.toDouble(), stockOutByMonth[i])),
+                                      isCurved: true, curveSmoothness: 0.4,
+                                      color: _red, barWidth: 2.5,
+                                      dotData: FlDotData(show: true,
+                                        getDotPainter: (p, x, bar, idx) => FlDotCirclePainter(radius: 4, color: _red, strokeWidth: 2, strokeColor: Colors.white)),
+                                      belowBarData: BarAreaData(show: true, color: _red.withOpacity(0.06)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        // Summary row below chart
+                        if (!isLoading && allTxns.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Row(children: [
+                            _txnSummaryChip(
+                              'Total IN',
+                              allTxns.where((t) => (t['type'] as String? ?? '').toUpperCase() == 'IN' && !(t['desc'] as String? ?? '').toLowerCase().contains('initial stock')).length,
+                              const Color(0xFF003087),
+                              Icons.download_outlined,
+                            ),
+                            const SizedBox(width: 8),
+                            _txnSummaryChip(
+                              'Total OUT',
+                              allTxns.where((t) => (t['type'] as String? ?? '').toUpperCase() == 'OUT').length,
+                              _red,
+                              Icons.upload_outlined,
+                            ),
+                            const SizedBox(width: 8),
+                            _txnSummaryChip(
+                              'All Records',
+                              allTxns.length,
+                              const Color(0xFF718096),
+                              Icons.swap_horiz,
+                            ),
+                          ]),
+                        ],
+                      ]),
+                    )),
+                    const SizedBox(height: 16),
+
+                    // Top 10 Most Used Parts — purple gradient icon, item-count badge, rich tooltip
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFe2e8f0)),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 12, offset: const Offset(0, 2))],
+                      ),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Container(
+                            width: 32, height: 32,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF7c3aed), Color(0xFF5b21b6)],
+                                begin: Alignment.topLeft, end: Alignment.bottomRight),
+                              borderRadius: BorderRadius.circular(9),
+                              boxShadow: [BoxShadow(color: const Color(0xFF7c3aed).withOpacity(0.35), blurRadius: 6, offset: const Offset(0, 2))],
+                            ),
+                            child: const Icon(Icons.bar_chart_rounded, color: Colors.white, size: 15),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            const Text('Top 10 Most Used Parts', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1a202c))),
+                            Text('${months[now.month - 1]} ${now.year} · Materials only', style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
+                          ])),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            decoration: BoxDecoration(color: const Color(0xFFf5f3ff), borderRadius: BorderRadius.circular(20)),
+                            child: Text('${sortedParts.length} items',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF7c3aed))),
+                          ),
+                        ]),
+                        const SizedBox(height: 16),
+                        isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : sortedParts.isEmpty
+                              ? const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 24),
+                                  child: Center(child: Text(
+                                    'No material issuances recorded this month.',
+                                    style: TextStyle(color: Color(0xFF718096), fontSize: 13))),
+                                )
+                              : SizedBox(
+                                  height: 220,
+                                  child: BarChart(
+                                    BarChartData(
+                                      maxY: partsMaxY,
+                                      groupsSpace: 8,
+                                      gridData: FlGridData(
+                                        show: true, drawVerticalLine: false,
+                                        getDrawingHorizontalLine: (_) => const FlLine(color: Color(0xFFf7f8fa), strokeWidth: 1.5),
+                                      ),
+                                      borderData: FlBorderData(show: false),
+                                      titlesData: FlTitlesData(
+                                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                        leftTitles: AxisTitles(sideTitles: SideTitles(
+                                          showTitles: true, reservedSize: 24,
+                                          getTitlesWidget: (v, meta) {
+                                            if (v != v.roundToDouble()) return const SizedBox.shrink();
+                                            return Text(v.toInt().toString(), style: const TextStyle(fontSize: 9, color: Color(0xFFa0aec0)));
+                                          },
+                                        )),
+                                        bottomTitles: AxisTitles(sideTitles: SideTitles(
+                                          showTitles: true, reservedSize: 44,
+                                          getTitlesWidget: (v, _) {
+                                            final i = v.toInt();
+                                            if (i < 0 || i >= sortedParts.length) return const SizedBox.shrink();
+                                            final name = sortedParts[i].key;
+                                            final short = name.length > 10 ? '${name.substring(0, 8)}…' : name;
+                                            return Padding(
+                                              padding: const EdgeInsets.only(top: 6),
+                                              child: Text(short, textAlign: TextAlign.center,
+                                                style: const TextStyle(fontSize: 9, color: Color(0xFF718096))));
+                                          },
+                                        )),
+                                      ),
+                                      barTouchData: BarTouchData(
+                                        touchTooltipData: BarTouchTooltipData(
+                                          getTooltipColor: (_) => const Color(0xFF1a202c),
+                                          tooltipRoundedRadius: 10,
+                                          tooltipPadding: const EdgeInsets.all(10),
+                                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                                            final name = sortedParts[group.x].key;
+                                            final qty = rod.toY;
+                                            return BarTooltipItem(
+                                              '$name\n',
+                                              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                                              children: [TextSpan(
+                                                text: '  Used: ${qty.toInt()} unit${qty != 1 ? 's' : ''}',
+                                                style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.normal, fontSize: 10),
+                                              )],
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                      barGroups: List.generate(sortedParts.length, (i) {
+                                        const palette = [
+                                          Color(0xFF7c3aed), Color(0xFF6d28d9), Color(0xFF5b21b6), Color(0xFF4c1d95),
+                                          Color(0xFFE8001C), Color(0xFFc0001a), Color(0xFF003087), Color(0xFF1e40af),
+                                          Color(0xFF0d9488), Color(0xFF0a7a70),
+                                        ];
+                                        return BarChartGroupData(
+                                          x: i,
+                                          barRods: [
+                                            BarChartRodData(
+                                              toY: sortedParts[i].value,
+                                              color: palette[i % palette.length],
+                                              width: 20,
+                                              borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                                            ),
+                                          ],
+                                        );
+                                      }),
+                                    ),
+                                  ),
+                                ),
+                      ]),
                     ),
                     const SizedBox(height: 20),
 
@@ -617,6 +1197,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       }),
                   ]),
                 );
+                          },
+                        );
+                      },
+                    );
+                  },
+                );
               },
             );
           },
@@ -625,7 +1211,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _chartCard({required String title, required IconData icon, required Widget child}) {
+  Widget _chartCard({required String title, required IconData icon, required Widget child, String? subtitle}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -641,11 +1227,61 @@ class _AdminDashboardState extends State<AdminDashboard> {
             child: Icon(icon, color: _red, size: 16),
           ),
           const SizedBox(width: 10),
-          Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1a202c))),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1a202c))),
+            if (subtitle != null)
+              Text(subtitle, style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
+          ])),
         ]),
         const SizedBox(height: 16),
         child,
       ]),
+    );
+  }
+
+  Widget _lineLegendDot(Color color, String label) {
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Container(width: 16, height: 3, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+      const SizedBox(width: 5),
+      Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF4a5568))),
+    ]);
+  }
+
+  // Website-style donut legend: colored square + label on left, bold count on right
+  Widget _donutLegendRow(String label, int count, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(children: [
+        Row(children: [
+          Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
+          const SizedBox(width: 7),
+          Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF4a5568))),
+        ]),
+        const Spacer(),
+        Text('$count', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
+      ]),
+    );
+  }
+
+  // Summary chip for the stock line chart footer
+  Widget _txnSummaryChip(String label, int count, Color color, IconData icon) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withOpacity(0.15)),
+        ),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 5),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('$count', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color)),
+            Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
+          ]),
+        ]),
+      ),
     );
   }
 
@@ -662,23 +1298,63 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _statCard(String label, String value, IconData icon, Color color) {
-    return Container(
+    return _clickableStatCard(label: label, value: value, icon: icon, color: color);
+  }
+
+  Widget _clickableStatCard({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+    VoidCallback? onTap,
+    bool fullWidth = false,
+  }) {
+    final card = AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.center, mainAxisAlignment: MainAxisAlignment.center, children: [
-        Container(
-          width: 34, height: 34,
-          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-          child: Icon(icon, color: color, size: 18),
-        ),
-        const SizedBox(height: 6),
-        FittedBox(fit: BoxFit.scaleDown, child: Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color))),
-        Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096)), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
-      ]),
+      child: fullWidth
+          ? Row(children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
+                Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+              ])),
+              if (onTap != null)
+                Icon(Icons.chevron_right, color: color.withOpacity(0.4), size: 20),
+            ])
+          : Column(crossAxisAlignment: CrossAxisAlignment.center, mainAxisAlignment: MainAxisAlignment.center, children: [
+              Container(
+                width: 34, height: 34,
+                decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                child: Icon(icon, color: color, size: 18),
+              ),
+              const SizedBox(height: 6),
+              FittedBox(fit: BoxFit.scaleDown, child: Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color))),
+              Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096)), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
+            ]),
+    );
+
+    if (onTap == null) return card;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        splashColor: color.withOpacity(0.08),
+        highlightColor: color.withOpacity(0.04),
+        child: card,
+      ),
     );
   }
 
@@ -1023,7 +1699,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
               padding: const EdgeInsets.all(20),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 _txnDetailRow('Item', t['item'] ?? '—'),
-                _txnDetailRow('Description', t['desc'] ?? '—'),
+                _txnDetailRow('Description', (t['desc'] ?? '—')
+                  .replaceAll(RegExp(r'for maintenance SVC-\d+ [—\-] '), 'for ')
+                  .replaceAll(RegExp(r'for maintenance SVC-\d+'), '')),
                 _txnDetailRow('Type', isIn ? 'Stock In (IN)' : 'Stock Out (OUT)'),
                 _txnDetailRow('Quantity', t['qty'] ?? '—'),
                 _txnDetailRow('Date', t['date'] ?? '—'),

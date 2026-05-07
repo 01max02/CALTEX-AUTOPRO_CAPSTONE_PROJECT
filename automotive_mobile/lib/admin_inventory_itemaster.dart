@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'barcode_scanner_screen.dart';
 
 class AdminInventoryItemMaster extends StatefulWidget {
   const AdminInventoryItemMaster({super.key});
@@ -426,23 +427,75 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
                   ]),
                   if (selectedType == 'Material') ...[
                     const SizedBox(height: 10),
-                    Row(children: [
+                    // Barcode field with scan button
+                    Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Expanded(child: TextField(controller: barcodeCtrl,
                         decoration: InputDecoration(
-                          labelText: 'Barcode', border: const OutlineInputBorder(),
-                          suffixIcon: IconButton(
-                            icon: const Icon(Icons.auto_fix_high, size: 18),
-                            onPressed: () { barcodeCtrl.text = DateTime.now().millisecondsSinceEpoch.toString().substring(3); setModalState(() {}); },
-                          ),
+                          labelText: 'Barcode',
+                          border: const OutlineInputBorder(),
+                          suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
+                            // Auto-generate
+                            IconButton(
+                              icon: const Icon(Icons.auto_fix_high, size: 18),
+                              tooltip: 'Auto-generate',
+                              onPressed: () {
+                                barcodeCtrl.text = DateTime.now().millisecondsSinceEpoch.toString().substring(3);
+                                setModalState(() {});
+                              },
+                            ),
+                            // Scan
+                            IconButton(
+                              icon: const Icon(Icons.qr_code_scanner, size: 18, color: Color(0xFF003087)),
+                              tooltip: 'Scan barcode',
+                              onPressed: () async {
+                                final result = await Navigator.push<String>(ctx,
+                                  MaterialPageRoute(builder: (_) => const BarcodeScannerScreen(
+                                    title: 'Scan Barcode',
+                                    hint: 'Point camera at the barcode',
+                                  )));
+                                if (result != null && result.isNotEmpty) {
+                                  barcodeCtrl.text = result;
+                                  setModalState(() {});
+                                }
+                              },
+                            ),
+                          ]),
                         ))),
-                      const SizedBox(width: 10),
+                    ]),
+                    const SizedBox(height: 10),
+                    // QR Code field with scan button
+                    Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Expanded(child: TextField(controller: qrCtrl,
                         decoration: InputDecoration(
-                          labelText: 'QR Code', border: const OutlineInputBorder(),
-                          suffixIcon: IconButton(
-                            icon: const Icon(Icons.auto_fix_high, size: 18),
-                            onPressed: () { qrCtrl.text = 'QR-$itemNum'; setModalState(() {}); },
-                          ),
+                          labelText: 'QR Code',
+                          border: const OutlineInputBorder(),
+                          suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
+                            // Auto-generate
+                            IconButton(
+                              icon: const Icon(Icons.auto_fix_high, size: 18),
+                              tooltip: 'Auto-generate',
+                              onPressed: () {
+                                qrCtrl.text = 'QR-$itemNum';
+                                setModalState(() {});
+                              },
+                            ),
+                            // Scan
+                            IconButton(
+                              icon: const Icon(Icons.qr_code_scanner, size: 18, color: Color(0xFF003087)),
+                              tooltip: 'Scan QR code',
+                              onPressed: () async {
+                                final result = await Navigator.push<String>(ctx,
+                                  MaterialPageRoute(builder: (_) => const BarcodeScannerScreen(
+                                    title: 'Scan QR Code',
+                                    hint: 'Point camera at the QR code',
+                                  )));
+                                if (result != null && result.isNotEmpty) {
+                                  qrCtrl.text = result;
+                                  setModalState(() {});
+                                }
+                              },
+                            ),
+                          ]),
                         ))),
                     ]),
                   ],

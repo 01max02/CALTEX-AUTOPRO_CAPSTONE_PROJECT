@@ -130,8 +130,8 @@ class _DomainDetailScreenState extends State<_DomainDetailScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      builder: (sheetCtx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
         child: Container(
           padding: const EdgeInsets.all(24),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -145,8 +145,9 @@ class _DomainDetailScreenState extends State<_DomainDetailScreen> {
               Text(doc == null ? 'Add ${widget.label}' : 'Edit',
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const Spacer(),
-              GestureDetector(onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.close, color: Color(0xFF718096))),
+              GestureDetector(
+                onTap: () => Navigator.pop(sheetCtx),
+                child: const Icon(Icons.close, color: Color(0xFF718096))),
             ]),
             const SizedBox(height: 20),
             TextField(
@@ -161,7 +162,7 @@ class _DomainDetailScreenState extends State<_DomainDetailScreen> {
             const SizedBox(height: 16),
             Row(children: [
               Expanded(child: OutlinedButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => Navigator.pop(sheetCtx),
                 child: const Text('Cancel'),
               )),
               const SizedBox(width: 12),
@@ -169,28 +170,28 @@ class _DomainDetailScreenState extends State<_DomainDetailScreen> {
                 onPressed: () async {
                   final name = ctrl.text.trim();
                   if (name.isEmpty) return;
+                  // Close sheet first, then show snackbar on the parent scaffold
+                  Navigator.pop(sheetCtx);
                   try {
                     if (doc == null) {
                       await _col.add({'name': name, 'createdAt': FieldValue.serverTimestamp()});
-                      if (context.mounted) {
-                        Navigator.pop(context);
+                      if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Item added successfully!')]),
+                          content: const Row(children: [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Item added successfully!')]),
                           backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
                       }
                     } else {
                       await doc.reference.update({'name': name});
-                      if (context.mounted) {
-                        Navigator.pop(context);
+                      if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Item updated successfully!')]),
+                          content: const Row(children: [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Item updated successfully!')]),
                           backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
                       }
                     }
                   } catch (e) {
-                    if (context.mounted) {
+                    if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
                     }
@@ -207,7 +208,7 @@ class _DomainDetailScreenState extends State<_DomainDetailScreen> {
           ]),
         ),
       ),
-    );
+    ).whenComplete(() => ctrl.dispose()); // dispose controller when sheet closes
   }
 
   void _confirmDelete(DocumentSnapshot doc) {

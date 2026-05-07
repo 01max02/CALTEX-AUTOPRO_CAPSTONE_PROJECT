@@ -1,9 +1,11 @@
 /* ================================================================
-   profile.css — All styles for profile.html (admin + customer)
+   profile.css — Profile-specific styles only
+   Base layout (admin-dashboard, admin-sidebar, stat-card, etc.)
+   comes from style.css + admin.css
    ================================================================ */
 
-/* ── Base reset ── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ── Base reset (only what style.css doesn't cover) ── */
+*, *::before, *::after { box-sizing: border-box; }
 
 body.portal-body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -11,12 +13,28 @@ body.portal-body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    margin: 0;
+    padding: 0;
 }
 
 /* ================================================================
-   CUSTOMER / STAFF LAYOUT
+   CUSTOMER / STAFF STANDALONE LAYOUT
    ================================================================ */
 
+#standaloneWrap {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+#standaloneWrap main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem 2rem;
+    background: #F7F8FA;
+}
+
+/* Customer topbar (reused from customer_shared) */
 .cu-topbar {
     background: #E8001C;
     height: 60px;
@@ -98,22 +116,6 @@ body.portal-body {
 .notif-panel-list { overflow-y: auto; flex: 1; scrollbar-width: none; -ms-overflow-style: none; }
 .notif-panel-list::-webkit-scrollbar { display: none; }
 
-.admin-notif-item {
-    display: flex; align-items: flex-start; gap: 0.85rem;
-    padding: 0.9rem 1.25rem; border-bottom: 1px solid #f0f4f8;
-    cursor: pointer; transition: background 0.15s;
-}
-.admin-notif-item:last-child { border-bottom: none; }
-.admin-notif-item:hover { background: #f8fafc; }
-.admin-notif-item.unread { background: #fff8f8; border-left: 3px solid #E8001C; }
-.admin-notif-icon { font-size: 1.3rem; flex-shrink: 0; margin-top: 0.1rem; }
-.admin-notif-title { font-size: 0.85rem; font-weight: 700; color: #1a202c; margin-bottom: 0.2rem; }
-.admin-notif-msg { font-size: 0.78rem; color: #4a5568; line-height: 1.5; }
-.admin-notif-time { font-size: 0.7rem; color: #a0aec0; margin-top: 0.25rem; }
-.admin-notif-empty { text-align: center; padding: 2.5rem 1rem; color: #a0aec0; }
-.admin-notif-empty-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
-.admin-notif-empty-text { font-size: 0.88rem; font-weight: 600; }
-
 .avatar-menu {
     position: absolute; top: calc(100% + 10px); right: 0;
     width: 220px; background: #fff; border-radius: 14px;
@@ -144,110 +146,7 @@ body.portal-body {
 @media (max-width: 480px) { .notif-panel { width: calc(100vw - 24px); right: -8px; } }
 
 /* ================================================================
-   ADMIN LAYOUT
-   ================================================================ */
-
-.admin-dashboard {
-    width: 100%; height: 100vh; background: #f8fafc; flex-direction: column;
-}
-.admin-dashboard-body { display: flex; flex-direction: row; flex: 1; overflow: visible; min-height: 0; }
-#sidebarContainer { display: contents; }
-
-.admin-topbar {
-    background: #E8001C; height: 60px;
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0 20px; position: sticky; top: 0; z-index: 200; flex-shrink: 0;
-}
-.admin-topbar-left { display: flex; align-items: center; gap: 12px; }
-.admin-menu-btn {
-    background: rgba(255,255,255,0.15); border: none; border-radius: 8px;
-    width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
-    cursor: pointer; color: white; transition: background .2s; flex-shrink: 0;
-}
-.admin-menu-btn:hover { background: rgba(255,255,255,0.28); }
-.admin-topbar-brand { display: flex; align-items: center; gap: 10px; }
-.admin-topbar-logo { width: 36px; height: 36px; object-fit: contain; }
-.admin-topbar-text { display: flex; flex-direction: column; gap: 1px; }
-.admin-topbar-wordmark { height: 16px; object-fit: contain; }
-.admin-topbar-autopro { font-size: 10px; color: rgba(255,255,255,0.7); font-weight: 700; letter-spacing: 2px; }
-.admin-topbar-actions { display: flex; align-items: center; gap: 8px; }
-.admin-notif-btn {
-    background: rgba(255,255,255,0.15); border: none; border-radius: 50%;
-    width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
-    cursor: pointer; color: white; position: relative; transition: background .2s;
-}
-.admin-notif-btn:hover { background: rgba(255,255,255,0.25); }
-.admin-notif-badge {
-    position: absolute; top: 4px; right: 4px; background: #fff; color: #E8001C;
-    font-size: 9px; font-weight: 800; min-width: 14px; height: 14px; border-radius: 7px;
-    display: flex; align-items: center; justify-content: center; padding: 0 3px;
-}
-.admin-avatar {
-    width: 34px; height: 34px; border-radius: 50%;
-    background: rgba(255,255,255,0.25); color: white; font-size: 12px; font-weight: 700;
-    display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden;
-}
-.admin-avatar img { width: 100%; height: 100%; object-fit: cover; }
-
-.admin-sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 299; }
-.admin-sidebar-overlay.active { display: block; }
-
-.admin-sidebar {
-    width: 256px; min-width: 256px; background: #fff; color: #1a202c;
-    display: flex; flex-direction: column; height: 100%;
-    overflow-y: auto; overflow-x: hidden; flex-shrink: 0; border-right: 1px solid #e2e8f0;
-    position: fixed; top: 60px; left: 0; bottom: 0; z-index: 300;
-    transform: translateX(-100%); transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
-    box-shadow: 4px 0 24px rgba(0,0,0,0.12); scrollbar-width: none; -ms-overflow-style: none;
-}
-.admin-sidebar::-webkit-scrollbar { display: none; }
-.admin-sidebar.admin-sidebar-open { transform: translateX(0); }
-
-.admin-nav { flex: 1; padding: 1rem 0.75rem; display: flex; flex-direction: column; gap: 0.2rem; }
-.admin-nav-btn {
-    display: flex; align-items: center; gap: 0.75rem; width: 100%;
-    padding: 0.7rem 1rem; background: transparent; border: none; border-radius: 0 8px 8px 0;
-    color: #4a5568; font-size: 0.88rem; font-weight: 500; cursor: pointer;
-    text-align: left; transition: background 0.15s, color 0.15s; font-family: inherit;
-}
-.admin-nav-btn:hover:not(.active) { background: #f7f8fa; color: #1a202c; }
-.admin-nav-btn.active { background: rgba(232,0,28,0.08); color: #E8001C; font-weight: 600; }
-.admin-nav-btn.active .admin-nav-icon svg { stroke: #E8001C; }
-.admin-nav-btn.submenu-item { padding-left: 2.75rem; font-size: 0.83rem; color: #718096; }
-.admin-nav-btn.submenu-item.active { color: #E8001C; font-weight: 600; }
-.admin-nav-icon { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 20px; height: 20px; color: inherit; }
-.admin-nav-section-label {
-    padding: 1rem 1rem 0.3rem; font-size: 0.7rem; font-weight: 700;
-    letter-spacing: 0.08em; text-transform: uppercase; color: #a0aec0; user-select: none;
-}
-.admin-sidebar-footer { padding: 1rem 1.25rem; border-top: 1px solid #e2e8f0; background: #fff; }
-.admin-user-info { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
-.admin-user-avatar {
-    width: 40px; height: 40px; border-radius: 50%;
-    background: linear-gradient(135deg, #E8001C 0%, #C41E3A 100%);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.9rem; font-weight: 700; color: white; flex-shrink: 0;
-}
-.logout-btn {
-    width: 100%; padding: 0.65rem 1rem; background: #f7f8fa; color: #718096;
-    border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 0.88rem; font-weight: 600;
-    cursor: pointer; font-family: inherit; transition: all 0.2s;
-    display: flex; align-items: center; justify-content: center; gap: 0.5rem;
-}
-.logout-btn:hover { background: #fff5f5; color: #E8001C; border-color: #feb2b2; }
-
-.admin-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 1rem 2rem; background: white; border-bottom: 1px solid #e2e8f0;
-    flex-shrink: 0; gap: 1rem; box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-}
-.admin-header-title { font-size: 1.25rem; font-weight: 700; color: #1a202c; }
-.breadcrumb { font-size: 0.75rem; color: #a0aec0; font-weight: 500; margin-bottom: 0.15rem; }
-.admin-main { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: visible; }
-.admin-content { flex: 1; overflow-y: auto; padding: 2rem; background: #f8fafc; }
-
-/* ================================================================
-   PROFILE CARDS (shared by both layouts)
+   PROFILE CARDS (shared by both admin + customer layouts)
    ================================================================ */
 
 .profile-grid {
@@ -256,12 +155,17 @@ body.portal-body {
     gap: 1.5rem;
     align-items: start;
     width: 100%;
+    max-width: 1100px;
 }
 @media (max-width: 860px) { .profile-grid { grid-template-columns: 1fr; } }
 
+/* Hero card */
 .profile-hero-card {
-    background: #fff; border-radius: 16px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; overflow: hidden;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
 }
 .profile-hero-banner {
     background: linear-gradient(135deg, #E8001C 0%, #C41E3A 100%);
@@ -269,7 +173,8 @@ body.portal-body {
 }
 .profile-avatar-lg {
     width: 76px; height: 76px; border-radius: 50%;
-    background: rgba(255,255,255,0.25); color: #fff; font-size: 1.7rem; font-weight: 800;
+    background: rgba(255,255,255,0.25); color: #fff;
+    font-size: 1.7rem; font-weight: 800;
     display: flex; align-items: center; justify-content: center;
     border: 3px solid rgba(255,255,255,0.5); overflow: hidden; margin: 0 auto;
 }
@@ -281,17 +186,32 @@ body.portal-body {
     padding: 3px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;
 }
 .profile-info-list { padding: 1rem 1.25rem; }
-.profile-info-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 0; border-bottom: 1px solid #f7fafc; }
+.profile-info-row {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.65rem 0; border-bottom: 1px solid #f7fafc;
+}
 .profile-info-row:last-child { border-bottom: none; }
-.profile-info-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.profile-info-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
 .profile-info-label { font-size: 0.7rem; color: #a0aec0; font-weight: 600; margin-bottom: 1px; }
 .profile-info-value { font-size: 0.85rem; font-weight: 700; color: #1a202c; }
 
+/* Right column */
 .profile-right { display: flex; flex-direction: column; gap: 1.25rem; }
-.profile-section-card { background: #fff; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; overflow: hidden; }
-.profile-section-head { padding: 0.9rem 1.25rem; border-bottom: 1px solid #f0f4f8; display: flex; align-items: center; gap: 0.6rem; }
+
+.profile-section-card {
+    background: #fff; border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; overflow: hidden;
+}
+.profile-section-head {
+    padding: 0.9rem 1.25rem; border-bottom: 1px solid #f0f4f8;
+    display: flex; align-items: center; gap: 0.6rem;
+}
 .profile-section-head-title { font-size: 0.85rem; font-weight: 700; color: #1a202c; flex: 1; }
 
+/* Edit button */
 .pf-edit-btn {
     display: inline-flex; align-items: center; gap: 0.3rem;
     background: none; border: none; cursor: pointer;
@@ -300,12 +220,20 @@ body.portal-body {
 }
 .pf-edit-btn:hover { background: rgba(232,0,28,0.07); }
 
-.pf-info-tile { display: flex; align-items: center; gap: 0.85rem; padding: 0.75rem 1.25rem; border-bottom: 1px solid #f0f4f8; }
+/* Info tiles */
+.pf-info-tile {
+    display: flex; align-items: center; gap: 0.85rem;
+    padding: 0.75rem 1.25rem; border-bottom: 1px solid #f0f4f8;
+}
 .pf-info-tile:last-child { border-bottom: none; }
-.pf-info-tile-icon { width: 34px; height: 34px; border-radius: 9px; background: #f0f4ff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.pf-info-tile-icon {
+    width: 34px; height: 34px; border-radius: 9px; background: #f0f4ff;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
 .pf-info-tile-label { font-size: 0.7rem; color: #718096; margin-bottom: 1px; }
 .pf-info-tile-value { font-size: 0.88rem; font-weight: 600; color: #1a202c; }
 
+/* Inline edit field */
 .pf-edit-field {
     width: 100%; padding: 0.3rem 0;
     border: none; border-bottom: 1.5px solid #E8001C;
@@ -313,15 +241,23 @@ body.portal-body {
     color: #1a202c; background: transparent; outline: none;
 }
 
-.pf-action-tile { display: flex; align-items: center; gap: 0.85rem; padding: 0.85rem 1.25rem; cursor: pointer; text-decoration: none; transition: background 0.15s; }
+/* Settings action tiles */
+.pf-action-tile {
+    display: flex; align-items: center; gap: 0.85rem;
+    padding: 0.85rem 1.25rem; cursor: pointer; text-decoration: none; transition: background 0.15s;
+}
 .pf-action-tile:hover { background: #f7fafc; }
-.pf-action-tile-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.pf-action-tile-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
 .pf-action-tile-text { flex: 1; }
 .pf-action-tile-label { font-size: 0.85rem; font-weight: 700; color: #1a202c; }
 .pf-action-tile-sub { font-size: 0.72rem; color: #718096; margin-top: 1px; }
 .pf-action-tile-chevron { color: #a0aec0; }
 .pf-action-divider { height: 1px; background: #f0f4f8; margin-left: 4.25rem; }
 
+/* Customer/staff page header */
 .pf-page-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; }
 .pf-page-title { font-size: 1.1rem; font-weight: 800; color: #1a202c; }
 .pf-page-sub { font-size: 0.78rem; color: #718096; margin-top: 1px; }

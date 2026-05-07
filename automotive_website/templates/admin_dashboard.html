@@ -7,6 +7,115 @@
     <link rel="icon" type="image/png" href="../static/img/LOGO_CALTEX.png" />
     <link rel="stylesheet" href="../static/css/style.css">
     <link rel="stylesheet" href="../static/css/admin.css">
+    <style>
+      /* ── Dashboard chart cards ── */
+      .dash-chart-card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 1.25rem 1.5rem;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+      }
+      .dash-chart-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1.1rem;
+      }
+      .dash-chart-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      }
+      .dash-chart-title {
+        font-weight: 700;
+        font-size: 0.88rem;
+        color: #1a202c;
+        line-height: 1.2;
+      }
+      .dash-chart-sub {
+        font-size: 0.72rem;
+        color: #718096;
+        margin-top: 1px;
+      }
+      .dash-chart-badge {
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 20px;
+      }
+
+      /* ── PMS Calendar ── */
+      .pms-cal-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 4px;
+      }
+      .pms-cal-dow {
+        text-align: center;
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #a0aec0;
+        text-transform: uppercase;
+        padding: 4px 0 6px;
+        letter-spacing: 0.5px;
+      }
+      .pms-cal-day {
+        position: relative;
+        min-height: 36px;
+        border-radius: 7px;
+        padding: 4px 4px 3px;
+        cursor: default;
+        border: 1.5px solid transparent;
+        transition: border-color 0.15s, background 0.15s;
+        background: #f7f8fa;
+      }
+      .pms-cal-day.other-month { opacity: 0.35; }
+      .pms-cal-day.today-cell  { border-color: #0d9488 !important; background: #f0fdfa; }
+      .pms-cal-day.has-pms     { cursor: pointer; }
+      .pms-cal-day.has-pms:hover { border-color: #cbd5e0; background: #fff; }
+      .pms-cal-day.selected    { border-color: #003087 !important; background: #ebf8ff; }
+      .pms-cal-day-num {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #4a5568;
+        line-height: 1;
+      }
+      .pms-cal-day.today-cell .pms-cal-day-num { color: #0d9488; font-weight: 800; }
+      .pms-cal-dots {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+        margin-top: 4px;
+      }
+      .pms-cal-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 2px;
+        flex-shrink: 0;
+      }
+      .pms-detail-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        margin-bottom: 6px;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+      }
+      .pms-detail-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+        flex-shrink: 0;
+      }
+    </style>
 </head>
 <body class="portal-body" data-page="overview">
 
@@ -48,79 +157,148 @@
 
                 <!-- Overview Section -->
                 <div class="admin-section active" id="overview">
-                    <div class="stats-grid">
-                        <div class="stat-card">
+                    <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);">
+                        <div class="stat-card" onclick="window.location.href='admin_vehicle_list.html'" style="cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.10)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
                             <div class="stat-icon blue">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3"/><rect x="9" y="11" width="14" height="10" rx="2"/><circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/></svg>
                             </div>
                             <div class="stat-number" id="statTotalVehicles">0</div>
                             <div class="stat-label">Total Vehicles</div>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card" onclick="window.location.href='admin_dss.html#dss-pms'" style="cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.10)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
                             <div class="stat-icon orange">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
                             </div>
                             <div class="stat-number" id="statDueForPms">0</div>
                             <div class="stat-label">Due for PMS</div>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card" onclick="window.location.href='admin_inventory_stock.html'" style="cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.10)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
                             <div class="stat-icon red">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                             </div>
                             <div class="stat-number" id="statLowStock">0</div>
                             <div class="stat-label">Low Stock</div>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card" onclick="window.location.href='admin_vehicle_maintenance.html'" style="cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.10)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
                             <div class="stat-icon green">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                             </div>
                             <div class="stat-number" id="statServicesWeek">0</div>
                             <div class="stat-label">Services Today</div>
                         </div>
+                        <div class="stat-card" onclick="window.location.href='admin_users.html'" style="cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.10)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+                            <div class="stat-icon" style="background:rgba(124,58,237,0.10);color:#7c3aed;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            </div>
+                            <div class="stat-number" id="statTotalUsers" style="color:#7c3aed;">0</div>
+                            <div class="stat-label">Total Users</div>
+                        </div>
                     </div>
 
-                    <!-- ── Charts Row ── -->
-                    <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:1.25rem;margin-bottom:1.5rem;">
+                    <!-- ── Charts Row 1: Bar + Donut ── -->
+                    <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
 
-                        <!-- Bar chart: Services last 7 days -->
-                        <div style="background:#fff;border-radius:14px;padding:1.25rem 1.5rem;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
-                            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:1rem;">
-                                <div style="width:28px;height:28px;background:rgba(232,0,28,0.08);border-radius:8px;display:flex;align-items:center;justify-content:center;">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E8001C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                        <!-- Stacked Bar chart: Services by Type last 7 days -->
+                        <div class="dash-chart-card">
+                            <div class="dash-chart-header" style="flex-wrap:wrap;gap:0.5rem;">
+                                <div class="dash-chart-icon" style="background:linear-gradient(135deg,#E8001C,#c0001a);">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
                                 </div>
-                                <span style="font-weight:700;font-size:0.88rem;color:#1a202c;">Services — Last 7 Days</span>
+                                <div style="flex:1;min-width:0;">
+                                    <div class="dash-chart-title">Services by Type — Last 7 Days</div>
+                                    <div class="dash-chart-sub">Top service types performed per day</div>
+                                </div>
+                                <div id="barChartTotal" class="dash-chart-badge" style="background:#fff5f5;color:#E8001C;flex-shrink:0;"></div>
                             </div>
-                            <div style="position:relative;height:200px;">
+                            <!-- Dynamic legend populated by JS -->
+                            <div id="barChartLegend" style="display:flex;flex-wrap:wrap;gap:0.4rem 0.9rem;margin-bottom:0.75rem;"></div>
+                            <div style="position:relative;height:210px;padding:0 4px;">
                                 <canvas id="servicesBarChart"></canvas>
                             </div>
                         </div>
 
                         <!-- Donut chart: Vehicle status -->
-                        <div style="background:#fff;border-radius:14px;padding:1.25rem 1.5rem;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
-                            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:1rem;">
-                                <div style="width:28px;height:28px;background:rgba(232,0,28,0.08);border-radius:8px;display:flex;align-items:center;justify-content:center;">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E8001C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+                        <div class="dash-chart-card">
+                            <div class="dash-chart-header">
+                                <div class="dash-chart-icon" style="background:linear-gradient(135deg,#003087,#001f5c);">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
                                 </div>
-                                <span style="font-weight:700;font-size:0.88rem;color:#1a202c;">Vehicle Status</span>
+                                <div>
+                                    <div class="dash-chart-title">Vehicle Status</div>
+                                    <div class="dash-chart-sub">Fleet health overview</div>
+                                </div>
                             </div>
-                            <div style="position:relative;height:160px;">
-                                <canvas id="vehicleDonutChart"></canvas>
+                            <div style="display:flex;align-items:center;gap:1.25rem;">
+                                <div style="position:relative;height:150px;width:150px;flex-shrink:0;">
+                                    <canvas id="vehicleDonutChart"></canvas>
+                                    <div id="donutCenter" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;">
+                                        <div style="font-size:1.5rem;font-weight:800;color:#1a202c;" id="donutTotal">0</div>
+                                        <div style="font-size:0.65rem;color:#718096;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Vehicles</div>
+                                    </div>
+                                </div>
+                                <div id="vehicleDonutLegend" style="display:flex;flex-direction:column;gap:0.55rem;font-size:0.78rem;flex:1;"></div>
                             </div>
-                            <div id="vehicleDonutLegend" style="display:flex;flex-wrap:wrap;gap:0.5rem 1rem;margin-top:0.75rem;font-size:0.75rem;"></div>
                         </div>
                     </div>
 
-                    <!-- Today's service schedule table -->
-                    <div style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
-                        <div class="data-table">
-                            <div style="padding:0.75rem 1rem;border-bottom:1px solid #e2e8f0;">
-                                <span style="font-weight:600;color:#1a202c;font-size:0.95rem;">Today's Service Schedule</span>
+                    <!-- ── Charts Row 2: Line + Top Parts side by side ── -->
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
+
+                        <!-- Line chart: Stock In vs Stock Out -->
+                        <div class="dash-chart-card">
+                            <div class="dash-chart-header">
+                                <div class="dash-chart-icon" style="background:linear-gradient(135deg,#0d9488,#0a7a70);">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                                </div>
+                                <div>
+                                    <div class="dash-chart-title">Stock In vs Stock Out</div>
+                                    <div class="dash-chart-sub" id="stockLineSubLabel">Identify usage patterns and seasonality</div>
+                                </div>
+                                <div style="margin-left:auto;display:flex;gap:0.6rem;align-items:center;flex-shrink:0;">
+                                    <span style="display:flex;align-items:center;gap:4px;font-size:0.7rem;color:#4a5568;">
+                                        <span style="width:16px;height:3px;background:#003087;border-radius:2px;display:inline-block;"></span>In
+                                    </span>
+                                    <span style="display:flex;align-items:center;gap:4px;font-size:0.7rem;color:#4a5568;">
+                                        <span style="width:16px;height:3px;background:#E8001C;border-radius:2px;display:inline-block;"></span>Out
+                                    </span>
+                                </div>
                             </div>
-                            <div class="table-row" style="background: #f7fafc; font-weight: bold; border-bottom: 2px solid #e2e8f0; grid-template-columns: 1fr 1.5fr 1fr 1fr;">
-                                <div>Plate Number</div><div>Service</div><div>Mechanic</div><div>Status</div>
+                            <div style="position:relative;height:220px;padding:0 4px;">
+                                <canvas id="stockLineChart"></canvas>
                             </div>
-                            <div id="todayServicesList"></div>
                         </div>
+
+                        <!-- Bar chart: Top 10 Most Used Parts -->
+                        <div class="dash-chart-card">
+                            <div class="dash-chart-header">
+                                <div class="dash-chart-icon" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                                </div>
+                                <div>
+                                    <div class="dash-chart-title">Top 10 Most Used Parts</div>
+                                    <div class="dash-chart-sub" id="topPartsSubLabel">Fast-moving items for inventory planning</div>
+                                </div>
+                                <div id="topPartsBadge" class="dash-chart-badge" style="margin-left:auto;background:#f5f3ff;color:#7c3aed;flex-shrink:0;"></div>
+                            </div>
+                            <div style="position:relative;height:220px;padding:0 4px;">
+                                <canvas id="topPartsBarChart"></canvas>
+                            </div>
+                            <div id="topPartsEmpty" style="display:none;text-align:center;padding:2rem;color:#718096;font-size:0.85rem;">
+                                No material issuances recorded this month.
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Today's service schedule table -->
+                    <div class="data-table">
+                        <div style="padding:0.75rem 1rem;border-bottom:1px solid #e2e8f0;">
+                            <span style="font-weight:600;color:#1a202c;font-size:0.95rem;">Today's Service Schedule</span>
+                        </div>
+                        <div class="table-row" style="background: #f7fafc; font-weight: bold; border-bottom: 2px solid #e2e8f0; grid-template-columns: 1fr 1.5fr 1fr 1fr;">
+                            <div>Plate Number</div><div>Service</div><div>Mechanic</div><div>Status</div>
+                        </div>
+                        <div id="todayServicesList"></div>
                     </div>
                 </div>
 
@@ -306,85 +484,174 @@
     <script src="../static/js/admin_sidebar.js"></script>
     <script>
       // ── Dashboard Charts ─────────────────────────────────────────────────
-      // Called by admin_firebase.js after Firestore data loads
-
       let _barChart   = null;
       let _donutChart = null;
+      let _lineChart  = null;
 
-      // Build last-7-days label array
+      const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
       function _last7DayLabels() {
-        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        const labels = [];
-        const keys   = [];
+        const labels = [], keys = [];
         for (let i = 6; i >= 0; i--) {
           const d = new Date();
           d.setDate(d.getDate() - i);
-          labels.push(months[d.getMonth()] + ' ' + d.getDate());
-          keys.push(months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear());
+          labels.push(MONTHS[d.getMonth()] + ' ' + d.getDate());
+          keys.push(MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear());
         }
         return { labels, keys };
       }
 
+      // Shared Chart.js defaults
+      Chart.defaults.font.family = "'Segoe UI', sans-serif";
+      Chart.defaults.color = '#718096';
+
       window.renderDashboardCharts = function() {
-        const services = window._fbServices || [];
-        const vehicles = window._fbVehicles || [];
+        const services     = window._fbServices     || [];
+        const vehicles     = window._fbVehicles     || [];
+        const transactions = window._fbTransactions || [];
 
-        // ── Bar chart data ──
-        const { labels, keys } = _last7DayLabels();
-        const counts = keys.map(k =>
-          services.filter(s => (s.date || s.dateServiced || '') === k).length
-        );
-        const today = labels[labels.length - 1];
-        const barColors = labels.map(l =>
-          l === today ? '#E8001C' : '#003087'
-        );
+        // ════════════════════════════════════════
+        // 1. STACKED BAR CHART — Services by Type, last 7 days
+        // ════════════════════════════════════════
+        const { labels: barLabels, keys: barKeys } = _last7DayLabels();
 
-        const barCtx = document.getElementById('servicesBarChart');
-        if (!barCtx) return;
-
-        if (_barChart) _barChart.destroy();
-        _barChart = new Chart(barCtx, {
-          type: 'bar',
-          data: {
-            labels,
-            datasets: [{
-              data: counts,
-              backgroundColor: barColors,
-              borderRadius: 6,
-              borderSkipped: false,
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                callbacks: {
-                  label: ctx => ' ' + ctx.parsed.y + ' service' + (ctx.parsed.y !== 1 ? 's' : '')
-                }
-              }
-            },
-            scales: {
-              x: {
-                grid: { display: false },
-                ticks: { font: { size: 11 }, color: '#718096' }
-              },
-              y: {
-                beginAtZero: true,
-                grid: { color: '#f0f0f0' },
-                ticks: {
-                  stepSize: 1,
-                  font: { size: 11 },
-                  color: '#718096',
-                  callback: v => Number.isInteger(v) ? v : ''
-                }
-              }
-            }
+        // Extract all service type names from svcRows across all services
+        const serviceTypeCount = {};
+        services.forEach(s => {
+          const rows = s.svcRows || [];
+          if (rows.length > 0) {
+            rows.forEach(r => {
+              const name = (r.name || r.service || '').trim();
+              if (name) serviceTypeCount[name] = (serviceTypeCount[name] || 0) + 1;
+            });
+          } else {
+            const name = (s.desc || s.description || '').trim();
+            if (name) serviceTypeCount[name] = (serviceTypeCount[name] || 0) + 1;
           }
         });
 
-        // ── Donut chart data ──
+        // Top 4 service types + "Others"
+        const topTypes = Object.entries(serviceTypeCount)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 4)
+          .map(([name]) => name);
+
+        const typeColors = ['#3b82f6','#22c55e','#f59e0b','#E8001C','#7c3aed'];
+        const allTypes = [...topTypes, 'Others'];
+
+        // Count per type per day
+        const typeData = {};
+        allTypes.forEach(type => {
+          typeData[type] = barKeys.map(k => {
+            const dayServices = services.filter(s => (s.date || s.dateServiced || '') === k);
+            return dayServices.reduce((sum, s) => {
+              const rows = s.svcRows || [];
+              if (rows.length > 0) {
+                return sum + rows.filter(r => {
+                  const n = (r.name || r.service || '').trim();
+                  return type === 'Others' ? !topTypes.includes(n) : n === type;
+                }).length;
+              } else {
+                const n = (s.desc || s.description || '').trim();
+                if (type === 'Others') return sum + (topTypes.includes(n) ? 0 : 1);
+                return sum + (n === type ? 1 : 0);
+              }
+            }, 0);
+          });
+        });
+
+        const total7 = barKeys.reduce((sum, k) =>
+          sum + services.filter(s => (s.date || s.dateServiced || '') === k).length, 0
+        );
+
+        const barBadge = document.getElementById('barChartTotal');
+        if (barBadge) barBadge.textContent = total7 + ' total';
+
+        // Update legend in header
+        const barLegendEl = document.getElementById('barChartLegend');
+        if (barLegendEl) {
+          barLegendEl.innerHTML = allTypes.map((t, i) =>
+            '<span style="display:flex;align-items:center;gap:4px;font-size:0.7rem;color:#4a5568;">'
+            + '<span style="width:10px;height:10px;border-radius:3px;background:' + typeColors[i] + ';display:inline-block;"></span>'
+            + (t.length > 14 ? t.slice(0, 12) + '…' : t)
+            + '</span>'
+          ).join('');
+        }
+
+        const barCtx = document.getElementById('servicesBarChart');
+        if (barCtx) {
+          if (_barChart) _barChart.destroy();
+          _barChart = new Chart(barCtx, {
+            type: 'bar',
+            data: {
+              labels: barLabels,
+              datasets: allTypes.map((type, i) => ({
+                label: type,
+                data: typeData[type],
+                backgroundColor: typeColors[i],
+                hoverBackgroundColor: typeColors[i],
+                borderRadius: 0,
+                borderSkipped: false,
+                borderWidth: 0,
+              }))
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: { duration: 400, easing: 'easeOutQuart' },
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  backgroundColor: '#1a202c',
+                  titleColor: '#fff',
+                  bodyColor: 'rgba(255,255,255,0.85)',
+                  padding: 12,
+                  cornerRadius: 10,
+                  mode: 'index',
+                  intersect: false,
+                  displayColors: true,
+                  boxWidth: 10,
+                  boxHeight: 10,
+                  callbacks: {
+                    title: items => barLabels[items[0].dataIndex],
+                    label: ctx => {
+                      if (ctx.parsed.y === 0) return null;
+                      return '  ' + ctx.dataset.label + ': ' + ctx.parsed.y;
+                    },
+                    afterBody: items => {
+                      const total = items.reduce((s, i) => s + (i.parsed.y || 0), 0);
+                      return total > 0 ? ['', '  Total: ' + total + ' service' + (total !== 1 ? 's' : '')] : [];
+                    }
+                  }
+                }
+              },
+              scales: {
+                x: {
+                  stacked: true,
+                  grid: { display: false },
+                  border: { display: false },
+                  ticks: { font: { size: 11 }, color: '#a0aec0' }
+                },
+                y: {
+                  stacked: true,
+                  beginAtZero: true,
+                  grid: { color: '#f7f8fa', lineWidth: 1.5 },
+                  border: { display: false },
+                  ticks: {
+                    stepSize: 1,
+                    font: { size: 11 },
+                    color: '#a0aec0',
+                    callback: v => Number.isInteger(v) ? v : ''
+                  }
+                }
+              }
+            }
+          });
+        }
+
+        // ════════════════════════════════════════
+        // 2. DONUT CHART — Vehicle status
+        // ════════════════════════════════════════
         let active = 0, dueSoon = 0, overdue = 0, maintenance = 0;
         vehicles.forEach(v => {
           const s = (v.status || '').toLowerCase();
@@ -394,62 +661,357 @@
           else active++;
         });
 
-        const donutCtx = document.getElementById('vehicleDonutChart');
-        if (!donutCtx) return;
-
-        if (_donutChart) _donutChart.destroy();
+        const donutTotal = document.getElementById('donutTotal');
+        if (donutTotal) donutTotal.textContent = vehicles.length;
 
         const donutLabels = ['Active', 'Due Soon', 'Overdue', 'Maintenance'];
         const donutData   = [active, dueSoon, overdue, maintenance];
         const donutColors = ['#003087', '#ed8936', '#E8001C', '#0d9488'];
 
-        _donutChart = new Chart(donutCtx, {
-          type: 'doughnut',
-          data: {
-            labels: donutLabels,
-            datasets: [{
-              data: donutData,
-              backgroundColor: donutColors,
-              borderWidth: 2,
-              borderColor: '#fff',
-              hoverOffset: 6,
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '62%',
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                callbacks: {
-                  label: ctx => ' ' + ctx.label + ': ' + ctx.parsed
+        const donutCtx = document.getElementById('vehicleDonutChart');
+        if (donutCtx) {
+          if (_donutChart) _donutChart.destroy();
+          _donutChart = new Chart(donutCtx, {
+            type: 'doughnut',
+            data: {
+              labels: donutLabels,
+              datasets: [{
+                data: donutData,
+                backgroundColor: donutColors,
+                borderWidth: 3,
+                borderColor: '#fff',
+                hoverOffset: 10,
+                hoverBorderWidth: 3,
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              cutout: '68%',
+              animation: { duration: 400, easing: 'easeOutQuart' },
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  backgroundColor: '#1a202c',
+                  titleColor: '#fff',
+                  bodyColor: 'rgba(255,255,255,0.8)',
+                  padding: 10,
+                  cornerRadius: 8,
+                  callbacks: {
+                    label: ctx => '  ' + ctx.label + ': ' + ctx.parsed
+                  }
                 }
-              }
+              },
+              onHover: (event, elements, chart) => {
+                chart.canvas.style.cursor = elements.length ? 'pointer' : 'default';
+              },
             }
-          }
-        });
+          });
+        }
 
-        // Custom legend
+        // Legend
         const legendEl = document.getElementById('vehicleDonutLegend');
         if (legendEl) {
           legendEl.innerHTML = donutLabels.map((l, i) =>
-            '<span style="display:flex;align-items:center;gap:5px;">'
-            + '<span style="width:10px;height:10px;border-radius:50%;background:' + donutColors[i] + ';flex-shrink:0;"></span>'
-            + '<span style="color:#4a5568;">' + l + '</span>'
-            + '<strong style="color:' + donutColors[i] + ';">' + donutData[i] + '</strong>'
-            + '</span>'
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+            + '<div style="display:flex;align-items:center;gap:7px;">'
+            +   '<span style="width:10px;height:10px;border-radius:3px;background:' + donutColors[i] + ';flex-shrink:0;"></span>'
+            +   '<span style="color:#4a5568;font-size:0.78rem;">' + l + '</span>'
+            + '</div>'
+            + '<strong style="color:' + donutColors[i] + ';font-size:0.82rem;">' + donutData[i] + '</strong>'
+            + '</div>'
           ).join('');
+        }
+
+        // ════════════════════════════════════════
+        // 3. LINE CHART — Stock In vs Stock Out by month
+        // ════════════════════════════════════════
+        // Build last 12 months
+        const now = new Date();
+        const monthLabels = [];
+        const monthKeys   = [];
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          monthLabels.push(MONTHS[d.getMonth()]); // month name only
+          monthKeys.push({ month: d.getMonth(), year: d.getFullYear() });
+        }
+        // Year range for subtitle (e.g. "Jun 2025 – May 2026")
+        const firstKey = monthKeys[0];
+        const lastKey  = monthKeys[monthKeys.length - 1];
+        const yearRange = MONTHS[firstKey.month] + ' ' + firstKey.year
+                        + ' – ' + MONTHS[lastKey.month] + ' ' + lastKey.year;
+        const lineSubEl = document.getElementById('stockLineSubLabel');
+        if (lineSubEl) lineSubEl.textContent = yearRange;
+
+        // Parse transaction date → month/year
+        // Handles: "Jan 5, 2025" string, Firestore Timestamp (createdAt fallback)
+        function _parseTxnDate(t) {
+          // Try the date string field first
+          const dateStr = t.date || '';
+          if (dateStr) {
+            const parts = dateStr.split(' ');
+            if (parts.length >= 3) {
+              const m = MONTHS.indexOf(parts[0]);
+              const y = parseInt(parts[2]);
+              if (m !== -1 && !isNaN(y)) return { month: m, year: y };
+            }
+          }
+          // Fallback: use createdAt Firestore Timestamp
+          const ts = t.createdAt;
+          if (ts && typeof ts.toDate === 'function') {
+            const d = ts.toDate();
+            return { month: d.getMonth(), year: d.getFullYear() };
+          }
+          if (ts && ts.seconds) {
+            const d = new Date(ts.seconds * 1000);
+            return { month: d.getMonth(), year: d.getFullYear() };
+          }
+          return null;
+        }
+
+        // Parse qty — handles number, "+5", "5", "-3"
+        function _parseQty(raw) {
+          if (typeof raw === 'number') return Math.abs(raw);
+          return parseFloat(String(raw || '0').replace(/[^0-9.]/g, '')) || 0;
+        }
+
+        const stockInByMonth  = monthKeys.map(mk =>
+          transactions.filter(t => {
+            if ((t.type || '').toUpperCase() !== 'IN') return false;
+            // Exclude initial stock setup — only count actual receiving transactions
+            const desc = (t.desc || t.description || '').toLowerCase();
+            if (desc.includes('initial stock')) return false;
+            const d = _parseTxnDate(t);
+            return d && d.month === mk.month && d.year === mk.year;
+          }).reduce((sum, t) => sum + _parseQty(t.qty || t.quantity), 0)
+        );
+
+        const stockOutByMonth = monthKeys.map(mk =>
+          transactions.filter(t => {
+            if ((t.type || '').toUpperCase() !== 'OUT') return false;
+            const d = _parseTxnDate(t);
+            return d && d.month === mk.month && d.year === mk.year;
+          }).reduce((sum, t) => sum + _parseQty(t.qty || t.quantity), 0)
+        );
+
+        const lineCtx = document.getElementById('stockLineChart');
+        if (lineCtx) {
+          if (_lineChart) _lineChart.destroy();
+          _lineChart = new Chart(lineCtx, {
+            type: 'line',
+            data: {
+              labels: monthLabels,
+              datasets: [
+                {
+                  label: 'Stock In (Receiving)',
+                  data: stockInByMonth,
+                  borderColor: '#003087',
+                  backgroundColor: 'rgba(0,48,135,0.08)',
+                  borderWidth: 2.5,
+                  pointBackgroundColor: '#003087',
+                  pointBorderColor: '#fff',
+                  pointBorderWidth: 2,
+                  pointRadius: 4,
+                  pointHoverRadius: 7,
+                  pointHoverBackgroundColor: '#003087',
+                  pointHoverBorderColor: '#fff',
+                  pointHoverBorderWidth: 2,
+                  fill: true,
+                  tension: 0.4,
+                },
+                {
+                  label: 'Stock Out (Usage)',
+                  data: stockOutByMonth,
+                  borderColor: '#E8001C',
+                  backgroundColor: 'rgba(232,0,28,0.06)',
+                  borderWidth: 2.5,
+                  pointBackgroundColor: '#E8001C',
+                  pointBorderColor: '#fff',
+                  pointBorderWidth: 2,
+                  pointRadius: 4,
+                  pointHoverRadius: 7,
+                  pointHoverBackgroundColor: '#E8001C',
+                  pointHoverBorderColor: '#fff',
+                  pointHoverBorderWidth: 2,
+                  fill: true,
+                  tension: 0.4,
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: { duration: 400, easing: 'easeOutQuart' },
+              interaction: { mode: 'index', intersect: false },
+              onHover: (event, elements, chart) => {
+                chart.canvas.style.cursor = elements.length ? 'crosshair' : 'default';
+              },
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  backgroundColor: '#1a202c',
+                  titleColor: '#fff',
+                  bodyColor: 'rgba(255,255,255,0.85)',
+                  padding: 12,
+                  cornerRadius: 10,
+                  callbacks: {
+                    label: ctx => '  ' + ctx.dataset.label + ': ' + ctx.parsed.y + ' units'
+                  }
+                }
+              },
+              scales: {
+                x: {
+                  grid: { display: false },
+                  border: { display: false },
+                  ticks: { font: { size: 11 }, color: '#a0aec0', maxRotation: 0 }
+                },
+                y: {
+                  beginAtZero: true,
+                  grid: { color: '#f7f8fa', lineWidth: 1.5 },
+                  border: { display: false },
+                  ticks: {
+                    font: { size: 11 },
+                    color: '#a0aec0',
+                    callback: v => Number.isInteger(v) ? v : ''
+                  }
+                }
+              }
+            }
+          });
+        }
+
+        // ════════════════════════════════════════
+        // 4. BAR CHART — Top 10 Most Used Parts (This Month)
+        // ════════════════════════════════════════
+        const issuances = window._fbIssuances || [];
+        const nowDate   = new Date();
+        const curMonth  = nowDate.getMonth();
+        const curYear   = nowDate.getFullYear();
+
+        // Filter issuances to current month, materials only (exclude services)
+        const thisMonthIssuances = issuances.filter(iss => {
+          if ((iss.itemType || '').toLowerCase() === 'service') return false;
+          const dateStr = iss.date || '';
+          if (!dateStr) return false;
+          // Format: "Jan 5, 2025"
+          const parts = dateStr.split(' ');
+          if (parts.length < 3) return false;
+          const m = MONTHS.indexOf(parts[0]);
+          const y = parseInt(parts[2]);
+          return m === curMonth && y === curYear;
+        });
+
+        // Aggregate qty by item name
+        const partUsage = {};
+        thisMonthIssuances.forEach(iss => {
+          const name = iss.itemName || iss.item || '—';
+          const qty  = typeof iss.quantity === 'number' ? iss.quantity
+                     : parseFloat(String(iss.quantity || iss.qty || '0').replace(/[^0-9.]/g, '')) || 0;
+          partUsage[name] = (partUsage[name] || 0) + qty;
+        });
+
+        // Sort descending, take top 10
+        const sorted = Object.entries(partUsage)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10);
+
+        const topPartsEmpty = document.getElementById('topPartsEmpty');
+        const topPartsCanvas = document.getElementById('topPartsBarChart');
+        const topPartsBadge  = document.getElementById('topPartsBadge');
+        const topPartsSub    = document.getElementById('topPartsSubLabel');
+
+        // Update subtitle with current month name
+        if (topPartsSub) topPartsSub.textContent = MONTHS[curMonth] + ' ' + curYear + ' · Materials only';
+
+        if (sorted.length === 0) {
+          if (topPartsEmpty)  topPartsEmpty.style.display  = 'block';
+          if (topPartsCanvas) topPartsCanvas.style.display = 'none';
+          if (topPartsBadge)  topPartsBadge.textContent    = '0 items';
+        } else {
+          if (topPartsEmpty)  topPartsEmpty.style.display  = 'none';
+          if (topPartsCanvas) topPartsCanvas.style.display = 'block';
+          if (topPartsBadge)  topPartsBadge.textContent    = sorted.length + ' items';
+
+          const partLabels = sorted.map(([name]) =>
+            name.length > 18 ? name.slice(0, 16) + '…' : name
+          );
+          const partCounts = sorted.map(([, qty]) => qty);
+
+          // Gradient colors from purple to red
+          const palette = [
+            '#7c3aed','#6d28d9','#5b21b6','#4c1d95',
+            '#E8001C','#c0001a','#003087','#1e40af',
+            '#0d9488','#0a7a70'
+          ];
+
+          if (topPartsCanvas) {
+            if (window._topPartsChart) window._topPartsChart.destroy();
+            window._topPartsChart = new Chart(topPartsCanvas, {
+              type: 'bar',
+              data: {
+                labels: partLabels,
+                datasets: [{
+                  data: partCounts,
+                  backgroundColor: partLabels.map((_, i) => palette[i % palette.length]),
+                  hoverBackgroundColor: partLabels.map((_, i) => palette[i % palette.length]),
+                  borderRadius: 8,
+                  borderSkipped: false,
+                  borderWidth: 0,
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 400, easing: 'easeOutQuart' },
+                onHover: (event, elements, chart) => {
+                  chart.canvas.style.cursor = elements.length ? 'pointer' : 'default';
+                },
+                plugins: {
+                  legend: { display: false },
+                  tooltip: {
+                    backgroundColor: '#1a202c',
+                    titleColor: '#fff',
+                    bodyColor: 'rgba(255,255,255,0.85)',
+                    padding: 12,
+                    cornerRadius: 10,
+                    callbacks: {
+                      title: items => sorted[items[0].dataIndex]?.[0] || items[0].label,
+                      label: ctx => '  Used: ' + ctx.parsed.y + ' unit' + (ctx.parsed.y !== 1 ? 's' : '')
+                    }
+                  }
+                },
+                scales: {
+                  x: {
+                    grid: { display: false },
+                    border: { display: false },
+                    ticks: {
+                      font: { size: 10 },
+                      color: '#718096',
+                      maxRotation: 30,
+                      minRotation: 0,
+                    }
+                  },
+                  y: {
+                    beginAtZero: true,
+                    grid: { color: '#f7f8fa', lineWidth: 1.5 },
+                    border: { display: false },
+                    ticks: {
+                      font: { size: 11 },
+                      color: '#a0aec0',
+                      callback: v => Number.isInteger(v) ? v : ''
+                    }
+                  }
+                }
+              }
+            });
+          }
         }
       };
 
-      // Hook into existing Firestore snapshot updates
-      // admin_firebase.js calls _updateOverviewStats() — we piggyback on that
-      const _origUpdateOverview = window._updateOverviewStats;
+      // Wait for Firestore data then render
       document.addEventListener('DOMContentLoaded', function() {
-        // Retry until admin_firebase.js has set up its listeners
         const _chartInterval = setInterval(function() {
-          if (window._fbServices !== undefined && window._fbVehicles !== undefined) {
+          if (window._fbServices !== undefined && window._fbVehicles !== undefined && window._fbTransactions !== undefined && window._fbIssuances !== undefined) {
             clearInterval(_chartInterval);
             window.renderDashboardCharts();
           }
@@ -509,5 +1071,10 @@
         }
       })();
     </script>
+
+    <!-- PMS Calendar floating widget (inlined) -->
+    <div id="pmsCalWidgetContainer">
+      {% include 'calendarview_widget.html' %}
+    </div>
 </body>
 </html>

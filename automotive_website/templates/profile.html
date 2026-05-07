@@ -10,7 +10,7 @@
 <body class="portal-body" data-page="profile">
 
 <!-- ── Admin layout ── -->
-<div id="adminWrap" style="display:none;flex-direction:column;" class="admin-dashboard">
+<div id="adminWrap" style="display:none;flex-direction:column;width:100%;height:100vh;">
     <div id="headerContainer"></div>
     <div class="admin-dashboard-body">
         <div id="sidebarContainer"></div>
@@ -21,7 +21,7 @@
                     <div class="admin-header-title">My Profile</div>
                 </div>
             </div>
-            <div class="admin-content">
+            <div class="admin-content" style="overflow-y:auto;">
                 <div id="profileContent"></div>
             </div>
         </div>
@@ -57,17 +57,37 @@
 <!-- Load admin scripts only for admin role; customer/staff use customer_shared.js only -->
 <script>
 (function() {
-    var _role = sessionStorage.getItem('apUser') ? 'admin'
-              : sessionStorage.getItem('spUser') ? 'staff'
-              : sessionStorage.getItem('cpUser') ? 'customer'
-              : null;
+    // Detect role by checking the actual role field inside each session key,
+    // not just which key exists — prevents stale/cross-contaminated session data
+    function _getRoleFromSession() {
+        var ap = sessionStorage.getItem('apUser');
+        if (ap) { try { var d = JSON.parse(ap); if (d.role === 'admin') return 'admin'; } catch(e){} }
+        var sp = sessionStorage.getItem('spUser');
+        if (sp) { try { var d2 = JSON.parse(sp); if (d2.role === 'staff') return 'staff'; } catch(e){} }
+        var cp = sessionStorage.getItem('cpUser');
+        if (cp) { try { var d3 = JSON.parse(cp); if (d3.role === 'customer') return 'customer'; } catch(e){} }
+        // Fallback: key presence only
+        if (ap) return 'admin';
+        if (sp) return 'staff';
+        if (cp) return 'customer';
+        return null;
+    }
+
+    var _role = _getRoleFromSession();
     if (!_role) { window.location.href = 'login.html'; return; }
     window._profileRoleDetected = _role;
 
     if (_role === 'admin') {
-        // Admin: load full admin stack
+        // Admin: inject style.css + admin.css first, then the JS stack
+        function _addLink(href) {
+            var l = document.createElement('link');
+            l.rel = 'stylesheet'; l.href = href;
+            document.head.appendChild(l);
+        }
+        _addLink('../static/css/style.css');
+        _addLink('../static/css/admin.css');
+
         var scripts = [
-            '../static/js/admin_firebase.js',
             '../static/js/admin_functions.js',
             '../static/js/admin.js',
             '../static/js/admin_sidebar.js',
@@ -123,7 +143,38 @@ var _profileRole = window._profileRoleDetected || 'customer';
 var _profileUnsubscribe = null;
 
 firebase.auth().onAuthStateChanged(function (user) {
-    if (!user) { window.location.href = 'login.html'; return; }
+    if (!user) {
+        // Don't redirect immediately — Firebase auth restore can take a moment.
+        // Only redirect if there's genuinely no session at all.
+        var hasSession = sessionStorage.getItem('apUser') ||
+                         sessionStorage.getItem('spUser') ||
+                         sessionStorage.getItem('cpUser');
+        if (!hasSession) { window.location.href = 'login.html'; }
+        return;
+    }
+
+    // ── Verify role from Firestore and correct layout if session was stale ──
+    firebase.firestore().collection('users').doc(user.uid).get().then(function(doc) {
+        if (!doc.exists) return;
+        var firestoreRole = (doc.data().role || '').toLowerCase();
+        // Map Firestore role values to our keys
+        var mappedRole = firestoreRole === 'admin' ? 'admin'
+                       : firestoreRole === 'staff' ? 'staff'
+                       : 'customer';
+
+        if (mappedRole !== _profileRole) {
+            // Role mismatch — correct it without full reload
+            _profileRole = mappedRole;
+            window._profileRoleDetected = mappedRole;
+            if (mappedRole === 'admin') {
+                document.getElementById('standaloneWrap').style.display = 'none';
+                document.getElementById('adminWrap').style.display = 'flex';
+            } else {
+                document.getElementById('adminWrap').style.display = 'none';
+                document.getElementById('standaloneWrap').style.display = 'flex';
+            }
+        }
+    }).catch(function() {});
 
     // ── Render immediately from sessionStorage (fast) ──
     var sessKey  = _profileRole === 'admin' ? 'apUser' : _profileRole === 'staff' ? 'spUser' : 'cpUser';

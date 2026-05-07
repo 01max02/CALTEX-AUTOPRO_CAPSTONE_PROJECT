@@ -63,7 +63,8 @@ Future<void> _sendViaOneSignal({
 }
 
 class AdminDSS extends StatefulWidget {
-  const AdminDSS({super.key});
+  final int initialTab;
+  const AdminDSS({super.key, this.initialTab = 0});
 
   @override
   State<AdminDSS> createState() => _AdminDSSState();
@@ -72,19 +73,17 @@ class AdminDSS extends StatefulWidget {
 class _AdminDSSState extends State<AdminDSS> {
   static const _red = Color(0xFFE8001C);
   static const _blue = Color(0xFF003087);
-  int _tab = 0;
+  late int _tab;
 
   static List<Map<String, String>> _stockItemsCache = [];
   static List<Map<String, String>> _pmsAssetsCache = [];
 
-  // Static flag — persists across widget rebuilds for the entire app session.
-  // Prevents duplicate alerts when admin navigates away and back to this screen.
   static bool _alertsSentThisSession = false;
 
   @override
   void initState() {
     super.initState();
-    // Trigger DSS alerts once when admin opens this screen
+    _tab = widget.initialTab;
     WidgetsBinding.instance.addPostFrameCallback((_) => _sendDSSAlerts());
   }
 
@@ -1115,6 +1114,7 @@ class _AdminDSSState extends State<AdminDSS> {
     final color = _priorityColor(priority);
     showModalBottomSheet(
       context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => DraggableScrollableSheet(
         expand: false, initialChildSize: 0.55, maxChildSize: 0.8,
@@ -1225,8 +1225,8 @@ class _AdminDSSState extends State<AdminDSS> {
               due = 'Overdue ${(-daysUntil)} day(s)';
               priority = 'Overdue';
             } else if (daysUntil <= 7) {
-              due = 'Due in $daysUntil day(s) (this week)';
-              priority = 'Due Soon';
+              due = 'Due in $daysUntil day(s)';
+              priority = 'Due This Week';
             } else if (daysUntil <= 14) {
               due = 'Due in $daysUntil days';
               priority = 'Due Soon';
@@ -1249,8 +1249,8 @@ class _AdminDSSState extends State<AdminDSS> {
           };
         }).toList()
           ..sort((a, b) {
-            const order = {'Overdue': 0, 'Due Soon': 1, 'Scheduled': 2, 'On Track': 3};
-            return (order[a['priority']] ?? 4).compareTo(order[b['priority']] ?? 4);
+            const order = {'Overdue': 0, 'Due This Week': 1, 'Due Soon': 2, 'Scheduled': 3, 'On Track': 4};
+            return (order[a['priority']] ?? 5).compareTo(order[b['priority']] ?? 5);
           });
 
         _pmsAssetsCache = assets;
@@ -1262,14 +1262,7 @@ class _AdminDSSState extends State<AdminDSS> {
   Widget _buildPMSDSSContent(List<Map<String, String>> assets) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final weekEnd = today.add(const Duration(days: 7));
-    final dueThisWeek = assets.where((a) {
-      if (a['nextPMS'] == '—') return false;
-      final d = DateTime.tryParse(a['nextPMS']!);
-      if (d == null) return false;
-      final dMidnight = DateTime(d.year, d.month, d.day);
-      return !dMidnight.isBefore(today) && !dMidnight.isAfter(weekEnd);
-    }).length;
+    final dueThisWeek = assets.where((a) => a['priority'] == 'Due This Week').length;
 
     return Column(children: [
       Container(
@@ -1299,6 +1292,7 @@ class _AdminDSSState extends State<AdminDSS> {
           itemBuilder: (_, i) {
             final a = assets[i];
             final color = a['priority'] == 'Overdue' ? _red
+                : a['priority'] == 'Due This Week' ? const Color(0xFFdd6b20)
                 : a['priority'] == 'Due Soon' ? Colors.orange
                 : a['priority'] == 'Scheduled' ? _blue
                 : Colors.green;
@@ -1348,11 +1342,13 @@ class _AdminDSSState extends State<AdminDSS> {
 
   void _showPMSDetails(Map<String, String> a) {
     final color = a['priority'] == 'Overdue' ? _red
+        : a['priority'] == 'Due This Week' ? const Color(0xFFdd6b20)
         : a['priority'] == 'Due Soon' ? Colors.orange
         : a['priority'] == 'Scheduled' ? _blue
         : Colors.green;
     showModalBottomSheet(
       context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => DraggableScrollableSheet(
         expand: false, initialChildSize: 0.55, maxChildSize: 0.8,

@@ -128,6 +128,8 @@
       _updateOverviewStats();
       // Render dashboard charts whenever vehicle/service data updates
       if (typeof window.renderDashboardCharts === 'function') window.renderDashboardCharts();
+      // Re-render PMS calendar when vehicle data changes
+      if (typeof window.renderPmsCalendar === 'function') window.renderPmsCalendar();
       // DSS-PMS readiness: vehicles loaded
       window._dssVehiclesReady = true;
       if (window._dssDataReady && typeof renderDSSPMS === 'function') {
@@ -270,6 +272,8 @@
         if (!section || section.id === 'issuance') renderIssuancesList();
       }
       _updateIssuanceStats();
+      // Re-render top parts chart when issuances change
+      if (typeof window.renderDashboardCharts === 'function') window.renderDashboardCharts();
       // DSS readiness: mark issuances loaded
       window._dssIssuancesReady = true;
       if (window._dssInventoryReady && window._dssIssuancesReady) {
@@ -289,6 +293,7 @@
         renderInventoryTransactions();
       }
       _updateTransactionStats();
+      if (typeof window.renderDashboardCharts === 'function') window.renderDashboardCharts();
     });
 
     // Users
@@ -483,6 +488,7 @@
   function _updateUserStats() {
     const users = window._fbUsers || [];
     _setStat('userStatTotal', users.length);
+    _setStat('statTotalUsers', users.length);
     _setStat('userStatActive', users.filter(u => (u.status || '').toLowerCase() === 'active').length);
     _setStat('userStatInactive', users.filter(u => (u.status || '').toLowerCase() !== 'active').length);
   }

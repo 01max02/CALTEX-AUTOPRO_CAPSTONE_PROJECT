@@ -1,0 +1,407 @@
+<!-- ── PMS Calendar Floating Widget ── -->
+<!-- Include this file in any admin page that needs the PMS calendar -->
+<!-- Requires: window._fbVehicles to be populated by admin_firebase.js -->
+
+<!-- Floating toggle button -->
+<button id="pmsCalToggleBtn" onclick="pmsCalToggle()"
+  title="PMS Schedule"
+  style="position:fixed;bottom:2rem;right:2rem;z-index:1200;
+         width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;
+         background:linear-gradient(135deg,#E8001C,#c0001a);
+         box-shadow:0 4px 16px rgba(232,0,28,0.4);
+         display:flex;align-items:center;justify-content:center;
+         transition:transform 0.2s,box-shadow 0.2s;"
+  onmouseover="this.style.transform='scale(1.1)';this.style.boxShadow='0 6px 24px rgba(232,0,28,0.5)'"
+  onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 4px 16px rgba(232,0,28,0.4)'">
+  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+       fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2"/>
+    <line x1="16" y1="2" x2="16" y2="6"/>
+    <line x1="8" y1="2" x2="8" y2="6"/>
+    <line x1="3" y1="10" x2="21" y2="10"/>
+  </svg>
+  <!-- Unread dot — shown when there are overdue/due-soon vehicles -->
+  <span id="pmsCalDot" style="display:none;position:absolute;top:4px;right:4px;
+        width:10px;height:10px;border-radius:50%;background:#fbbf24;
+        border:2px solid #fff;"></span>
+</button>
+
+<!-- Floating calendar panel -->
+<div id="pmsCalPanel"
+  style="display:none;position:fixed;bottom:5.5rem;right:2rem;z-index:1199;
+         width:320px;background:#fff;border-radius:18px;
+         box-shadow:0 8px 40px rgba(0,0,0,0.18);
+         border:1px solid #e2e8f0;overflow:hidden;
+         animation:pmsCalSlideIn 0.22s ease;">
+
+  <!-- Panel header -->
+  <div style="background:linear-gradient(135deg,#E8001C,#c0001a);padding:1rem 1.1rem 0.9rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;">
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+             fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/>
+          <line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        <span style="font-size:0.78rem;font-weight:700;color:rgba(255,255,255,0.9);
+                     text-transform:uppercase;letter-spacing:0.5px;">PMS Schedule</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <span id="calYearBadge"
+          style="font-size:0.72rem;font-weight:700;color:rgba(255,255,255,0.7);
+                 background:rgba(255,255,255,0.15);padding:2px 8px;border-radius:20px;"></span>
+        <button onclick="pmsCalToggle()"
+          style="width:24px;height:24px;border:none;background:rgba(255,255,255,0.2);
+                 border-radius:6px;cursor:pointer;color:#fff;font-size:1rem;
+                 display:flex;align-items:center;justify-content:center;line-height:1;">
+          &times;
+        </button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <button onclick="pmsCalNav(-1)"
+        style="width:26px;height:26px;border:none;background:rgba(255,255,255,0.2);
+               border-radius:6px;cursor:pointer;color:#fff;font-size:1rem;
+               display:flex;align-items:center;justify-content:center;line-height:1;">&#8249;</button>
+      <span id="calMonthLabel" style="font-size:1.1rem;font-weight:800;color:#fff;"></span>
+      <button onclick="pmsCalNav(1)"
+        style="width:26px;height:26px;border:none;background:rgba(255,255,255,0.2);
+               border-radius:6px;cursor:pointer;color:#fff;font-size:1rem;
+               display:flex;align-items:center;justify-content:center;line-height:1;">&#8250;</button>
+    </div>
+  </div>
+
+  <!-- Calendar grid -->
+  <div style="padding:0.75rem 0.9rem 0.5rem;">
+    <div id="pmsCalendar"></div>
+  </div>
+
+  <!-- Selected day detail -->
+  <div id="pmsDayDetail"
+    style="display:none;margin:0 0.9rem 0.75rem;padding:0.75rem;
+           background:#f7f8fa;border-radius:10px;border:1px solid #e2e8f0;">
+    <div id="pmsDayDetailTitle"
+      style="font-size:0.7rem;font-weight:700;color:#718096;
+             text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;"></div>
+    <div id="pmsDayDetailList"></div>
+  </div>
+
+  <!-- Legend -->
+  <div style="padding:0 0.9rem 0.85rem;display:flex;flex-wrap:wrap;gap:0.5rem 0.9rem;">
+    <span style="display:flex;align-items:center;gap:4px;font-size:0.68rem;color:#4a5568;">
+      <span style="width:8px;height:8px;border-radius:2px;background:#E8001C;display:inline-block;"></span>Overdue
+    </span>
+    <span style="display:flex;align-items:center;gap:4px;font-size:0.68rem;color:#4a5568;">
+      <span style="width:8px;height:8px;border-radius:2px;background:#ed8936;display:inline-block;"></span>This Week
+    </span>
+    <span style="display:flex;align-items:center;gap:4px;font-size:0.68rem;color:#4a5568;">
+      <span style="width:8px;height:8px;border-radius:2px;background:#003087;display:inline-block;"></span>Upcoming
+    </span>
+    <span style="display:flex;align-items:center;gap:4px;font-size:0.68rem;color:#4a5568;">
+      <span style="width:8px;height:8px;border-radius:2px;background:#0d9488;display:inline-block;"></span>Today
+    </span>
+  </div>
+</div>
+
+<style>
+@keyframes pmsCalSlideIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+.pms-cal-day {
+  position: relative;
+  min-height: 36px;
+  border-radius: 7px;
+  padding: 4px 4px 3px;
+  cursor: default;
+  border: 1.5px solid transparent;
+  transition: border-color 0.15s, background 0.15s;
+  background: #f7f8fa;
+}
+.pms-cal-day.other-month { opacity: 0.35; }
+.pms-cal-day.today-cell  { border-color: #0d9488 !important; background: #f0fdfa; }
+.pms-cal-day.has-pms     { cursor: pointer; }
+.pms-cal-day.has-pms:hover { border-color: #cbd5e0; background: #fff; }
+.pms-cal-day.selected    { border-color: #003087 !important; background: #ebf8ff; }
+.pms-cal-day-num {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #4a5568;
+  line-height: 1;
+}
+.pms-cal-day.today-cell .pms-cal-day-num { color: #0d9488; font-weight: 800; }
+.pms-cal-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: 4px;
+}
+.pms-cal-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.pms-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+}
+</style>
+
+<script>
+(function() {
+  'use strict';
+
+  const CAL_MONTHS = ['January','February','March','April','May','June',
+                      'July','August','September','October','November','December'];
+  const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  let _calYear    = new Date().getFullYear();
+  let _calMonth   = new Date().getMonth();
+  let _pmsEvents  = {};
+  let _selectedDay = null;
+  let _panelOpen  = false;
+
+  // ── Toggle panel ──
+  window.pmsCalToggle = function() {
+    _panelOpen = !_panelOpen;
+    const panel = document.getElementById('pmsCalPanel');
+    if (panel) {
+      panel.style.display = _panelOpen ? 'block' : 'none';
+      if (_panelOpen) _renderCalendar();
+    }
+  };
+
+  // Close on outside click — but NOT when clicking inside the panel
+  document.addEventListener('click', function(e) {
+    if (!_panelOpen) return;
+    const panel = document.getElementById('pmsCalPanel');
+    const btn   = document.getElementById('pmsCalToggleBtn');
+    if (!panel || !btn) return;
+    // Only close if the click is truly outside both the panel and the toggle button
+    if (!panel.contains(e.target) && !btn.contains(e.target)) {
+      _panelOpen = false;
+      panel.style.display = 'none';
+    }
+  });
+
+  // ── Build PMS events ──
+  // Uses window.assets (mapped, always has nextPMSDue computed) if available,
+  // falls back to window._fbVehicles (raw Firestore) for pages without admin_firebase.js
+  function _buildPmsEvents() {
+    _pmsEvents = {};
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    let urgentCount = 0;
+
+    // Prefer window.assets (already has nextPMSDue calculated from lastSvcDate+svcFreq)
+    const source = (window.assets && window.assets.length > 0)
+      ? window.assets.map(function(a) {
+          return {
+            plate:      a.plateNumber || a.plate || a.assetNum || '—',
+            nextPMSDue: a.nextPMSDue  || '',
+          };
+        })
+      : (window._fbVehicles || []).map(function(v) {
+          // Calculate nextPMSDue if not stored
+          let nextPMSDue = v.nextPMSDue || '';
+          if (!nextPMSDue) {
+            const lastSvc = v.lastSvcDate || v.lastServiceDate || '';
+            const freq    = parseInt(v.svcFreq || v.serviceFrequency) || 2;
+            if (lastSvc) {
+              const d = new Date(lastSvc);
+              if (!isNaN(d)) {
+                d.setMonth(d.getMonth() + freq);
+                nextPMSDue = d.toISOString().split('T')[0];
+              }
+            }
+          }
+          return {
+            plate:      v.plate || v.plateNumber || v._id || '—',
+            nextPMSDue: nextPMSDue,
+          };
+        });
+
+    source.forEach(function(v) {
+      if (!v.nextPMSDue) return;
+      const due = new Date(v.nextPMSDue);
+      if (isNaN(due.getTime())) return;
+      due.setHours(0,0,0,0);
+
+      const key = due.getFullYear() + '-'
+        + String(due.getMonth() + 1).padStart(2,'0') + '-'
+        + String(due.getDate()).padStart(2,'0');
+
+      const daysUntil = Math.round((due - today) / 86400000);
+      const urgency   = daysUntil < 0 ? 'overdue' : daysUntil <= 7 ? 'week' : 'upcoming';
+      if (urgency !== 'upcoming') urgentCount++;
+
+      if (!_pmsEvents[key]) _pmsEvents[key] = [];
+      _pmsEvents[key].push({ plate: v.plate, daysUntil, urgency });
+    });
+
+    // Show/hide dot on toggle button
+    const dot = document.getElementById('pmsCalDot');
+    if (dot) dot.style.display = urgentCount > 0 ? 'block' : 'none';
+  }
+
+  function _urgencyColor(u) {
+    if (u === 'overdue') return '#E8001C';
+    if (u === 'week')    return '#ed8936';
+    return '#003087';
+  }
+
+  // ── Render calendar ──
+  function _renderCalendar() {
+    const label = document.getElementById('calMonthLabel');
+    if (label) label.textContent = CAL_MONTHS[_calMonth];
+    const yearBadge = document.getElementById('calYearBadge');
+    if (yearBadge) yearBadge.textContent = _calYear;
+
+    const cal = document.getElementById('pmsCalendar');
+    if (!cal) return;
+
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    let html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">';
+    DOW.forEach(function(d) {
+      html += '<div style="text-align:center;font-size:0.6rem;font-weight:700;color:#a0aec0;'
+            + 'text-transform:uppercase;padding:2px 0 5px;letter-spacing:0.3px;">' + d + '</div>';
+    });
+
+    const firstDay    = new Date(_calYear, _calMonth, 1).getDay();
+    const daysInMonth = new Date(_calYear, _calMonth + 1, 0).getDate();
+    const prevDays    = new Date(_calYear, _calMonth, 0).getDate();
+
+    for (let i = firstDay - 1; i >= 0; i--) {
+      html += '<div class="pms-cal-day other-month"><div class="pms-cal-day-num">'
+            + (prevDays - i) + '</div></div>';
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateObj = new Date(_calYear, _calMonth, d);
+      dateObj.setHours(0,0,0,0);
+      const key = _calYear + '-'
+        + String(_calMonth + 1).padStart(2,'0') + '-'
+        + String(d).padStart(2,'0');
+      const events    = _pmsEvents[key] || [];
+      const isToday   = dateObj.getTime() === today.getTime();
+      const isSelected = _selectedDay === key;
+
+      let cls = 'pms-cal-day';
+      if (isToday)       cls += ' today-cell';
+      if (events.length) cls += ' has-pms';
+      if (isSelected)    cls += ' selected';
+
+      const onclick = events.length ? 'pmsCalSelectDay(\'' + key + '\', event)' : '';
+
+      html += '<div class="' + cls + '"' + (onclick ? ' onclick="' + onclick + '"' : '') + '>';
+      html += '<div class="pms-cal-day-num">' + d + '</div>';
+      if (events.length) {
+        html += '<div class="pms-cal-dots">';
+        events.slice(0, 6).forEach(function(e) {
+          html += '<div class="pms-cal-dot" style="background:' + _urgencyColor(e.urgency) + ';"></div>';
+        });
+        if (events.length > 6) {
+          html += '<div style="font-size:9px;color:#718096;line-height:7px;">+'
+                + (events.length - 6) + '</div>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+
+    const totalCells = firstDay + daysInMonth;
+    const trailing   = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+    for (let d = 1; d <= trailing; d++) {
+      html += '<div class="pms-cal-day other-month"><div class="pms-cal-day-num">' + d + '</div></div>';
+    }
+    html += '</div>';
+    cal.innerHTML = html;
+
+    if (_selectedDay) _renderDayDetail(_selectedDay);
+  }
+
+  // ── Day detail ──
+  function _renderDayDetail(key) {
+    const events = _pmsEvents[key] || [];
+    const detail = document.getElementById('pmsDayDetail');
+    const title  = document.getElementById('pmsDayDetailTitle');
+    const list   = document.getElementById('pmsDayDetailList');
+    if (!detail || !title || !list) return;
+    if (!events.length) { detail.style.display = 'none'; return; }
+
+    const parts = key.split('-');
+    const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    title.textContent = CAL_MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear()
+      + ' — ' + events.length + ' vehicle' + (events.length > 1 ? 's' : '') + ' due';
+
+    list.innerHTML = events.map(function(e) {
+      const color = _urgencyColor(e.urgency);
+      const lbl   = e.daysUntil < 0
+        ? Math.abs(e.daysUntil) + ' day' + (Math.abs(e.daysUntil) !== 1 ? 's' : '') + ' overdue'
+        : e.daysUntil === 0 ? 'Due today'
+        : 'Due in ' + e.daysUntil + ' day' + (e.daysUntil !== 1 ? 's' : '');
+      return '<div class="pms-detail-row">'
+        + '<div style="width:10px;height:10px;border-radius:3px;background:' + color + ';flex-shrink:0;"></div>'
+        + '<div style="flex:1;"><strong style="font-size:0.85rem;color:#1a202c;">' + e.plate + '</strong></div>'
+        + '<span style="font-size:0.75rem;font-weight:700;color:' + color + ';background:' + color
+        + '18;padding:3px 10px;border-radius:20px;">' + lbl + '</span>'
+        + '</div>';
+    }).join('');
+
+    detail.style.display = 'block';
+  }
+
+  // ── Public API ──
+  window.pmsCalNav = function(dir) {
+    _calMonth += dir;
+    if (_calMonth > 11) { _calMonth = 0;  _calYear++; }
+    if (_calMonth < 0)  { _calMonth = 11; _calYear--; }
+    _selectedDay = null;
+    const detail = document.getElementById('pmsDayDetail');
+    if (detail) detail.style.display = 'none';
+    _renderCalendar();
+  };
+
+  window.pmsCalSelectDay = function(key, event) {
+    if (event) event.stopPropagation(); // prevent outside-click handler from firing
+    _selectedDay = _selectedDay === key ? null : key;
+    _renderCalendar();
+    if (_selectedDay) _renderDayDetail(_selectedDay);
+    else {
+      const detail = document.getElementById('pmsDayDetail');
+      if (detail) detail.style.display = 'none';
+    }
+  };
+
+  window.renderPmsCalendar = function() {
+    _buildPmsEvents();
+    if (_panelOpen) _renderCalendar();
+  };
+
+  // Init — wait for either window.assets or window._fbVehicles to be populated
+  document.addEventListener('DOMContentLoaded', function() {
+    const iv = setInterval(function() {
+      const hasAssets   = window.assets   && window.assets.length   > 0;
+      const hasVehicles = window._fbVehicles && window._fbVehicles.length > 0;
+      if (hasAssets || hasVehicles) {
+        clearInterval(iv);
+        window.renderPmsCalendar();
+      }
+    }, 400);
+    // Safety timeout — render after 5s even if no data
+    setTimeout(function() { clearInterval(iv); window.renderPmsCalendar(); }, 5000);
+  });
+})();
+</script>

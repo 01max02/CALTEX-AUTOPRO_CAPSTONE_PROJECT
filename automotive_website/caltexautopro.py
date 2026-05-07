@@ -467,6 +467,10 @@ def admin_sidebar():
 def admin_header():
     return render_template('admin_header.html')
 
+@app.route('/calendarview_widget.html')
+def calendarview_widget():
+    return render_template('calendarview_widget.html')
+
 @app.route('/notifications.html')
 def notifications():
     return render_template('notifications.html')
