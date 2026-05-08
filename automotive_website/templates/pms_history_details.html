@@ -240,8 +240,8 @@
           <span class="phd-chip-value">${records.length}</span> service${records.length !== 1 ? 's' : ''}
         </div>
         <div class="phd-chip">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          <span class="phd-chip-value">₱${totalCost.toLocaleString('en-PH', {minimumFractionDigits:2})}</span> total
+          <span style="font-size:13px;font-weight:700;color:#4a5568;">₱</span>
+          <span class="phd-chip-value">${totalCost.toLocaleString('en-PH', {minimumFractionDigits:2})}</span> total
         </div>
       `;
 
@@ -254,6 +254,16 @@
       const recordsHtml = records.map(r => {
         const svcRows = (r.svcRows || []).filter(s => s.name);
         const matRows = (r.matRows || []).filter(m => m.name);
+
+        // Compute subtotals per section (mirrors mobile _lineItem: unitCost * qty)
+        function rowSubtotal(row) {
+          const unitCost = parseFloat((row.cost || '0').replace(/[₱,]/g, '')) || 0;
+          const qty = parseFloat(row.qty) || 1;
+          return unitCost * qty;
+        }
+        const svcTotal = svcRows.reduce((s, row) => s + rowSubtotal(row), 0);
+        const matTotal = matRows.reduce((s, row) => s + rowSubtotal(row), 0);
+
         return `
           <div class="phd-record-card">
             <div class="phd-record-header">
@@ -275,26 +285,42 @@
                   </span>
                   Services Rendered
                 </div>
-                ${svcRows.map(s => `
+                ${svcRows.map(s => {
+                  const sub = rowSubtotal(s);
+                  return `
                   <div class="phd-line-item">
                     <div class="phd-dot" style="background:#2b6cb0;"></div>
                     <span style="flex:1;">${s.name}</span>
-                    <span style="color:#718096;">${s.qty} ${s.uom}</span>
-                  </div>`).join('')}
+                    <span style="color:#718096;margin-right:10px;">${s.qty} ${s.uom}</span>
+                    <span style="font-size:12px;font-weight:600;color:#1a202c;">₱${sub.toLocaleString('en-PH',{minimumFractionDigits:2})}</span>
+                  </div>`;
+                }).join('')}
+                <div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0;">
+                  <span style="font-size:11px;color:#718096;">Services subtotal</span>
+                  <span style="font-size:13px;font-weight:700;color:#2b6cb0;">₱${svcTotal.toLocaleString('en-PH',{minimumFractionDigits:2})}</span>
+                </div>
               ` : ''}
               ${matRows.length ? `
                 <div class="phd-section-label" style="color:#0d9488;margin-top:10px;">
                   <span style="background:#f0fdfa;padding:3px 5px;border-radius:6px;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7.5L12 3l10 4.5V17L12 21 2 17V7.5z"/><path d="M12 3v18"/><path d="M2 7.5l10 4.5 10-4.5"/><path d="M7 5.25L17 9.75"/></svg>
                   </span>
                   Materials Used
                 </div>
-                ${matRows.map(m => `
+                ${matRows.map(m => {
+                  const sub = rowSubtotal(m);
+                  return `
                   <div class="phd-line-item">
                     <div class="phd-dot" style="background:#0d9488;"></div>
                     <span style="flex:1;">${m.name}</span>
-                    <span style="color:#718096;">${m.qty} ${m.uom}</span>
-                  </div>`).join('')}
+                    <span style="color:#718096;margin-right:10px;">${m.qty} ${m.uom}</span>
+                    <span style="font-size:12px;font-weight:600;color:#1a202c;">₱${sub.toLocaleString('en-PH',{minimumFractionDigits:2})}</span>
+                  </div>`;
+                }).join('')}
+                <div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0;">
+                  <span style="font-size:11px;color:#718096;">Materials subtotal</span>
+                  <span style="font-size:13px;font-weight:700;color:#0d9488;">₱${matTotal.toLocaleString('en-PH',{minimumFractionDigits:2})}</span>
+                </div>
               ` : ''}
               <hr class="phd-divider">
               <div class="phd-total">

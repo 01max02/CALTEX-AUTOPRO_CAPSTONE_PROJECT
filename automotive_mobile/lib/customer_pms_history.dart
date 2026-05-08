@@ -12,14 +12,25 @@ class CustomerPms extends StatefulWidget {
 
 class _CustomerPmsState extends State<CustomerPms> {
   static const _red = Color(0xFFE8001C);
-  static const _bg = Color(0xFFF7F8FA);
+  static const _bg  = Color(0xFFF7F8FA);
 
   String _userName = '';
+
+  // Search state lives here — NOT rebuilt by StreamBuilder
+  final _searchCtrl = TextEditingController();
+  final _searchNotifier = ValueNotifier<String>('');
 
   @override
   void initState() {
     super.initState();
     _loadUserName();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _searchNotifier.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUserName() async {
@@ -37,57 +48,137 @@ class _CustomerPmsState extends State<CustomerPms> {
 
     return Container(
       color: _bg,
-      child: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('vehicles')
-            .snapshots(),
-        builder: (context, vSnap) {
-          if (vSnap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      child: Column(children: [
 
-          final myVehicles = (vSnap.data?.docs ?? [])
-              .where((d) => (d['owner'] as String? ?? '').toLowerCase() == _userName.toLowerCase())
-              .toList();
-
-          if (myVehicles.isEmpty) {
-            return const Center(child: Text('No vehicles registered under your name.',
-              style: TextStyle(color: Color(0xFF718096))));
-          }
-
-          return Column(children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-              child: Row(children: [
-                const Icon(Icons.history, color: _red, size: 20),
-                const SizedBox(width: 8),
-                const Expanded(child: Text('PMS History',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1a202c)))),
-                Text('${myVehicles.length} vehicle${myVehicles.length != 1 ? 's' : ''}',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF718096))),
-              ]),
+        // ── Header ───────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Row(children: [
+            const Icon(Icons.history, color: _red, size: 20),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('PMS History',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1a202c)))),
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance.collection('vehicles').snapshots(),
+              builder: (_, snap) {
+                final count = (snap.data?.docs ?? [])
+                    .where((d) => (d['owner'] as String? ?? '').toLowerCase() == _userName.toLowerCase())
+                    .length;
+                return Text('$count vehicle${count != 1 ? 's' : ''}',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF718096)));
+              },
             ),
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                itemCount: myVehicles.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (ctx, i) {
-                  final vData = myVehicles[i].data() as Map<String, dynamic>;
-                  final plate = vData['plate'] as String? ?? '';
-                  final desc = vData['desc'] as String? ?? '';
-                  final type = vData['type'] as String? ?? '';
-                  return _VehicleHistoryCard(plate: plate, desc: desc, type: type);
-                },
+          ]),
+        ),
+
+        // ── Search bar — completely outside StreamBuilder ─────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: TextField(
+            controller: _searchCtrl,
+            onChanged: (v) => _searchNotifier.value = v,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF1a202c)),
+            decoration: InputDecoration(
+              hintText: 'Search by plate or description...',
+              hintStyle: const TextStyle(fontSize: 13, color: Color(0xFFa0aec0)),
+              prefixIcon: const Icon(Icons.search, size: 18, color: Color(0xFFa0aec0)),
+              suffixIcon: ValueListenableBuilder<String>(
+                valueListenable: _searchNotifier,
+                builder: (_, q, __) => q.isNotEmpty
+                    ? GestureDetector(
+                        onTap: () {
+                          _searchCtrl.clear();
+                          _searchNotifier.value = '';
+                        },
+                        child: const Icon(Icons.close, size: 16, color: Color(0xFFa0aec0)),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFe2e8f0)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFe2e8f0)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: _red, width: 1.5),
               ),
             ),
-          ]);
-        },
-      ),
+          ),
+        ),
+
+        // ── Vehicle list — rebuilt only by stream + search ────
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('vehicles').snapshots(),
+            builder: (context, vSnap) {
+              if (vSnap.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final allVehicles = (vSnap.data?.docs ?? [])
+                  .where((d) => (d['owner'] as String? ?? '').toLowerCase() == _userName.toLowerCase())
+                  .toList();
+
+              // Use ValueListenableBuilder so only the list rebuilds on search change
+              return ValueListenableBuilder<String>(
+                valueListenable: _searchNotifier,
+                builder: (_, q, __) {
+                  final query = q.toLowerCase().trim();
+                  final filtered = query.isEmpty
+                      ? allVehicles
+                      : allVehicles.where((d) {
+                          final data  = d.data() as Map<String, dynamic>;
+                          final plate = (data['plate'] as String? ?? '').toLowerCase();
+                          final desc  = (data['desc']  as String? ?? '').toLowerCase();
+                          return plate.contains(query) || desc.contains(query);
+                        }).toList();
+
+                  if (filtered.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Text(
+                          query.isNotEmpty
+                              ? 'No vehicles match "$q".'
+                              : 'No vehicles registered under your name.',
+                          style: const TextStyle(color: Color(0xFF718096)),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (ctx, i) {
+                      final vData = filtered[i].data() as Map<String, dynamic>;
+                      return _VehicleHistoryCard(
+                        plate: vData['plate'] as String? ?? '',
+                        desc:  vData['desc']  as String? ?? '',
+                        type:  vData['type']  as String? ?? '',
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ]),
     );
   }
 }
 
+// ── Vehicle card ─────────────────────────────────────────────
 class _VehicleHistoryCard extends StatelessWidget {
   final String plate;
   final String desc;
@@ -98,7 +189,6 @@ class _VehicleHistoryCard extends StatelessWidget {
 
   IconData get _vehicleIcon {
     final t = type.toLowerCase();
-    if (t.contains('car')) return Icons.directions_car_outlined;
     if (t.contains('truck')) return Icons.local_shipping_outlined;
     return Icons.directions_car_outlined;
   }
@@ -119,6 +209,7 @@ class _VehicleHistoryCard extends StatelessWidget {
             if (aTime == null || bTime == null) return 0;
             return (bTime as Timestamp).compareTo(aTime as Timestamp);
           });
+
         final totalCost = docs.fold<double>(0, (sum, d) {
           final cost = (d['cost'] as String? ?? '0').replaceAll('₱', '').replaceAll(',', '');
           return sum + (double.tryParse(cost) ?? 0);
@@ -144,9 +235,10 @@ class _VehicleHistoryCard extends StatelessWidget {
                 decoration: BoxDecoration(color: _red.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
                 child: Icon(_vehicleIcon, color: _red, size: 22),
               ),
+              const SizedBox(width: 14),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(plate, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1a202c))),
-                Text(desc, style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+                Text(desc,  style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
                 const SizedBox(height: 4),
                 Row(children: [
                   const Icon(Icons.receipt_long_outlined, size: 12, color: Color(0xFF718096)),
