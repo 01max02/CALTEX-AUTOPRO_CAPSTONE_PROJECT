@@ -1,4 +1,4 @@
-// Page → URL mapping for navigation
+﻿// Page → URL mapping for navigation
 const PAGE_URLS = {
     'overview':                 'admin_dashboard.html',
     'item-master':              'admin_inventory_itemaster.html',
@@ -200,10 +200,15 @@ window.addEventListener('pageshow', function(e) {
     if (typeof firebase !== 'undefined' && firebase.auth) {
         firebase.auth().onAuthStateChanged(function(user) {
             if (!user) {
-                sessionStorage.removeItem('apUser');
-                sessionStorage.removeItem('spUser');
-                sessionStorage.removeItem('cpUser');
-                window.location.replace('/login.html');
+                // Delay check — Firebase fires null first during auth restore
+                setTimeout(function() {
+                    if (!firebase.auth().currentUser) {
+                        sessionStorage.removeItem('apUser');
+                        sessionStorage.removeItem('spUser');
+                        sessionStorage.removeItem('cpUser');
+                        window.location.replace('/login.html');
+                    }
+                }, 2000);
             }
         });
     }

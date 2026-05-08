@@ -1,4 +1,4 @@
-// customer_shared.js — runs as a proper <script src> on all customer pages.
+﻿// customer_shared.js — runs as a proper <script src> on all customer pages.
 // Handles: avatar dropdown, notification panel, active tab highlight.
 
 (function () {
@@ -59,7 +59,7 @@
 
     // ── Back/Forward navigation guard ──────────────────────
     window.addEventListener('pageshow', function () {
-        var hasSession = sessionStorage.getItem('cpUser') || sessionStorage.getItem('spUser');
+        var hasSession = sessionStorage.getItem('cpUser') || sessionStorage.getItem('spUser') || sessionStorage.getItem('apUser');
         if (!hasSession) {
             window.location.replace('/login.html');
             return;
@@ -67,9 +67,13 @@
         if (typeof firebase !== 'undefined' && firebase.auth) {
             firebase.auth().onAuthStateChanged(function (user) {
                 if (!user) {
-                    sessionStorage.removeItem('cpUser');
-                    sessionStorage.removeItem('spUser');
-                    window.location.replace('/login.html');
+                    // Only redirect if no session remains (admin may use apUser)
+                    var stillHasSession = sessionStorage.getItem('cpUser') || sessionStorage.getItem('spUser') || sessionStorage.getItem('apUser');
+                    if (!stillHasSession) {
+                        sessionStorage.removeItem('cpUser');
+                        sessionStorage.removeItem('spUser');
+                        window.location.replace('/login.html');
+                    }
                 }
             });
         }

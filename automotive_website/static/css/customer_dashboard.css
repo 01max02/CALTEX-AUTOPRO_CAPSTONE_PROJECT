@@ -100,10 +100,12 @@ body {
 /* ── Stat cards ── */
 .cu-stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 14px;
   margin-bottom: 24px;
 }
+@media (max-width: 900px) { .cu-stats-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 540px) { .cu-stats-grid { grid-template-columns: repeat(2, 1fr); } }
 
 .cu-stat-card {
   background: var(--white);
@@ -129,6 +131,7 @@ body {
 .cu-stat-icon.orange { background: #fff7ed; color: #ea580c; }
 .cu-stat-icon.amber  { background: #fef3c7; color: #d97706; }
 .cu-stat-icon.green  { background: #f0fdf4; color: #16a34a; }
+.cu-stat-icon.purple { background: rgba(221,107,32,0.08); color: #dd6b20; }
 
 .cu-stat-value { font-size: 22px; font-weight: 800; color: var(--dark); line-height: 1; margin-bottom: 4px; }
 .cu-stat-label { font-size: 10px; color: var(--light); font-weight: 500; }

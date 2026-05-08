@@ -5,19 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Profile</title>
     <link rel="icon" type="image/png" href="../static/img/LOGO_CALTEX.png" />
+    <link rel="stylesheet" href="../static/css/style.css">
+    <link rel="stylesheet" href="../static/css/admin.css">
     <link rel="stylesheet" href="../static/css/profile.css">
+    <style>
+        /* Override style.css login-page body styles */
+        body {
+            background: #F7F8FA !important;
+            display: block !important;
+            align-items: unset !important;
+            justify-content: unset !important;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+        /* Both wrappers hidden until JS shows the right one */
+        #adminWrap, #standaloneWrap { display: none; }
+    </style>
 </head>
 <body class="portal-body" data-page="profile">
 
-<!-- ── Admin layout ── -->
-<div id="adminWrap" style="display:none;flex-direction:column;width:100%;height:100vh;">
+<!-- Admin layout -->
+<div id="adminWrap" style="flex-direction:column;width:100%;min-height:100vh;">
     <div id="headerContainer"></div>
     <div class="admin-dashboard-body">
         <div id="sidebarContainer"></div>
         <div class="admin-main">
             <div class="admin-header">
                 <div>
-                    <div class="breadcrumb">Admin Portal › My Profile</div>
+                    <div class="breadcrumb">Admin Portal &rsaquo; My Profile</div>
                     <div class="admin-header-title">My Profile</div>
                 </div>
             </div>
@@ -28,8 +44,8 @@
     </div>
 </div>
 
-<!-- ── Customer / Staff layout ── -->
-<div id="standaloneWrap" style="display:none;flex-direction:column;min-height:100vh;">
+<!-- Customer / Staff layout -->
+<div id="standaloneWrap" style="flex-direction:column;min-height:100vh;">
     <div id="cuHeaderWrap"></div>
     <main style="flex:1;overflow-y:auto;padding:1.5rem 2rem;background:#F7F8FA;">
         <div id="profileContent2"></div>
@@ -42,248 +58,189 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
-  if (!firebase.apps.length) {
+if (!firebase.apps.length) {
     firebase.initializeApp({
-      apiKey: "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
-      authDomain: "caltex-autopro-1e664.firebaseapp.com",
-      projectId: "caltex-autopro-1e664",
-      storageBucket: "caltex-autopro-1e664.firebasestorage.app",
-      messagingSenderId: "930140433367",
-      appId: "1:930140433367:web:cf67bfa388fa517422b992"
+        apiKey: "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
+        authDomain: "caltex-autopro-1e664.firebaseapp.com",
+        projectId: "caltex-autopro-1e664",
+        storageBucket: "caltex-autopro-1e664.firebasestorage.app",
+        messagingSenderId: "930140433367",
+        appId: "1:930140433367:web:cf67bfa388fa517422b992"
     });
-  }
+}
 </script>
 
-<!-- Load admin scripts only for admin role; customer/staff use customer_shared.js only -->
 <script>
-(function() {
-    // Detect role by checking the actual role field inside each session key,
-    // not just which key exists — prevents stale/cross-contaminated session data
-    function _getRoleFromSession() {
-        var ap = sessionStorage.getItem('apUser');
-        if (ap) { try { var d = JSON.parse(ap); if (d.role === 'admin') return 'admin'; } catch(e){} }
-        var sp = sessionStorage.getItem('spUser');
-        if (sp) { try { var d2 = JSON.parse(sp); if (d2.role === 'staff') return 'staff'; } catch(e){} }
-        var cp = sessionStorage.getItem('cpUser');
-        if (cp) { try { var d3 = JSON.parse(cp); if (d3.role === 'customer') return 'customer'; } catch(e){} }
-        // Fallback: key presence only
-        if (ap) return 'admin';
-        if (sp) return 'staff';
-        if (cp) return 'customer';
-        return null;
-    }
-
-    var _role = _getRoleFromSession();
-    if (!_role) { window.location.href = 'login.html'; return; }
-    window._profileRoleDetected = _role;
-
-    if (_role === 'admin') {
-        // Admin: inject style.css + admin.css first, then the JS stack
-        function _addLink(href) {
-            var l = document.createElement('link');
-            l.rel = 'stylesheet'; l.href = href;
-            document.head.appendChild(l);
-        }
-        _addLink('../static/css/style.css');
-        _addLink('../static/css/admin.css');
-
-        var scripts = [
-            '../static/js/admin_functions.js',
-            '../static/js/admin.js',
-            '../static/js/admin_sidebar.js',
-            '../static/js/customer_shared.js',
-        ];
-        (function loadNext(i) {
-            if (i >= scripts.length) { window._profileScriptsReady = true; return; }
-            var s = document.createElement('script');
-            s.src = scripts[i];
-            s.onload = function() { loadNext(i + 1); };
-            document.body.appendChild(s);
-        })(0);
-    } else {
-        // Customer / Staff: only load customer_shared.js — no admin redirects
-        var s = document.createElement('script');
-        s.src = '../static/js/customer_shared.js';
-        s.onload = function() { window._profileScriptsReady = true; };
-        document.body.appendChild(s);
-    }
+// ── Step 1: Detect role from sessionStorage ──────────────────
+var _profileRole = (function() {
+    var ap = sessionStorage.getItem('apUser');
+    if (ap) { try { var d = JSON.parse(ap); if (d.role === 'admin') return 'admin'; } catch(e){} }
+    var sp = sessionStorage.getItem('spUser');
+    if (sp) { try { var d2 = JSON.parse(sp); if (d2.role === 'staff') return 'staff'; } catch(e){} }
+    var cp = sessionStorage.getItem('cpUser');
+    if (cp) { try { var d3 = JSON.parse(cp); if (d3.role === 'customer') return 'customer'; } catch(e){} }
+    if (ap) return 'admin';
+    if (sp) return 'staff';
+    if (cp) return 'customer';
+    return null;
 })();
-</script>
-<script>
-// ── Role detection ──────────────────────────────────────────
-var _profileRole = window._profileRoleDetected || 'customer';
 
-(function () {
-    if (_profileRole === 'admin') {
-        document.getElementById('adminWrap').style.display = 'flex';
-    } else {
-        document.getElementById('standaloneWrap').style.display = 'flex';
-        fetch('customer_header.html').then(function (r) { return r.text(); }).then(function (html) {
+// ── Step 2: Show the correct layout immediately ──────────────
+if (!_profileRole) {
+    window.location.replace('/login.html');
+} else if (_profileRole === 'admin') {
+    document.getElementById('adminWrap').style.display = 'flex';
+    // Load admin sidebar script for header/sidebar injection
+    var s = document.createElement('script');
+    s.src = '../static/js/admin_sidebar.js';
+    document.body.appendChild(s);
+} else {
+    document.getElementById('standaloneWrap').style.display = 'flex';
+    // Load customer header
+    fetch('customer_header.html')
+        .then(function(r) { return r.text(); })
+        .then(function(html) {
             document.getElementById('cuHeaderWrap').innerHTML = html;
-            // Trigger active tab + avatar init after header is injected
             if (typeof setActiveTab === 'function') setActiveTab();
-            // Populate avatar from session immediately
-            var sessKey2 = _profileRole === 'staff' ? 'spUser' : 'cpUser';
-            var sess2 = JSON.parse(sessionStorage.getItem(sessKey2) || '{}');
-            if (sess2.name) {
-                var parts2 = sess2.name.trim().split(' ').filter(Boolean);
-                var ini2 = parts2.length >= 2
-                    ? (parts2[0][0] + parts2[1][0]).toUpperCase()
-                    : parts2[0][0].toUpperCase();
-                var avatarEl2 = document.getElementById('cuAvatar');
-                if (avatarEl2) avatarEl2.textContent = ini2;
-                var nameEl2 = document.getElementById('cuAvatarName');
-                if (nameEl2) nameEl2.textContent = sess2.name;
+            var sessKey = _profileRole === 'staff' ? 'spUser' : 'cpUser';
+            var sess = JSON.parse(sessionStorage.getItem(sessKey) || '{}');
+            if (sess.name) {
+                var parts = sess.name.trim().split(' ').filter(Boolean);
+                var ini = parts.length >= 2
+                    ? (parts[0][0] + parts[1][0]).toUpperCase()
+                    : parts[0][0].toUpperCase();
+                var av = document.getElementById('cuAvatar');
+                if (av) av.textContent = ini;
+                var nm = document.getElementById('cuAvatarName');
+                if (nm) nm.textContent = sess.name;
             }
         });
-    }
-})();
+    // Load customer shared JS
+    var cs = document.createElement('script');
+    cs.src = '../static/js/customer_shared.js';
+    document.body.appendChild(cs);
+}
+</script>
 
-// ── Load from Firestore ─────────────────────────────────────
+<script>
+// ── Step 3: Load profile data from Firebase ──────────────────
+var _pEditing = false;
 var _profileUnsubscribe = null;
 
-firebase.auth().onAuthStateChanged(function (user) {
+firebase.auth().onAuthStateChanged(function(user) {
     if (!user) {
-        // Don't redirect immediately — Firebase auth restore can take a moment.
-        // Only redirect if there's genuinely no session at all.
+        // Wait briefly for auth restore before redirecting
         var hasSession = sessionStorage.getItem('apUser') ||
                          sessionStorage.getItem('spUser') ||
                          sessionStorage.getItem('cpUser');
-        if (!hasSession) { window.location.href = 'login.html'; }
+        if (!hasSession) {
+            window.location.replace('/login.html');
+        }
         return;
     }
 
-    // ── Verify role from Firestore and correct layout if session was stale ──
-    firebase.firestore().collection('users').doc(user.uid).get().then(function(doc) {
-        if (!doc.exists) return;
-        var firestoreRole = (doc.data().role || '').toLowerCase();
-        // Map Firestore role values to our keys
-        var mappedRole = firestoreRole === 'admin' ? 'admin'
-                       : firestoreRole === 'staff' ? 'staff'
-                       : 'customer';
-
-        if (mappedRole !== _profileRole) {
-            // Role mismatch — correct it without full reload
-            _profileRole = mappedRole;
-            window._profileRoleDetected = mappedRole;
-            if (mappedRole === 'admin') {
-                document.getElementById('standaloneWrap').style.display = 'none';
-                document.getElementById('adminWrap').style.display = 'flex';
-            } else {
-                document.getElementById('adminWrap').style.display = 'none';
-                document.getElementById('standaloneWrap').style.display = 'flex';
+    // Verify role from Firestore (corrects stale session)
+    firebase.firestore().collection('users').doc(user.uid).get()
+        .then(function(doc) {
+            if (!doc.exists) return;
+            var fsRole = (doc.data().role || '').toLowerCase();
+            var mapped = fsRole === 'admin' ? 'admin' : fsRole === 'staff' ? 'staff' : 'customer';
+            if (mapped !== _profileRole) {
+                _profileRole = mapped;
+                if (mapped === 'admin') {
+                    document.getElementById('standaloneWrap').style.display = 'none';
+                    document.getElementById('adminWrap').style.display = 'flex';
+                } else {
+                    document.getElementById('adminWrap').style.display = 'none';
+                    document.getElementById('standaloneWrap').style.display = 'flex';
+                }
             }
-        }
-    }).catch(function() {});
+        }).catch(function() {});
 
-    // ── Render immediately from sessionStorage (fast) ──
-    var sessKey  = _profileRole === 'admin' ? 'apUser' : _profileRole === 'staff' ? 'spUser' : 'cpUser';
-    var sessData = JSON.parse(sessionStorage.getItem(sessKey) || '{}');
-    if (sessData.name || sessData.email) {
+    // Render from sessionStorage immediately (fast)
+    var sessKey = _profileRole === 'admin' ? 'apUser' : _profileRole === 'staff' ? 'spUser' : 'cpUser';
+    var sess = JSON.parse(sessionStorage.getItem(sessKey) || '{}');
+    if (sess.name || sess.email) {
         _renderProfile({
-            name:     sessData.name     || 'User',
-            email:    sessData.email    || user.email || '—',
-            role:     sessData.role     || _profileRole,
-            photoUrl: sessData.photoUrl || null,
+            name:     sess.name     || 'User',
+            email:    sess.email    || user.email || '',
+            role:     sess.role     || _profileRole,
+            photoUrl: sess.photoUrl || null,
         });
     }
 
-    // ── Real-time listener — auto-syncs from mobile or any other source ──
-    if (_profileUnsubscribe) _profileUnsubscribe(); // clean up previous listener
+    // Real-time Firestore listener
+    if (_profileUnsubscribe) _profileUnsubscribe();
     _profileUnsubscribe = firebase.firestore()
         .collection('users').doc(user.uid)
-        .onSnapshot(function (doc) {
+        .onSnapshot(function(doc) {
             if (!doc.exists) return;
             var data = doc.data();
-            var name     = data.name     || sessData.name  || 'User';
-            var email    = data.email    || user.email     || '—';
+            var name     = data.name     || sess.name  || 'User';
+            var email    = data.email    || user.email || '';
             var role     = data.role     || _profileRole;
             var photoUrl = data.photoUrl || null;
 
-            // Only re-render if not currently in edit mode (avoid wiping unsaved input)
             if (!_pEditing) {
-                _renderProfile({ name, email, role, photoUrl });
+                _renderProfile({ name: name, email: email, role: role, photoUrl: photoUrl });
             }
 
-            // Always keep sessionStorage in sync
-            var key  = _profileRole === 'admin' ? 'apUser' : _profileRole === 'staff' ? 'spUser' : 'cpUser';
-            var sess = JSON.parse(sessionStorage.getItem(key) || '{}');
-            sess.name  = name;
-            sess.email = email;
-            sessionStorage.setItem(key, JSON.stringify(sess));
-        }, function (err) {
-            console.warn('Profile listener error:', err);
-        });
+            // Sync sessionStorage
+            var key = _profileRole === 'admin' ? 'apUser' : _profileRole === 'staff' ? 'spUser' : 'cpUser';
+            var s2 = JSON.parse(sessionStorage.getItem(key) || '{}');
+            s2.name = name; s2.email = email;
+            sessionStorage.setItem(key, JSON.stringify(s2));
+        }, function(err) { console.warn('Profile listener:', err); });
 });
 
+// ── Render profile HTML ──────────────────────────────────────
 function _renderProfile(d) {
-    var name     = d.name;
-    var email    = d.email;
-    var role     = d.role;
+    var name     = d.name || 'User';
+    var email    = d.email || '';
+    var role     = d.role || _profileRole;
     var photoUrl = d.photoUrl;
 
     var parts    = name.trim().split(' ').filter(Boolean);
     var initials = parts.length >= 2
         ? (parts[0][0] + parts[1][0]).toUpperCase()
-        : parts[0][0].toUpperCase();
+        : (parts[0] ? parts[0][0].toUpperCase() : '?');
 
     var roleColors = { admin: '#E8001C', staff: '#003087', customer: '#38a169' };
     var roleLabels = { admin: 'Administrator', staff: 'Staff', customer: 'Customer' };
     var roleColor  = roleColors[role]  || '#718096';
     var roleLabel  = roleLabels[role]  || role;
 
-    window._profileUid      = firebase.auth().currentUser?.uid;
-    window._profileOrigName = name;
+    window._profileUid = firebase.auth().currentUser && firebase.auth().currentUser.uid;
 
-    var html = _buildProfileHTML({ name, email, role, photoUrl, initials, roleColor, roleLabel });
+    var avatarHtml = photoUrl
+        ? '<img src="' + _esc(photoUrl) + '" alt="avatar" style="width:100%;height:100%;object-fit:cover;">'
+        : initials;
 
-    var target = _profileRole === 'admin'
-        ? document.getElementById('profileContent')
-        : document.getElementById('profileContent2');
-    if (target) target.innerHTML = html;
-}
-
-// ── Build HTML ──────────────────────────────────────────────
-function _buildProfileHTML(p) {
-    var avatarHtml = p.photoUrl
-        ? '<img src="' + p.photoUrl + '" alt="avatar">'
-        : p.initials;
-
-    // Page header only for customer/staff (admin has it in admin-header)
     var pageHeader = (_profileRole !== 'admin')
-        ? '<div class="pf-page-header"><div>'
-        +   '<div class="pf-page-title">My Profile</div>'
-        +   '<div class="pf-page-sub">Manage your account information</div>'
-        + '</div></div>'
+        ? '<div class="pf-page-header"><div><div class="pf-page-title">My Profile</div><div class="pf-page-sub">Manage your account information</div></div></div>'
         : '';
 
-    return pageHeader
+    var html = pageHeader
         + '<div class="profile-grid">'
 
-        // ── Left: hero card ──
+        // Left hero card
         + '<div class="profile-hero-card">'
         +   '<div class="profile-hero-banner">'
         +     '<div class="profile-avatar-lg">' + avatarHtml + '</div>'
-        +     '<div class="profile-hero-name">' + _esc(p.name) + '</div>'
-        +     '<div class="profile-hero-role-badge"><span>' + _esc(p.roleLabel) + '</span></div>'
+        +     '<div class="profile-hero-name">' + _esc(name) + '</div>'
+        +     '<div class="profile-hero-role-badge"><span>' + _esc(roleLabel) + '</span></div>'
         +   '</div>'
         +   '<div class="profile-info-list">'
-        +     _infoRow('rgba(0,48,135,0.08)', '#003087',
-                '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
-                'Full Name', '<span id="pDisplayName">' + _esc(p.name) + '</span>')
-        +     _infoRow('rgba(56,161,105,0.08)', '#38a169',
-                '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
-                'Email', _esc(p.email))
-        +     _infoRow('rgba(113,128,150,0.08)', '#718096',
-                '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
-                'Role', '<span style="color:' + p.roleColor + ';font-weight:700;">' + _esc(p.roleLabel) + '</span>')
+        +     _infoRow('rgba(0,48,135,0.08)', '#003087', '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>', 'Full Name', '<span id="pDisplayName">' + _esc(name) + '</span>')
+        +     _infoRow('rgba(56,161,105,0.08)', '#38a169', '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>', 'Email', _esc(email))
+        +     _infoRow('rgba(113,128,150,0.08)', '#718096', '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>', 'Role', '<span style="color:' + roleColor + ';font-weight:700;">' + _esc(roleLabel) + '</span>')
         +   '</div>'
         + '</div>'
 
-        // ── Right: edit + security ──
+        // Right column
         + '<div class="profile-right">'
 
-        // Edit profile card
+        // Account info card
         +   '<div class="profile-section-card">'
         +     '<div class="profile-section-head">'
         +       '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#003087" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
@@ -293,9 +250,9 @@ function _buildProfileHTML(p) {
         +         '<span id="pEditBtnLabel">Edit</span>'
         +       '</button>'
         +     '</div>'
-        +     _infoEditTile('person', 'Full Name', 'pFieldName', _esc(p.name), false, false)
-        +     _infoEditTile('email', 'Email', 'pFieldEmail', _esc(p.email), false, false)
-        +     _infoEditTile('role', 'Role', 'pFieldRole', _esc(p.roleLabel), true, true)
+        +     _infoEditTile('person', 'Full Name', 'pFieldName', _esc(name), false, false)
+        +     _infoEditTile('email', 'Email', 'pFieldEmail', _esc(email), false, false)
+        +     _infoEditTile('role', 'Role', 'pFieldRole', _esc(roleLabel), true, true)
         +   '</div>'
 
         // Settings card
@@ -304,21 +261,20 @@ function _buildProfileHTML(p) {
         +       '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#718096" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
         +       '<span class="profile-section-head-title">Settings</span>'
         +     '</div>'
-        +     _settingsTile('rgba(113,128,150,0.1)', '#718096',
-                '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
-                'Change Password', 'Update your credentials', 'change_password.html', false)
+        +     _settingsTile('rgba(113,128,150,0.1)', '#718096', '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>', 'Change Password', 'Update your credentials', 'change_password.html')
         +     '<div class="pf-action-divider"></div>'
-        +     _settingsTile('rgba(0,48,135,0.1)', '#003087',
-                '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
-                'Notifications', 'Manage alerts', 'notifications.html', false)
+        +     _settingsTile('rgba(0,48,135,0.1)', '#003087', '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>', 'Notifications', 'Manage alerts', 'notifications.html')
         +     '<div class="pf-action-divider"></div>'
-        +     _settingsTile('rgba(0,48,135,0.1)', '#003087',
-                '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
-                'Help & Support', 'Get assistance', 'help_support.html', true)
+        +     _settingsTile('rgba(0,48,135,0.1)', '#003087', '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>', 'Help & Support', 'Get assistance', 'help_support.html')
         +   '</div>'
 
         + '</div>'  // .profile-right
         + '</div>'; // .profile-grid
+
+    var target = _profileRole === 'admin'
+        ? document.getElementById('profileContent')
+        : document.getElementById('profileContent2');
+    if (target) target.innerHTML = '<div class="pf-page-wrapper">' + html + '</div>';
 }
 
 function _infoRow(iconBg, iconColor, svgPath, label, valueHtml) {
@@ -326,10 +282,7 @@ function _infoRow(iconBg, iconColor, svgPath, label, valueHtml) {
         + '<div class="profile-info-icon" style="background:' + iconBg + ';">'
         +   '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="' + iconColor + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + svgPath + '</svg>'
         + '</div>'
-        + '<div>'
-        +   '<div class="profile-info-label">' + label + '</div>'
-        +   '<div class="profile-info-value">' + valueHtml + '</div>'
-        + '</div>'
+        + '<div><div class="profile-info-label">' + label + '</div><div class="profile-info-value">' + valueHtml + '</div></div>'
         + '</div>';
 }
 
@@ -339,11 +292,8 @@ function _infoEditTile(type, label, fieldId, value, isLast, readOnly) {
         email:  '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
         role:   '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
     };
-    var borderStyle = isLast ? 'border-bottom:none;' : '';
-    return '<div class="pf-info-tile" id="tile_' + fieldId + '" style="' + borderStyle + '">'
-        + '<div class="pf-info-tile-icon">'
-        +   '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8001C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + (icons[type] || '') + '</svg>'
-        + '</div>'
+    return '<div class="pf-info-tile" id="tile_' + fieldId + '" style="' + (isLast ? 'border-bottom:none;' : '') + '">'
+        + '<div class="pf-info-tile-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8001C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + (icons[type] || '') + '</svg></div>'
         + '<div style="flex:1;">'
         +   '<div class="pf-info-tile-label">' + label + '</div>'
         +   '<div class="pf-info-tile-value" id="view_' + fieldId + '">' + value + '</div>'
@@ -352,131 +302,102 @@ function _infoEditTile(type, label, fieldId, value, isLast, readOnly) {
         + '</div>';
 }
 
-function _settingsTile(iconBg, iconColor, svgPath, label, sub, href, isLast) {
-    return '<a class="pf-action-tile" href="' + href + '" style="' + (isLast ? '' : '') + '">'
+function _settingsTile(iconBg, iconColor, svgPath, label, sub, href) {
+    return '<a class="pf-action-tile" href="' + href + '">'
         + '<div class="pf-action-tile-icon" style="background:' + iconBg + ';">'
         +   '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="' + iconColor + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + svgPath + '</svg>'
         + '</div>'
-        + '<div class="pf-action-tile-text">'
-        +   '<div class="pf-action-tile-label">' + label + '</div>'
-        +   '<div class="pf-action-tile-sub">' + sub + '</div>'
-        + '</div>'
+        + '<div class="pf-action-tile-text"><div class="pf-action-tile-label">' + label + '</div><div class="pf-action-tile-sub">' + sub + '</div></div>'
         + '<svg class="pf-action-tile-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>'
         + '</a>';
 }
 
-// ── Edit mode toggle ────────────────────────────────────────
-var _pEditing = false;
-
-window.toggleEditMode = function () {
+// ── Edit mode ────────────────────────────────────────────────
+window.toggleEditMode = function() {
     if (_pEditing) {
         saveProfile();
     } else {
         _pEditing = true;
-        // Show input fields, hide view values
-        ['pFieldName', 'pFieldEmail'].forEach(function (id) {
-            var view  = document.getElementById('view_' + id);
+        ['pFieldName', 'pFieldEmail'].forEach(function(id) {
+            var view = document.getElementById('view_' + id);
             var input = document.getElementById(id);
-            if (view)  view.style.display  = 'none';
-            if (input) { input.style.display = 'block'; }
+            if (view) view.style.display = 'none';
+            if (input) input.style.display = 'block';
         });
-        var nameInput = document.getElementById('pFieldName');
-        if (nameInput) nameInput.focus();
-        // Update button to Save/Check
-        var lbl  = document.getElementById('pEditBtnLabel');
+        var ni = document.getElementById('pFieldName');
+        if (ni) ni.focus();
+        var lbl = document.getElementById('pEditBtnLabel');
         var icon = document.getElementById('pEditBtnIcon');
-        if (lbl)  lbl.textContent = 'Save';
-        if (icon) icon.innerHTML  = '<polyline points="20 6 9 17 4 12"/>';
+        if (lbl) lbl.textContent = 'Save';
+        if (icon) icon.innerHTML = '<polyline points="20 6 9 17 4 12"/>';
     }
 };
 
-// ── Save profile ────────────────────────────────────────────
-window.saveProfile = function () {
-    var uid       = window._profileUid;
-    var nameInput  = document.getElementById('pFieldName');
-    var emailInput = document.getElementById('pFieldEmail');
-    var name  = nameInput  ? nameInput.value.trim()  : '';
-    var email = emailInput ? emailInput.value.trim() : '';
+window.saveProfile = function() {
+    var uid = window._profileUid;
+    var nameEl  = document.getElementById('pFieldName');
+    var emailEl = document.getElementById('pFieldEmail');
+    var name  = nameEl  ? nameEl.value.trim()  : '';
+    var email = emailEl ? emailEl.value.trim() : '';
 
     if (!name)  { _showToast('Name cannot be empty.', 'error'); return; }
     if (!email) { _showToast('Email cannot be empty.', 'error'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        _showToast('Please enter a valid email.', 'error'); return;
-    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { _showToast('Invalid email.', 'error'); return; }
 
     var btn = document.getElementById('pEditToggleBtn');
-    if (btn) btn.disabled = true;
     var lbl = document.getElementById('pEditBtnLabel');
-    if (lbl) lbl.textContent = 'Saving…';
+    if (btn) btn.disabled = true;
+    if (lbl) lbl.textContent = 'Saving...';
 
     var user = firebase.auth().currentUser;
-
-    // Update Firestore first, then Firebase Auth email
     firebase.firestore().collection('users').doc(uid).update({ name: name, email: email })
-        .then(function () {
-            return user.updateEmail(email);
-        })
-        .then(function () {
-            var key  = _profileRole === 'admin' ? 'apUser' : _profileRole === 'staff' ? 'spUser' : 'cpUser';
-            var sess = JSON.parse(sessionStorage.getItem(key) || '{}');
-            sess.name  = name;
-            sess.email = email;
-            sessionStorage.setItem(key, JSON.stringify(sess));
+        .then(function() { return user.updateEmail(email); })
+        .then(function() {
+            var key = _profileRole === 'admin' ? 'apUser' : _profileRole === 'staff' ? 'spUser' : 'cpUser';
+            var s = JSON.parse(sessionStorage.getItem(key) || '{}');
+            s.name = name; s.email = email;
+            sessionStorage.setItem(key, JSON.stringify(s));
 
-            // Switch back to view mode
             _pEditing = false;
-            ['pFieldName', 'pFieldEmail'].forEach(function (id) {
-                var view  = document.getElementById('view_' + id);
+            ['pFieldName', 'pFieldEmail'].forEach(function(id) {
+                var view = document.getElementById('view_' + id);
                 var input = document.getElementById(id);
-                if (view)  { view.textContent = id === 'pFieldName' ? name : email; view.style.display = 'block'; }
+                if (view) { view.textContent = id === 'pFieldName' ? name : email; view.style.display = 'block'; }
                 if (input) input.style.display = 'none';
             });
 
-            // Update left card display name
             var dn = document.getElementById('pDisplayName');
             if (dn) dn.textContent = name;
-            window._profileOrigName = name;
 
-            // Sync avatar initials and dropdown name in the header immediately
-            var parts    = name.trim().split(' ').filter(Boolean);
-            var initials = parts.length >= 2
-                ? (parts[0][0] + parts[1][0]).toUpperCase()
-                : parts[0].slice(0, 2).toUpperCase();
-            var avatarEl = document.getElementById('adminHeaderAvatar');
-            var nameEl   = document.getElementById('adminAvatarName');
-            if (avatarEl) avatarEl.textContent = initials;
-            if (nameEl)   nameEl.textContent   = name;
+            var parts = name.trim().split(' ').filter(Boolean);
+            var ini = parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : parts[0].slice(0, 2).toUpperCase();
+            var av = document.getElementById('adminHeaderAvatar');
+            var nm = document.getElementById('adminAvatarName');
+            if (av) av.textContent = ini;
+            if (nm) nm.textContent = name;
 
-            // Reset button
             if (lbl) lbl.textContent = 'Edit';
             var icon = document.getElementById('pEditBtnIcon');
             if (icon) icon.innerHTML = '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>';
-
             _showToast('Profile updated successfully!', 'success');
         })
-        .catch(function (err) {
-            var msg = err.code === 'auth/requires-recent-login'
-                ? 'Please log out and log back in before changing your email.'
-                : err.code === 'auth/email-already-in-use'
-                ? 'That email is already in use by another account.'
-                : 'Error: ' + err.message;
+        .catch(function(err) {
+            var msg = err.code === 'auth/requires-recent-login' ? 'Please log out and log back in before changing your email.'
+                    : err.code === 'auth/email-already-in-use' ? 'That email is already in use.'
+                    : 'Error: ' + err.message;
             _showToast(msg, 'error');
         })
-        .finally(function () {
-            if (btn) btn.disabled = false;
-        });
+        .finally(function() { if (btn) btn.disabled = false; });
 };
 
-// ── Logout ──────────────────────────────────────────────────
-window.profileLogout = function () {
+window.profileLogout = function() {
     if (!confirm('Are you sure you want to logout?')) return;
     sessionStorage.removeItem('apUser');
     sessionStorage.removeItem('spUser');
     sessionStorage.removeItem('cpUser');
-    firebase.auth().signOut().finally(function () { window.location.href = 'login.html'; });
+    firebase.auth().signOut().finally(function() { window.location.replace('/login.html'); });
 };
 
-// ── Helpers ─────────────────────────────────────────────────
 function _esc(str) {
     return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -487,7 +408,7 @@ function _showToast(msg, type) {
     t.textContent = msg;
     t.className = 'toast-visible toast-' + (type || 'success');
     clearTimeout(window._toastTimer);
-    window._toastTimer = setTimeout(function () { t.className = ''; }, 3000);
+    window._toastTimer = setTimeout(function() { t.className = ''; }, 3000);
 }
 </script>
 </body>

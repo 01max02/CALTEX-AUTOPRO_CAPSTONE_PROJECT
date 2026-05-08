@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 import smtplib
 import os
@@ -27,7 +28,11 @@ if not firebase_admin._apps:
         print('   Place serviceAccountKey.json next to caltexautopro.py to enable Auth deletion.')
 
 app = Flask(__name__)
+app.config['JSON_AS_ASCII'] = False
 app.secret_key = 'your-secret-key-change-this-in-production'
+app.jinja_env.auto_reload = True
+import jinja2
+app.jinja_loader = jinja2.FileSystemLoader(app.template_folder, encoding='utf-8')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
 # ── Email config (Gmail SMTP) ────────────────────────────────

@@ -170,9 +170,11 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                   };
                 }).toList();
 
-            final maint = vehicles.where((v) => v['status'] == 'Under Maintenance').length;
-            final overdue = vehicles.where((v) => v['status'] == 'Overdue').length;
-            final dueSoon = vehicles.where((v) => v['status'] == 'PMS Due Soon').length;
+            final maint     = vehicles.where((v) => v['status'] == 'Under Maintenance').length;
+            final overdue   = vehicles.where((v) => v['status'] == 'Overdue').length;
+            final dueWeek   = vehicles.where((v) => v['status'] == 'Due This Week').length;
+            final dueSoon   = vehicles.where((v) => v['status'] == 'Due Soon').length;
+            final active    = vehicles.where((v) => v['status'] == 'On Track' || v['status'] == 'Scheduled').length;
 
             // Update nav icon based on fleet type (only once when vehicles first load)
             if (!_iconComputed && vehicles.isNotEmpty) {
@@ -188,10 +190,12 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                   physics: const NeverScrollableScrollPhysics(),
                   crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.4,
                   children: [
-                    _miniStat('Total Vehicles', '${vehicles.length}', _fleetIcon(vehicles), _red),
-                    _miniStat('Maintenance', '$maint', Icons.build_outlined, Colors.orange),
-                    _miniStat('PMS Overdue', '$overdue', Icons.warning_amber_outlined, Colors.red),
-                    _miniStat('Due Soon', '$dueSoon', Icons.schedule_outlined, Colors.amber),
+                    _miniStat('Total Vehicles',  '${vehicles.length}', _fleetIcon(vehicles),           _red),
+                    _miniStat('Active',           '$active',            Icons.check_circle_outline,     Colors.green),
+                    _miniStat('Maintenance',      '$maint',             Icons.build_outlined,           Colors.orange),
+                    _miniStat('PMS Overdue',      '$overdue',           Icons.warning_amber_outlined,   Colors.red),
+                    _miniStat('Due This Week',    '$dueWeek',           Icons.event_available_outlined, const Color(0xFFdd6b20)),
+                    _miniStat('Due Soon',         '$dueSoon',           Icons.schedule_outlined,        Colors.amber),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -256,17 +260,17 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
   }
 
   Widget _vehicleCard(Map<String, String> v) {
-    final status = v['status'] ?? 'Active';
-    final statusColor = status == 'Active' ? Colors.green
-        : status == 'Under Maintenance' ? Colors.orange
-        : status == 'Overdue' ? Colors.red
-        : status == 'PMS Due Soon' ? Colors.amber.shade700
-        : Colors.grey;
-    final statusLabel = status == 'Active' ? 'Active'
-        : status == 'Under Maintenance' ? 'Under Maintenance'
-        : status == 'Overdue' ? 'PMS Overdue'
-        : status == 'PMS Due Soon' ? 'Due Soon'
-        : status;
+    final status = v['status'] ?? 'On Track';
+    final statusColor = status == 'Overdue'           ? _red
+        : status == 'Due This Week'                   ? const Color(0xFFdd6b20)
+        : status == 'Due Soon'                        ? Colors.orange
+        : status == 'Under Maintenance'               ? Colors.orange
+        : Colors.green; // On Track + Scheduled → Active
+    final statusLabel = status == 'Overdue'           ? 'Overdue'
+        : status == 'Due This Week'                   ? 'Due This Week'
+        : status == 'Due Soon'                        ? 'Due Soon'
+        : status == 'Under Maintenance'               ? 'Under Maintenance'
+        : 'Active'; // On Track + Scheduled
 
     return GestureDetector(
       onTap: () => _showVehicleHistory(v),
@@ -333,12 +337,12 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
   }
 
   void _showVehicleHistory(Map<String, String> v) {
-    final status = v['status'] ?? 'Active';
-    final statusColor = status == 'Active' ? Colors.green
-        : status == 'Under Maintenance' ? Colors.orange
-        : status == 'Overdue' ? Colors.red
-        : status == 'PMS Due Soon' ? Colors.amber.shade700
-        : Colors.grey;
+    final status = v['status'] ?? 'On Track';
+    final statusColor = status == 'Overdue'           ? _red
+        : status == 'Due This Week'                   ? const Color(0xFFdd6b20)
+        : status == 'Due Soon'                        ? Colors.orange
+        : status == 'Under Maintenance'               ? Colors.orange
+        : Colors.green; // On Track + Scheduled → Active
 
     // Compute next PMS
     String nextPms = '—';
@@ -364,11 +368,17 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
     } else if (daysUntil == null) {
       statusLabel = status;
     } else if (daysUntil < 0) {
-      statusLabel = 'Overdue (${daysUntil.abs()} day${daysUntil.abs() != 1 ? 's' : ''} ago)';
+      statusLabel = 'Overdue ${(-daysUntil)} day${(-daysUntil) != 1 ? 's' : ''}';
     } else if (daysUntil == 0) {
       statusLabel = 'Due Today';
+    } else if (daysUntil <= 7) {
+      statusLabel = 'Due in $daysUntil day${daysUntil != 1 ? 's' : ''} (This Week)';
+    } else if (daysUntil <= 14) {
+      statusLabel = 'Due in $daysUntil days (Due Soon)';
+    } else if (daysUntil <= 30) {
+      statusLabel = 'Due in $daysUntil days (Scheduled)';
     } else {
-      statusLabel = '$status ($daysUntil day${daysUntil != 1 ? 's' : ''} remaining)';
+      statusLabel = 'Due in $daysUntil days (On Track)';
     }
 
     showModalBottomSheet(
@@ -489,20 +499,23 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
 
   Widget _divider() => const Divider(height: 1, indent: 62, endIndent: 12);
 
-  // ── STATUS COMPUTATION ──
+  // ── STATUS COMPUTATION — mirrors admin_dss.dart PMS Scheduling ──
+  // Overdue < 0, Due This Week ≤ 7, Due Soon ≤ 14, Scheduled ≤ 30, On Track > 30
   String _computeStatus(String lastSvcDate, String svcFreq) {
-    if (lastSvcDate.isEmpty || svcFreq.isEmpty) return 'Active';
+    if (lastSvcDate.isEmpty || svcFreq.isEmpty) return 'On Track';
     final date = DateTime.tryParse(lastSvcDate);
     final months = int.tryParse(svcFreq);
-    if (date == null || months == null) return 'Active';
+    if (date == null || months == null) return 'On Track';
     final nextPms = DateTime(date.year, date.month + months, date.day);
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final nextMidnight = DateTime(nextPms.year, nextPms.month, nextPms.day);
     final daysUntil = nextMidnight.difference(today).inDays;
-    if (daysUntil < 0) return 'Overdue';
-    if (daysUntil <= 30) return 'PMS Due Soon';
-    return 'Active';
+    if (daysUntil < 0)   return 'Overdue';
+    if (daysUntil <= 7)  return 'Due This Week';
+    if (daysUntil <= 14) return 'Due Soon';
+    if (daysUntil <= 30) return 'Scheduled';
+    return 'On Track';
   }
 
   Future<void> _refreshVehicleStatuses(List<QueryDocumentSnapshot> docs, String userName) async {

@@ -125,28 +125,41 @@
     if (v.status === 'Under Maintenance') return 'Under Maintenance';
     const lastSvc = v.lastSvcDate || '';
     const freq = parseInt(v.svcFreq) || 0;
-    if (!lastSvc || !freq) return v.status || 'Active';
+    if (!lastSvc || !freq) return 'On Track';
     const date = new Date(lastSvc);
-    if (isNaN(date)) return v.status || 'Active';
+    if (isNaN(date)) return 'On Track';
     const next = new Date(date);
     next.setMonth(next.getMonth() + freq);
-    // Strip both dates to local midnight for consistent day-level comparison
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const nextMidnight = new Date(next.getFullYear(), next.getMonth(), next.getDate());
     const days = Math.round((nextMidnight - today) / 86400000);
-    if (days < 0) return 'Overdue';
-    if (days <= 30) return 'PMS Due Soon';
-    return 'Active';
+    if (days < 0)   return 'Overdue';
+    if (days <= 7)  return 'Due This Week';
+    if (days <= 14) return 'Due Soon';
+    if (days <= 30) return 'Scheduled';
+    return 'On Track';
   }
 
   function updateStats() {
     const statuses = _vehicles.map(v => computeStatus(v));
     document.getElementById('cuTotalVehicles').textContent = _vehicles.length;
     document.getElementById('cuTotalVehiclesIcon').innerHTML = fleetIconSvg(_vehicles, 20);
-    document.getElementById('cuMaintenance').textContent = statuses.filter(s => s === 'Under Maintenance').length;
-    document.getElementById('cuOverdue').textContent = statuses.filter(s => s === 'Overdue').length;
-    document.getElementById('cuDueSoon').textContent = statuses.filter(s => s === 'PMS Due Soon').length;
+    document.getElementById('cuActive').textContent       = statuses.filter(s => s === 'On Track' || s === 'Scheduled').length;
+    document.getElementById('cuMaintenance').textContent  = statuses.filter(s => s === 'Under Maintenance').length;
+    document.getElementById('cuOverdue').textContent      = statuses.filter(s => s === 'Overdue').length;
+    document.getElementById('cuDueThisWeek').textContent  = statuses.filter(s => s === 'Due This Week').length;
+    document.getElementById('cuDueSoon').textContent      = statuses.filter(s => s === 'Due Soon').length;
+  }
+
+  function statusStyle(status) {
+    switch (status) {
+      case 'Overdue':           return { color: '#E8001C',  bg: 'rgba(232,0,28,0.08)',   label: 'Overdue' };
+      case 'Due This Week':     return { color: '#dd6b20',  bg: 'rgba(221,107,32,0.08)', label: 'Due This Week' };
+      case 'Due Soon':          return { color: '#d97706',  bg: 'rgba(217,119,6,0.08)',  label: 'Due Soon' };
+      case 'Under Maintenance': return { color: '#ea580c',  bg: 'rgba(234,88,12,0.08)',  label: 'Under Maintenance' };
+      default:                  return { color: '#16a34a',  bg: 'rgba(22,163,74,0.08)',  label: 'Active' }; // On Track + Scheduled
+    }
   }
 
   function renderVehicles() {
@@ -158,17 +171,7 @@
 
     el.innerHTML = `<div class="cu-vehicles-grid">${_vehicles.map(v => {
       const status = computeStatus(v);
-      const statusColor = status === 'Active' ? '#16a34a'
-        : status === 'Under Maintenance' ? '#ea580c'
-        : status === 'Overdue' ? '#E8001C'
-        : status === 'PMS Due Soon' ? '#d97706'
-        : '#718096';
-      const statusBg = status === 'Active' ? 'rgba(22,163,74,0.08)'
-        : status === 'Under Maintenance' ? 'rgba(234,88,12,0.08)'
-        : status === 'Overdue' ? 'rgba(232,0,28,0.08)'
-        : status === 'PMS Due Soon' ? 'rgba(217,119,6,0.08)'
-        : 'rgba(113,128,150,0.08)';
-      const statusLabel = status === 'PMS Due Soon' ? 'Due Soon' : status;
+      const { color, bg, label } = statusStyle(status);
 
       return `
         <div class="cu-vehicle-card" onclick="cuShowVehicle('${v.id}')">
@@ -180,7 +183,7 @@
               <div class="cu-vehicle-plate">${v.plate || '—'}</div>
               <div class="cu-vehicle-desc">${v.desc || '—'}</div>
             </div>
-            <span class="cu-vehicle-status-badge" style="background:${statusBg};color:${statusColor};">${statusLabel}</span>
+            <span class="cu-vehicle-status-badge" style="background:${bg};color:${color};">${label}</span>
           </div>
           <div class="cu-vehicle-card-body">
             <div class="cu-vehicle-meta-row">
@@ -208,16 +211,7 @@
     if (!v) return;
 
     const status = computeStatus(v);
-    const statusColor = status === 'Active' ? '#16a34a'
-      : status === 'Under Maintenance' ? '#ea580c'
-      : status === 'Overdue' ? '#E8001C'
-      : status === 'PMS Due Soon' ? '#d97706'
-      : '#718096';
-    const statusBg = status === 'Active' ? 'rgba(22,163,74,0.08)'
-      : status === 'Under Maintenance' ? 'rgba(234,88,12,0.08)'
-      : status === 'Overdue' ? 'rgba(232,0,28,0.08)'
-      : status === 'PMS Due Soon' ? 'rgba(217,119,6,0.08)'
-      : 'rgba(113,128,150,0.08)';
+    const { color, bg } = statusStyle(status);
 
     // Compute next PMS
     let nextPms = '—';
@@ -229,7 +223,6 @@
         const next = new Date(date);
         next.setMonth(next.getMonth() + months);
         nextPms = next.toISOString().split('T')[0];
-        // Strip both dates to local midnight for consistent day-level comparison
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const nextMidnight = new Date(next.getFullYear(), next.getMonth(), next.getDate());
@@ -238,10 +231,15 @@
     }
 
     let statusLabel = status;
-    if (daysUntil !== null && status !== 'Under Maintenance') {
-      if (daysUntil < 0) statusLabel = `Overdue (${Math.abs(daysUntil)} days ago)`;
+    if (status === 'Under Maintenance') {
+      statusLabel = 'Under Maintenance';
+    } else if (daysUntil !== null) {
+      if (daysUntil < 0)       statusLabel = `Overdue ${Math.abs(daysUntil)} day${Math.abs(daysUntil) !== 1 ? 's' : ''}`;
       else if (daysUntil === 0) statusLabel = 'Due Today';
-      else statusLabel = `${status} (${daysUntil} days remaining)`;
+      else if (daysUntil <= 7)  statusLabel = `Due in ${daysUntil} day${daysUntil !== 1 ? 's' : ''} (This Week)`;
+      else if (daysUntil <= 14) statusLabel = `Due in ${daysUntil} days (Due Soon)`;
+      else if (daysUntil <= 30) statusLabel = `Due in ${daysUntil} days (Scheduled)`;
+      else                      statusLabel = `Due in ${daysUntil} days (On Track)`;
     }
 
     document.getElementById('cuModalPlate').textContent = v.plate || '—';
@@ -251,8 +249,8 @@
     document.getElementById('cuModalDetails').innerHTML = `
       ${detailRow('#718096', 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 5v5l3 3', 'Odometer', v.odo ? v.odo + ' km' : '—')}
       ${detailRow('#2b6cb0', 'M3 4h18v18H3zM16 2v4M8 2v4M3 10h18', 'Last Service', v.lastSvcDate || '—')}
-      ${detailRow(statusColor, 'M8 6l4-4 4 4M8 18l4 4 4-4M4 12h16', 'Next PMS Due', nextPms)}
-      ${detailRow(statusColor, 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'Status', `<span style="background:${statusBg};color:${statusColor};padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:700;">${statusLabel}</span>`)}
+      ${detailRow(color, 'M8 6l4-4 4 4M8 18l4 4 4-4M4 12h16', 'Next PMS Due', nextPms)}
+      ${detailRow(color, 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'Status', `<span style="background:${bg};color:${color};padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:700;">${statusLabel}</span>`)}
     `;
 
     document.getElementById('cuVehicleModal').classList.add('active');
