@@ -780,26 +780,26 @@ function dssAnalyzePMS() {
             priorityLabel = 'OVERDUE';
             priorityColor = '#e53e3e';
             statusKey = 'overdue';
-        } else if (daysUntil !== null && daysUntil <= 7) {
+        } else if (daysUntil !== null && daysUntil === 0) {
             urgency = 2;
+            priorityLabel = 'DUE TODAY';
+            priorityColor = '#c05621';
+            statusKey = 'due-today';
+        } else if (daysUntil !== null && daysUntil <= 7) {
+            urgency = 3;
             priorityLabel = 'DUE THIS WEEK';
             priorityColor = '#dd6b20';
             statusKey = 'this-week';
         } else if (daysUntil !== null && daysUntil <= 14) {
-            urgency = 3;
+            urgency = 4;
             priorityLabel = 'DUE SOON';
             priorityColor = '#d69e2e';
             statusKey = 'due-soon';
-        } else if (daysUntil !== null && daysUntil <= 30) {
-            urgency = 4;
-            priorityLabel = 'SCHEDULED';
-            priorityColor = '#3182ce';
-            statusKey = 'scheduled';
         } else {
-            urgency = 5;
-            priorityLabel = 'ON TRACK';
+            urgency = 4;
+            priorityLabel = 'ACTIVE';
             priorityColor = '#38a169';
-            statusKey = 'on-track';
+            statusKey = 'active';
         }
 
         // Recommendation text
@@ -808,12 +808,12 @@ function dssAnalyzePMS() {
             recommendation = 'Currently under maintenance — monitor progress';
         } else if (isOverdue) {
             recommendation = 'Schedule PMS immediately — overdue by ' + Math.abs(daysUntil) + ' day(s)';
+        } else if (daysUntil !== null && daysUntil === 0) {
+            recommendation = 'PMS is due today — schedule immediately';
         } else if (daysUntil !== null && daysUntil <= 7) {
             recommendation = 'Schedule PMS within this week';
         } else if (daysUntil !== null && daysUntil <= 14) {
             recommendation = 'Plan PMS within 2 weeks';
-        } else if (daysUntil !== null && daysUntil <= 30) {
-            recommendation = 'PMS scheduled — prepare parts & mechanic';
         } else {
             recommendation = 'No action needed — next PMS on schedule';
         }
@@ -847,22 +847,22 @@ function renderDSSPMSKpis() {
     var d = _dssPmsData;
 
     var overdue   = d.filter(function (x) { return x.statusKey === 'overdue'; }).length;
+    var dueToday  = d.filter(function (x) { return x.statusKey === 'due-today'; }).length;
     var thisWeek  = d.filter(function (x) { return x.statusKey === 'this-week'; }).length;
     var dueSoon   = d.filter(function (x) { return x.statusKey === 'due-soon'; }).length;
-    var scheduled = d.filter(function (x) { return x.statusKey === 'scheduled'; }).length;
-    var onTrack   = d.filter(function (x) { return x.statusKey === 'on-track'; }).length;
+    var active    = d.filter(function (x) { return x.statusKey === 'active'; }).length;
 
     el.innerHTML = [
-        { svg: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
-          label: 'Due This Week', val: thisWeek, color: '#dd6b20', bg: 'rgba(221,107,32,0.10)' },
         { svg: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
           label: 'Overdue PMS', val: overdue, color: '#e53e3e', bg: 'rgba(229,62,62,0.10)' },
         { svg: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+          label: 'Due Today', val: dueToday, color: '#c05621', bg: 'rgba(192,86,33,0.10)' },
+        { svg: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+          label: 'Due This Week', val: thisWeek, color: '#dd6b20', bg: 'rgba(221,107,32,0.10)' },
+        { svg: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
           label: 'Due Soon', val: dueSoon, color: '#b7791f', bg: 'rgba(183,121,31,0.10)' },
-        { svg: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 14 11 16 15 12"/>',
-          label: 'Scheduled', val: scheduled, color: '#003087', bg: 'rgba(0,48,135,0.10)' },
         { svg: '<polyline points="20 6 9 17 4 12"/>',
-          label: 'On Track', val: onTrack, color: '#276749', bg: 'rgba(39,103,73,0.10)' },
+          label: 'Active', val: active, color: '#276749', bg: 'rgba(39,103,73,0.10)' },
     ].map(function (k) {
         return '<div class="stat-card">'
             + '<div class="stat-icon" style="background:' + k.bg + ';color:' + k.color + ';">'
@@ -1005,7 +1005,7 @@ window.dssPMSSetFilter = function (filter, btn) {
 window.dssPMSApplySearch = function () { renderDSSPMSTable(); };
 
 window.dssPMSPrintReport = function () {
-    var rows = _dssPmsData.filter(function (x) { return x.urgency <= 3; });
+    var rows = _dssPmsData.filter(function (x) { return x.urgency <= 4; });
     if (rows.length === 0) { alert('All assets are on schedule. No immediate PMS action needed.'); return; }
 
     var html = '<html><head><title>Preventive Maintenance Schedule Report</title>'

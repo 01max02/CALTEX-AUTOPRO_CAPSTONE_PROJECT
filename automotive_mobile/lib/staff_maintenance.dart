@@ -138,6 +138,7 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
               'status': data['status'] as String? ?? 'Pending',
               'svcRows': data['svcRows'],
               'matRows': data['matRows'],
+              'issues': data['issues'],
             };
           }).toList();
 
@@ -294,6 +295,25 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
                     ),
                   ]),
                   const SizedBox(height: 16),
+                  // ── Issues Tags ──
+                  if ((s['issues'] as List?)?.isNotEmpty == true) ...[
+                    const Text('Vehicle Issues Reported', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4a5568))),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: (s['issues'] as List).map<Widget>((issue) => Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF5F5),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFFED7D7), width: 1.5),
+                        ),
+                        child: Text(issue.toString(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFE8001C))),
+                      )).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   if ((s['svcRows'] as List?)?.isNotEmpty == true) ...[
                     const Text('Services Rendered', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4a5568))),
                     const SizedBox(height: 8),
@@ -493,6 +513,17 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
     final dateCtrl = TextEditingController(text: service?['date'] as String? ?? '');
     Map<String, dynamic>? foundVehicle = isEdit ? _vehicleMap[service!['plate']] : null;
 
+    // ── Issue tags ──
+    const presetIssues = [
+      'Engine Problem', 'Brake Issue', 'Tire/Wheel', 'Battery', 'Overheating',
+      'Oil Leak', 'Transmission', 'Suspension', 'Electrical', 'AC/Cooling',
+      'Exhaust', 'Steering', 'Fuel System', 'Body Damage', 'Lights/Signals',
+    ];
+    final selectedIssues = List<String>.from(
+      (service?['issues'] as List<dynamic>?)?.map((e) => e.toString()) ?? [],
+    );
+    final customIssueCtrl = TextEditingController();
+
     List<Map<String, TextEditingController>> makeRows(List<dynamic>? saved) {
       if (saved != null && saved.isNotEmpty) {
         return saved.map<Map<String, TextEditingController>>((r) => {
@@ -654,6 +685,82 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    // ── Vehicle Issues ──
+                    const Text('Vehicle Issues', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF4a5568))),
+                    const SizedBox(height: 4),
+                    Text('Select all that apply', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        ...presetIssues.map((issue) {
+                          final sel = selectedIssues.contains(issue);
+                          return GestureDetector(
+                            onTap: () => setModal(() {
+                              if (sel) selectedIssues.remove(issue);
+                              else selectedIssues.add(issue);
+                            }),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: sel ? _red : Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: sel ? _red : const Color(0xFFe2e8f0), width: 1.5),
+                              ),
+                              child: Text(issue, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: sel ? Colors.white : const Color(0xFF4a5568))),
+                            ),
+                          );
+                        }),
+                        // Custom issues not in preset
+                        ...selectedIssues.where((i) => !presetIssues.contains(i)).map((issue) =>
+                          GestureDetector(
+                            onTap: () => setModal(() => selectedIssues.remove(issue)),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(color: _red, borderRadius: BorderRadius.circular(20), border: Border.all(color: _red, width: 1.5)),
+                              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                Text(issue, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.close, size: 12, color: Colors.white),
+                              ]),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      Expanded(child: TextField(
+                        controller: customIssueCtrl,
+                        decoration: const InputDecoration(
+                          hintText: 'Add custom issue...',
+                          hintStyle: TextStyle(fontSize: 12),
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          isDense: true,
+                        ),
+                        onSubmitted: (v) {
+                          final val = v.trim();
+                          if (val.isNotEmpty && !selectedIssues.contains(val)) {
+                            setModal(() { selectedIssues.add(val); customIssueCtrl.clear(); });
+                          }
+                        },
+                      )),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () {
+                          final val = customIssueCtrl.text.trim();
+                          if (val.isNotEmpty && !selectedIssues.contains(val)) {
+                            setModal(() { selectedIssues.add(val); customIssueCtrl.clear(); });
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12)),
+                        child: const Text('+ Add', style: TextStyle(fontSize: 12)),
+                      ),
+                    ]),
+                    const SizedBox(height: 16),
                     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                       const Text('Services Rendered', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF4a5568))),
                       TextButton.icon(
@@ -713,6 +820,7 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
                             'date': dateCtrl.text.trim(),
                             'cost': '₱${totalCost().toStringAsFixed(2)}',
                             'status': isEdit ? service!['status'] as String : 'Pending',
+                            'issues': selectedIssues,
                             'svcRows': svcRows.map((r) => {'name': r['name']!.text, 'qty': r['qty']!.text, 'uom': r['uom']!.text, 'cost': r['cost']!.text}).toList(),
                             'matRows': matRows.map((r) => {'name': r['name']!.text, 'qty': r['qty']!.text, 'uom': r['uom']!.text, 'cost': r['cost']!.text}).toList(),
                           };

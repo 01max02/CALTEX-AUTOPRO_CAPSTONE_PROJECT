@@ -271,6 +271,26 @@ class _AdminDSSState extends State<AdminDSS> {
               type: 'warning',
             );
           }
+        } else if (daysUntil == 0) {
+          final targets = await filterByPref(adminIds, 'pmsDueThisWeek');
+          await db.collection('notifications').add({
+            'title': '🔔 PMS Due Today',
+            'message': '$plate is due for maintenance today.',
+            'type': 'warning',
+            'targetRole': 'admin',
+            'targetUid': '',
+            'createdAt': FieldValue.serverTimestamp(),
+            'readBy': <String, bool>{},
+            'isRead': false,
+          });
+          if (targets.isNotEmpty) {
+            await _sendViaOneSignal(
+              userIds: targets,
+              title: '🔔 PMS Due Today',
+              message: '$plate is due for maintenance today.',
+              type: 'warning',
+            );
+          }
         } else if (daysUntil <= 7) {
           final targets = await filterByPref(adminIds, 'pmsDueThisWeek');
           await db.collection('notifications').add({
@@ -336,6 +356,26 @@ class _AdminDSSState extends State<AdminDSS> {
                 userIds: targets,
                 title: '🚨 Your PMS is Overdue',
                 message: 'Your $plate is ${(-daysUntil)} day(s) overdue for maintenance.',
+                type: 'warning',
+              );
+            }
+          } else if (daysUntil == 0) {
+            final targets = await filterByPref([ownerId], 'pmsDueThisWeek');
+            await db.collection('notifications').add({
+              'title': '🔔 Your PMS is Due Today',
+              'message': 'Your $plate is due for maintenance today.',
+              'type': 'warning',
+              'targetRole': '',
+              'targetUid': ownerId,
+              'createdAt': FieldValue.serverTimestamp(),
+              'readBy': <String, bool>{},
+              'isRead': false,
+            });
+            if (targets.isNotEmpty) {
+              await _sendViaOneSignal(
+                userIds: targets,
+                title: '🔔 Your PMS is Due Today',
+                message: 'Your $plate is due for maintenance today.',
                 type: 'warning',
               );
             }
@@ -1052,8 +1092,12 @@ class _AdminDSSState extends State<AdminDSS> {
                   final isEven = e.key % 2 == 0;
                   final priorityColor = a['priority'] == 'Overdue'
                     ? const PdfColor.fromInt(0xFFE8001C)
-                    : a['priority'] == 'Due Soon'
+                    : a['priority'] == 'Due Today'
+                      ? const PdfColor.fromInt(0xFFc05621)
+                    : a['priority'] == 'Due This Week'
                       ? const PdfColor.fromInt(0xFFdd6b20)
+                    : a['priority'] == 'Due Soon'
+                      ? const PdfColor.fromInt(0xFFb7791f)
                       : const PdfColor.fromInt(0xFF276749);
                   return pw.TableRow(
                     decoration: pw.BoxDecoration(
@@ -1210,7 +1254,7 @@ class _AdminDSSState extends State<AdminDSS> {
           final months = int.tryParse(svcFreq);
 
           String due = '—';
-          String priority = 'On Track';
+          String priority = 'Active';
           String nextPMS = '—';
           String lastService = lastSvcDate.isNotEmpty ? lastSvcDate : '—';
 
@@ -1224,18 +1268,18 @@ class _AdminDSSState extends State<AdminDSS> {
             if (daysUntil < 0) {
               due = 'Overdue ${(-daysUntil)} day(s)';
               priority = 'Overdue';
+            } else if (daysUntil == 0) {
+              due = 'Due today';
+              priority = 'Due Today';
             } else if (daysUntil <= 7) {
               due = 'Due in $daysUntil day(s)';
               priority = 'Due This Week';
             } else if (daysUntil <= 14) {
               due = 'Due in $daysUntil days';
               priority = 'Due Soon';
-            } else if (daysUntil <= 30) {
-              due = 'Due in $daysUntil days';
-              priority = 'Scheduled';
             } else {
               due = 'Due in $daysUntil days';
-              priority = 'On Track';
+              priority = 'Active';
             }
           }
 
@@ -1249,7 +1293,7 @@ class _AdminDSSState extends State<AdminDSS> {
           };
         }).toList()
           ..sort((a, b) {
-            const order = {'Overdue': 0, 'Due This Week': 1, 'Due Soon': 2, 'Scheduled': 3, 'On Track': 4};
+            const order = {'Overdue': 0, 'Due Today': 1, 'Due This Week': 2, 'Due Soon': 3, 'Active': 4};
             return (order[a['priority']] ?? 5).compareTo(order[b['priority']] ?? 5);
           });
 
@@ -1260,27 +1304,23 @@ class _AdminDSSState extends State<AdminDSS> {
   }
 
   Widget _buildPMSDSSContent(List<Map<String, String>> assets) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final dueThisWeek = assets.where((a) => a['priority'] == 'Due This Week').length;
-
     return Column(children: [
       Container(
         color: Colors.white,
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
         child: Column(children: [
           Row(children: [
-            _kpiChip('Due This Week', '$dueThisWeek', Colors.orange, Icons.calendar_today_outlined),
-            const SizedBox(width: 8),
             _kpiChip('Overdue', '${assets.where((a) => a['priority'] == 'Overdue').length}', _red, Icons.error_outline),
+            const SizedBox(width: 8),
+            _kpiChip('Due Today', '${assets.where((a) => a['priority'] == 'Due Today').length}', const Color(0xFFc05621), Icons.schedule_outlined),
           ]),
           const SizedBox(height: 8),
           Row(children: [
-            _kpiChip('Due Soon', '${assets.where((a) => a['priority'] == 'Due Soon').length}', Colors.orange, Icons.schedule_outlined),
+            _kpiChip('Due This Week', '${assets.where((a) => a['priority'] == 'Due This Week').length}', const Color(0xFFdd6b20), Icons.calendar_today_outlined),
             const SizedBox(width: 8),
-            _kpiChip('Scheduled', '${assets.where((a) => a['priority'] == 'Scheduled').length}', _blue, Icons.event_outlined),
+            _kpiChip('Due Soon', '${assets.where((a) => a['priority'] == 'Due Soon').length}', const Color(0xFFb7791f), Icons.event_outlined),
             const SizedBox(width: 8),
-            _kpiChip('On Track', '${assets.where((a) => a['priority'] == 'On Track').length}', Colors.green, Icons.check_circle_outline),
+            _kpiChip('Active', '${assets.where((a) => a['priority'] == 'Active').length}', const Color(0xFF276749), Icons.check_circle_outline),
           ]),
         ]),
       ),
@@ -1292,10 +1332,10 @@ class _AdminDSSState extends State<AdminDSS> {
           itemBuilder: (_, i) {
             final a = assets[i];
             final color = a['priority'] == 'Overdue' ? _red
+                : a['priority'] == 'Due Today' ? const Color(0xFFc05621)
                 : a['priority'] == 'Due This Week' ? const Color(0xFFdd6b20)
-                : a['priority'] == 'Due Soon' ? Colors.orange
-                : a['priority'] == 'Scheduled' ? _blue
-                : Colors.green;
+                : a['priority'] == 'Due Soon' ? const Color(0xFFb7791f)
+                : const Color(0xFF276749); // Active
             return GestureDetector(
               onTap: () => _showPMSDetails(a),
               child: Container(
@@ -1342,10 +1382,10 @@ class _AdminDSSState extends State<AdminDSS> {
 
   void _showPMSDetails(Map<String, String> a) {
     final color = a['priority'] == 'Overdue' ? _red
+        : a['priority'] == 'Due Today' ? const Color(0xFFc05621)
         : a['priority'] == 'Due This Week' ? const Color(0xFFdd6b20)
-        : a['priority'] == 'Due Soon' ? Colors.orange
-        : a['priority'] == 'Scheduled' ? _blue
-        : Colors.green;
+        : a['priority'] == 'Due Soon' ? const Color(0xFFb7791f)
+        : const Color(0xFF276749); // Active
     showModalBottomSheet(
       context: context, isScrollControlled: true,
       backgroundColor: Colors.white,

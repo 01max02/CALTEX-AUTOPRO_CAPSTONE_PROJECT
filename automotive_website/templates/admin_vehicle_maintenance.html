@@ -97,6 +97,11 @@
         <div style="padding:1.25rem 1.5rem;overflow-y:auto;flex:1;background:#f8fafc;display:flex;flex-direction:column;gap:0.75rem;">
             <!-- Info rows -->
             <div style="background:white;border-radius:14px;padding:1rem 1.25rem;border:1px solid #e2e8f0;" id="svcDetailRows"></div>
+            <!-- Issues Tags -->
+            <div id="svcDetailIssuesSection" style="display:none;">
+                <div style="font-size:0.75rem;font-weight:700;color:#4a5568;text-transform:uppercase;margin-bottom:0.5rem;letter-spacing:0.05em;">Vehicle Issues Reported</div>
+                <div id="svcDetailIssueTiles" style="display:flex;flex-wrap:wrap;gap:0.4rem;"></div>
+            </div>
             <!-- Services Rendered -->
             <div id="svcDetailSvcSection" style="display:none;">
                 <div style="font-size:0.75rem;font-weight:700;color:#4a5568;text-transform:uppercase;margin-bottom:0.5rem;letter-spacing:0.05em;">Services Rendered</div>
@@ -156,6 +161,18 @@
             <div class="form-group" style="margin:0;">
                 <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Date Serviced *</label>
                 <input type="date" id="svcDate" style="margin-top:0.3rem;">
+            </div>
+            <!-- Vehicle Issues -->
+            <div>
+                <label style="font-size:0.78rem;font-weight:600;color:#4a5568;display:block;margin-bottom:0.4rem;">Vehicle Issues <span style="font-weight:400;color:#a0aec0;">(select all that apply)</span></label>
+                <div id="svcIssueTiles" style="display:flex;flex-wrap:wrap;gap:0.4rem;"></div>
+                <div style="margin-top:0.5rem;display:flex;gap:0.4rem;align-items:center;">
+                    <input type="text" id="svcIssueCustomInput" placeholder="Add custom issue..." autocomplete="off"
+                        style="flex:1;padding:0.45rem 0.75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.82rem;"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();svcAddCustomIssue();}">
+                    <button type="button" onclick="svcAddCustomIssue()"
+                        style="padding:0.45rem 0.85rem;background:#E31E24;color:white;border:none;border-radius:8px;font-size:0.82rem;font-weight:600;cursor:pointer;">+ Add</button>
+                </div>
             </div>
             <!-- Services Rendered -->
             <div>
@@ -220,6 +237,62 @@ var _svcEditingId = null;
 var _svcServiceItems = [];
 var _svcMaterialItems = [];
 var _svcVehicles = [];
+
+// ── Vehicle Issue Tags ──────────────────────────────────────
+var _SVC_PRESET_ISSUES = [
+  'Engine Problem','Brake Issue','Tire/Wheel','Battery','Overheating',
+  'Oil Leak','Transmission','Suspension','Electrical','AC/Cooling',
+  'Exhaust','Steering','Fuel System','Body Damage','Lights/Signals',
+];
+var _svcSelectedIssues = [];
+
+function svcRenderIssueTiles() {
+  var container = document.getElementById('svcIssueTiles');
+  if (!container) return;
+  // Preset tiles
+  var html = _SVC_PRESET_ISSUES.map(function(issue) {
+    var sel = _svcSelectedIssues.indexOf(issue) !== -1;
+    return '<button type="button" onclick="svcToggleIssue(\'' + issue.replace(/'/g,"\\'") + '\',this)"'
+      + ' style="padding:0.3rem 0.75rem;border-radius:20px;font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.15s;'
+      + (sel
+        ? 'background:#E31E24;color:white;border:1.5px solid #E31E24;'
+        : 'background:white;color:#4a5568;border:1.5px solid #e2e8f0;')
+      + '">' + issue + '</button>';
+  }).join('');
+  // Custom issues (not in preset)
+  _svcSelectedIssues.filter(function(i){ return _SVC_PRESET_ISSUES.indexOf(i) === -1; }).forEach(function(issue) {
+    html += '<button type="button" onclick="svcToggleIssue(\'' + issue.replace(/'/g,"\\'") + '\',this)"'
+      + ' style="padding:0.3rem 0.75rem;border-radius:20px;font-size:0.78rem;font-weight:600;cursor:pointer;background:#E31E24;color:white;border:1.5px solid #E31E24;">'
+      + issue + ' ✕</button>';
+  });
+  container.innerHTML = html;
+}
+
+function svcToggleIssue(issue, btn) {
+  var idx = _svcSelectedIssues.indexOf(issue);
+  if (idx === -1) {
+    _svcSelectedIssues.push(issue);
+    btn.style.background = '#E31E24'; btn.style.color = 'white'; btn.style.borderColor = '#E31E24';
+  } else {
+    _svcSelectedIssues.splice(idx, 1);
+    // If custom, remove tile entirely; if preset, just deselect
+    if (_SVC_PRESET_ISSUES.indexOf(issue) === -1) {
+      svcRenderIssueTiles(); return;
+    }
+    btn.style.background = 'white'; btn.style.color = '#4a5568'; btn.style.borderColor = '#e2e8f0';
+  }
+}
+
+function svcAddCustomIssue() {
+  var input = document.getElementById('svcIssueCustomInput');
+  var val = (input.value || '').trim();
+  if (!val) return;
+  if (_svcSelectedIssues.indexOf(val) === -1) {
+    _svcSelectedIssues.push(val);
+    svcRenderIssueTiles();
+  }
+  input.value = '';
+}
 
 // Pull latest data from Firebase globals — called on demand so timing doesn't matter
 function _svcRefreshData() {
@@ -555,6 +628,8 @@ function svcOpenAddModal() {
   document.getElementById('svcSvcRows').innerHTML = '';
   document.getElementById('svcMatRows').innerHTML = '';
   document.getElementById('svcTotalDisplay').textContent = '₱0.00';
+  _svcSelectedIssues = [];
+  svcRenderIssueTiles();
   svcAddSvcRow(); svcAddMatRow();
   document.getElementById('svcAddModal').classList.add('active');
   }); // _svcEnsureVehiclesThen
@@ -603,6 +678,19 @@ window._svcViewDetails = function(docId) {
         + '<span style="font-size:0.85rem;font-weight:600;color:#1a202c;flex:1;">' + r[1] + '</span>'
         + '</div>';
     }).join('');
+
+    // Issues Tags
+    var issuesSec = document.getElementById('svcDetailIssuesSection');
+    var issuesTiles = document.getElementById('svcDetailIssueTiles');
+    var issues = (s.issues || []).filter(function(i){ return i; });
+    if (issues.length > 0) {
+      issuesSec.style.display = 'block';
+      issuesTiles.innerHTML = issues.map(function(tag) {
+        return '<span style="display:inline-block;padding:0.3rem 0.75rem;border-radius:20px;font-size:0.78rem;font-weight:600;background:#fff5f5;color:#E31E24;border:1.5px solid #fed7d7;">' + tag + '</span>';
+      }).join('');
+    } else {
+      issuesSec.style.display = 'none';
+    }
 
     // Services Rendered (svcRows)
     var svcSec = document.getElementById('svcDetailSvcSection');
@@ -774,6 +862,7 @@ function svcSave() {
     cost: '₱' + total.toLocaleString('en-PH', {minimumFractionDigits:2}),
     svcRows: svcRows,
     matRows: matRows,
+    issues: _svcSelectedIssues.slice(),
   };
 
   var db = firebase.firestore();

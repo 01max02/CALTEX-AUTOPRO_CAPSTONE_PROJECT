@@ -655,6 +655,9 @@ function editService(docId) {
         if (!s.svcRows || !s.svcRows.length) svcAddSvcRow();
         (s.matRows || []).forEach(function(r){ svcAddMatRow(r.name, r.qty, r.uom, r.cost); });
         if (!s.matRows || !s.matRows.length) svcAddMatRow();
+        // Load saved issues
+        window._svcSelectedIssues = (s.issues || []).slice();
+        if (typeof svcRenderIssueTiles === 'function') svcRenderIssueTiles();
         svcCalcTotal();
         document.getElementById('svcAddModal').classList.add('active');
     });
