@@ -464,6 +464,10 @@ def admin_smart_reports():
 def admin_domains():
     return render_template('admin_domain_management.html')
 
+@app.route('/print_layout.html')
+def print_layout():
+    return render_template('print_layout.html')
+
 @app.route('/admin_sidebar.html')
 def admin_sidebar():
     return render_template('admin_sidebar.html')

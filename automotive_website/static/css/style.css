@@ -616,6 +616,8 @@ body {
     transition: all 0.2s ease;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    text-align: center;
     gap: 0.4rem;
 }
 
@@ -623,6 +625,8 @@ body {
     background: #edf2f7;
     border-color: #cbd5e0;
 }
+
+
 
 .btn-success {
     background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);

@@ -136,7 +136,7 @@
                         <svg style="position:absolute;left:0.65rem;pointer-events:none;color:#a0aec0;" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                         <input type="text" class="search-bar" placeholder="Search transactions..." id="txnSearch" style="width:220px;padding-left:2rem;" oninput="renderInventoryTransactions()">
                     </div>
-                    <button class="btn-icon btn-secondary" onclick="window.print()" style="display:flex;align-items:center;gap:0.3rem;">
+                    <button class="btn-icon btn-secondary" onclick="printTransactions()" style="display:flex;align-items:center;gap:0.3rem;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                         Print
                     </button>
@@ -146,7 +146,10 @@
                         <svg style="position:absolute;left:0.65rem;pointer-events:none;color:#a0aec0;" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                         <input type="text" class="search-bar" placeholder="Search items..." id="issuanceSearch" style="width:220px;padding-left:2rem;" oninput="renderIssuancesList()">
                     </div>
-                    <button class="btn-icon btn-secondary" onclick="window.print()" style="display:flex;align-items:center;gap:0.3rem;">
+                    <select id="issuanceMonthFilter" class="search-bar" style="width:160px;cursor:pointer;" onchange="renderIssuancesList()">
+                        <option value="">All Months</option>
+                    </select>
+                    <button class="btn-icon btn-secondary" onclick="printIssuances()" style="display:flex;align-items:center;gap:0.3rem;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                         Print
                     </button>
@@ -450,7 +453,7 @@
                     </div>
                 </div>
                 <div style="display: flex; gap: 1rem; margin-top: 2rem;">
-                    <button type="button" class="btn-secondary" style="flex: 1;" onclick="closeModal('addIssuanceModal')">Cancel</button>
+                    <button type="button" class="btn-secondary" style="flex: 1;display:flex;align-items:center;justify-content:center;" onclick="closeModal('addIssuanceModal')">Cancel</button>
                     <button type="submit" class="btn-primary" style="flex: 1;">Save Issuance</button>
                 </div>
             </form>
@@ -1070,6 +1073,288 @@
           });
         }
       })();
+    </script>
+
+    <!-- Print functions for Transactions and Issuances -->
+    <script>
+      // ── Shared print engine — CSS @media print overlay, zero navigation ──
+      function _doPrint(title, summary, columns, rows) {
+        var now = new Date();
+        var dateStr = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        var timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+        // Build summary HTML — removed from print layout
+        var summaryHtml = '';
+
+        // Build table rows
+        var theadHtml = (columns||[]).map(function(c) { return '<th>' + c + '</th>'; }).join('');
+        var tbodyHtml = (rows||[]).map(function(row, idx) {
+          return '<tr class="' + (idx%2===1?'even':'') + '">'
+            + row.map(function(cell){ return '<td>' + cell + '</td>'; }).join('')
+            + '</tr>';
+        }).join('');
+
+        // Build the full print content div
+        var printDiv = document.createElement('div');
+        printDiv.id = '_apPrintContent';
+        printDiv.innerHTML =
+          // ── Clean White Header ──
+          '<div class="ap-header">'
+          +   '<div class="ap-header-inner">'
+          +     '<div class="ap-header-left">'
+          +       '<img src="/static/img/LOGO_CALTEX.png" class="ap-logo" alt="Caltex">'
+          +       '<div class="ap-brand-block">'
+          +         '<div class="ap-brand">Caltex <span>Auto</span>Pro</div>'
+          +         '<div class="ap-brand-sub">Fleet Management System</div>'
+          +       '</div>'
+          +     '</div>'
+          +     '<div class="ap-header-right">'
+          +       '<div class="ap-report-label">Official Report</div>'
+          +       '<div class="ap-report-title">' + title + '</div>'
+          +       '<div class="ap-report-meta">Generated on <strong>' + dateStr + '</strong> at ' + timeStr + '</div>'
+          +     '</div>'
+          +   '</div>'
+          +   '<div class="ap-header-rule"></div>'
+          +   '<div class="ap-strip">'
+          +     '<span class="ap-strip-item"><strong>JA Noble Enterprise INC</strong></span>'
+          +     '<span class="ap-strip-sep">|</span>'
+          +     '<span class="ap-strip-item">caltexautopro2026@gmail.com</span>'
+          +     '<span class="ap-strip-sep">|</span>'
+          +     '<span class="ap-strip-item"><strong>' + rows.length + '</strong> records</span>'
+          +   '</div>'
+          + '</div>'
+          // Content
+          + '<div class="ap-content">'
+          +   '<div class="ap-table-wrap"><table><thead><tr>' + theadHtml + '</tr></thead><tbody>' + tbodyHtml + '</tbody></table></div>'
+          + '</div>';
+
+        // Inject print styles
+        var styleEl = document.createElement('style');
+        styleEl.id = '_apPrintStyle';
+        styleEl.textContent = [
+          '@media print {',
+          '  body > *:not(#_apPrintContent) { display: none !important; }',
+          '  #_apPrintContent { display: block !important; }',
+          '  @page { margin: 8mm; }',
+          '}',
+          '* { box-sizing: border-box; margin: 0; padding: 0; }',
+          '#_apPrintContent {',
+          '  display: none;',
+          '  font-family: "Segoe UI", Arial, sans-serif;',
+          '  font-size: 10px;',
+          '  color: #1a202c;',
+          '  background: white;',
+          '  width: 100%;',
+          '  -webkit-print-color-adjust: exact !important;',
+          '  print-color-adjust: exact !important;',
+          '}',
+          /* ── Header — clean white, no background color ── */
+          '.ap-header { background: white; margin-bottom: 0; }',
+          '.ap-header-inner {',
+          '  display: flex; align-items: center; justify-content: space-between;',
+          '  padding: 14px 0 12px;',
+          '}',
+          '.ap-header-left { display: flex; align-items: center; gap: 12px; }',
+          '.ap-logo { width: 44px; height: 44px; object-fit: contain; flex-shrink: 0; }',
+          '.ap-brand-block {}',
+          '.ap-brand { font-size: 18px; font-weight: 900; color: #1a202c !important; letter-spacing: -0.3px; line-height: 1; }',
+          '.ap-brand span { color: #E8001C !important; }',
+          '.ap-brand-sub { font-size: 7px; color: #718096 !important; font-weight: 600; letter-spacing: 1.8px; text-transform: uppercase; margin-top: 3px; }',
+          '.ap-header-right { text-align: right; }',
+          '.ap-report-label { font-size: 7px; color: #a0aec0 !important; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 2px; }',
+          '.ap-report-title { font-size: 16px; font-weight: 800; color: #1a202c !important; line-height: 1.2; }',
+          '.ap-report-meta { font-size: 8px; color: #718096 !important; margin-top: 3px; }',
+          '.ap-report-meta strong { color: #1a202c !important; }',
+          '.ap-header-rule {',
+          '  height: 2px;',
+          '  background: #E8001C !important;',
+          '  -webkit-print-color-adjust: exact !important;',
+          '  print-color-adjust: exact !important;',
+          '  margin-bottom: 0;',
+          '}',
+          '.ap-strip {',
+          '  display: flex; align-items: center;',
+          '  padding: 5px 0;',
+          '  border-bottom: 1px solid #e2e8f0;',
+          '  margin-bottom: 14px;',
+          '}',
+          '.ap-strip-item { font-size: 8px; color: #718096 !important; }',
+          '.ap-strip-item strong { color: #1a202c !important; font-weight: 700; }',
+          '.ap-strip-sep { margin: 0 10px; color: #cbd5e0 !important; font-size: 10px; }',
+          /* ── Content ── */
+          '.ap-content { padding: 14px 20px 0; }',
+          '.ap-chips { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }',
+          '.ap-chip {',
+          '  background: #f7f8fa !important;',
+          '  -webkit-print-color-adjust: exact !important;',
+          '  print-color-adjust: exact !important;',
+          '  border: 1.5px solid #e2e8f0;',
+          '  border-radius: 8px; padding: 8px 14px; min-width: 95px;',
+          '}',
+          '.ap-chip-val { font-size: 19px; font-weight: 900; line-height: 1; }',
+          '.ap-chip-label { font-size: 8px; color: #718096 !important; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; margin-top: 3px; }',
+          /* ── Table ── */
+          '.ap-table-wrap { border-radius: 6px; overflow: hidden; border: 1.5px solid #e2e8f0; width: 100%; }',
+          'table { width: 100%; border-collapse: collapse; font-size: 8.5px; table-layout: fixed; }',
+          'thead tr {',
+          '  background: #1a202c !important;',
+          '  -webkit-print-color-adjust: exact !important;',
+          '  print-color-adjust: exact !important;',
+          '}',
+          'thead th {',
+          '  padding: 8px 7px; text-align: left;',
+          '  font-size: 7px; font-weight: 700;',
+          '  color: rgba(255,255,255,0.92) !important;',
+          '  text-transform: uppercase; letter-spacing: 0.4px;',
+          '  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;',
+          '}',
+          'tbody tr { border-bottom: 1px solid #f0f4f8; }',
+          'tbody tr.even {',
+          '  background: #f8fafc !important;',
+          '  -webkit-print-color-adjust: exact !important;',
+          '  print-color-adjust: exact !important;',
+          '}',
+          'tbody td { padding: 5px 7px; vertical-align: middle; color: #2d3748 !important; line-height: 1.3; font-size: 8.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
+          '.badge { display: inline-block; padding: 2px 7px; border-radius: 20px; font-size: 8px; font-weight: 700; }',
+          '.badge-in {',
+          '  background: #ebf8ff !important; color: #003087 !important;',
+          '  border: 1px solid #bee3f8;',
+          '  -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;',
+          '}',
+          '.badge-out {',
+          '  background: #fff5f5 !important; color: #E8001C !important;',
+          '  border: 1px solid #fed7d7;',
+          '  -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;',
+          '}',
+          /* ── Footer ── */
+          '.ap-footer {',
+          '  margin-top: 16px; padding-top: 10px;',
+          '  border-top: 1.5px solid #e2e8f0;',
+          '  display: flex; justify-content: space-between; align-items: center;',
+          '  font-size: 8.5px; color: #a0aec0 !important;',
+          '}',
+          '.ap-footer-brand { display: flex; align-items: center; gap: 6px; font-weight: 600; }',
+          '.ap-dot {',
+          '  width: 5px; height: 5px; border-radius: 50%;',
+          '  background: #E8001C !important;',
+          '  -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;',
+          '  display: inline-block;',
+          '}',
+        ].join('\n');
+
+        document.head.appendChild(styleEl);
+        document.body.appendChild(printDiv);
+
+        // Print then clean up
+        setTimeout(function() {
+          window.print();
+          setTimeout(function() {
+            var s = document.getElementById('_apPrintStyle');
+            var d = document.getElementById('_apPrintContent');
+            if (s) s.remove();
+            if (d) d.remove();
+          }, 500);
+        }, 100);
+      }
+
+      function printTransactions() {
+        var txns = (window._fbTransactions || []).map(function(t) {
+          return {
+            date: t.date || '',
+            item: t.item || t.name || '—',
+            description: (t.desc || t.description || '—')
+              .replace(/for maintenance SVC-\d+\s*[—\-]\s*/gi, 'for ')
+              .replace(/for maintenance SVC-\d+/gi, '')
+              .replace(/\s*SVC-\d+\s*/gi, '')
+              .trim() || '—',
+            type: (t.type || 'IN').toUpperCase(),
+            qty: t.qty || t.quantity || 0,
+            by: t.by || t.performedBy || '—'
+          };
+        });
+        var q = ((document.getElementById('txnSearch') || {}).value || '').trim().toLowerCase();
+        if (q) txns = txns.filter(function(t) { return (t.item + t.description + t.by).toLowerCase().includes(q); });
+
+        var inCount  = txns.filter(function(t){ return t.type === 'IN'; }).length;
+        var outCount = txns.filter(function(t){ return t.type === 'OUT'; }).length;
+
+        var rows = txns.map(function(t) {
+          var isIn = t.type === 'IN';
+          var badge = '<span class="badge badge-' + (isIn ? 'in' : 'out') + '">' + t.type + '</span>';
+          return [t.date || '—', '<strong>' + t.item + '</strong>', t.description, badge, t.qty, t.by];
+        });
+
+        _doPrint('Inventory Transactions',
+          [{ label:'Total', value:txns.length, color:'#1a202c' }, { label:'Stock In', value:inCount, color:'#003087' }, { label:'Stock Out', value:outCount, color:'#E8001C' }],
+          ['Date', 'Item', 'Description', 'Type', 'Qty', 'Performed By'],
+          rows
+        );
+      }
+
+      function printIssuances() {
+        // Use mapped issuances (already parsed by admin_firebase.js)
+        var issuances = window.issuances || window._fbIssuances || [];
+
+        // Apply month filter
+        var selectedMonth = ((document.getElementById('issuanceMonthFilter') || {}).value || '').trim();
+        var afterMonth = selectedMonth ? issuances.filter(function(i) {
+          if (!i.date) return false;
+          var parts = i.date.split(' ');
+          return parts.length >= 3 && (parts[0] + ' ' + parts[2]) === selectedMonth;
+        }) : issuances;
+
+        // Apply search filter
+        var q = ((document.getElementById('issuanceSearch') || {}).value || '').trim().toLowerCase();
+        var filtered = q ? afterMonth.filter(function(i) {
+          return (i.assetNum||i.plate||'').toLowerCase().includes(q)
+              || (i.itemNum||'').toLowerCase().includes(q)
+              || (i.itemName||'').toLowerCase().includes(q)
+              || (i.itemType||'').toLowerCase().includes(q)
+              || (i.commodityGroup||'').toLowerCase().includes(q)
+              || (i.date||'').toLowerCase().includes(q);
+        }) : afterMonth;
+
+        var svcCount = filtered.filter(function(i){ return (i.itemType||'') === 'Service'; }).length;
+        var matCount = filtered.filter(function(i){ return (i.itemType||'') !== 'Service'; }).length;
+
+        var reportTitle = selectedMonth ? 'Issuances — ' + selectedMonth : 'Issuances';
+
+        var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        function fmtDate(d) {
+          if (!d) return '—';
+          var parts = d.split(' ');
+          if (parts.length >= 3) return d;
+          var dt = new Date(d);
+          if (!isNaN(dt)) return MONTHS[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear();
+          return d;
+        }
+
+        var rows = filtered.map(function(i) {
+          var qty      = parseFloat(i.quantity || i.qty || 0) || 0;
+          var uc       = parseFloat(String(i.unitCost || i.unit_cost || 0).replace(/[₱,]/g,'')) || 0;
+          var subtotal = parseFloat(String(i.subtotal || 0).replace(/[₱,]/g,'')) || (qty * uc);
+          var plate    = i.plate || i.assetNum || i.assetDesc || '—';
+
+          return [
+            fmtDate(i.date),
+            plate,
+            i.itemNum  || '—',
+            i.itemName || '—',
+            i.itemType || '—',
+            i.commodityGroup || '—',
+            i.uom || i.unit || '—',
+            qty > 0 ? qty : '—',
+            uc > 0 ? '₱' + uc.toLocaleString('en-PH',{minimumFractionDigits:2}) : '—',
+            subtotal > 0 ? '₱' + subtotal.toLocaleString('en-PH',{minimumFractionDigits:2}) : '—'
+          ];
+        });
+
+        _doPrint(reportTitle,
+          [{ label:'Total', value:filtered.length, color:'#1a202c' }, { label:'Services', value:svcCount, color:'#003087' }, { label:'Materials', value:matCount, color:'#E8001C' }],
+          ['Date', 'Plate No.', 'Item No.', 'Description', 'Type', 'Group', 'UOM', 'Qty', 'Unit Cost', 'Subtotal'],
+          rows
+        );
+      }
     </script>
 
     <!-- PMS Calendar floating widget (inlined) -->

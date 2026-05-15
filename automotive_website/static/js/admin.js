@@ -831,7 +831,12 @@ function dssAnalyzePMS() {
             recommendation: recommendation,
             serviceCount: assetSvcs.length + (asset.maintenanceHistory ? asset.maintenanceHistory.length : 0)
         };
-    }).sort(function (a, b) { return a.urgency - b.urgency; });
+    }).sort(function (a, b) {
+        // Sort by latest last service date first (most recently serviced at top)
+        var dateA = a.asset.lastServiceDate ? new Date(a.asset.lastServiceDate).getTime() : 0;
+        var dateB = b.asset.lastServiceDate ? new Date(b.asset.lastServiceDate).getTime() : 0;
+        return dateB - dateA;
+    });
 }
 
 window.renderDSSPMS = function () {

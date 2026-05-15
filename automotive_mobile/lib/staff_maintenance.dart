@@ -24,6 +24,7 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
   Map<String, Map<String, dynamic>> _itemMasterMap = {};
   List<String> _serviceItems = [];
   bool _lookupLoaded = false;
+  String _currentUserName = '';
 
   @override
   void initState() {
@@ -32,6 +33,7 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
   }
 
   Future<void> _loadLookups() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     final vSnap = await FirebaseFirestore.instance.collection('vehicles').get();
     final iSnap = await FirebaseFirestore.instance.collection('item_master').get();
     if (!mounted) return;
@@ -46,6 +48,11 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
     _serviceItems = _itemMasterMap.entries
         .where((e) => e.value['type'] == 'Service')
         .map((e) => e.key).toList()..sort();
+    // Fetch logged-in staff name
+    if (uid != null) {
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      _currentUserName = (userDoc.data()?['name'] as String?) ?? '';
+    }
     setState(() => _lookupLoaded = true);
   }
 
@@ -284,7 +291,7 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _detailRow('Plate Number', s['plate'] as String),
                   _detailRow('Mechanic', s['mechanic'] as String),
-                  _detailRow('Date Serviced', s['date'] as String),
+                  _detailRow('Service Date', s['date'] as String),
                   _detailRow('Total Cost', _formatCost(s['cost'] as String)),
                   Row(children: [
                     const SizedBox(width: 130, child: Text('Status', style: TextStyle(fontSize: 12, color: Color(0xFF718096), fontWeight: FontWeight.w500))),
@@ -509,8 +516,10 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
   void _showAddServiceModal({Map<String, dynamic>? service}) async {
     final isEdit = service != null;
     final plateCtrl = TextEditingController(text: service?['plate'] as String? ?? '');
-    final mechanicCtrl = TextEditingController(text: service?['mechanic'] as String? ?? '');
-    final dateCtrl = TextEditingController(text: service?['date'] as String? ?? '');
+    final mechanicCtrl = TextEditingController(text: service?['mechanic'] as String? ?? (isEdit ? '' : _currentUserName));
+    final dateCtrl = TextEditingController(
+      text: service?['date'] as String? ?? '${_monthName(DateTime.now().month)} ${DateTime.now().day}, ${DateTime.now().year}',
+    );
     Map<String, dynamic>? foundVehicle = isEdit ? _vehicleMap[service!['plate']] : null;
 
     // ── Issue tags ──
@@ -665,7 +674,7 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
                     TextField(
                       controller: dateCtrl, readOnly: true,
                       decoration: InputDecoration(
-                        labelText: 'Date Serviced *', border: const OutlineInputBorder(), hintText: 'Select date',
+                        labelText: 'Service Date *', border: const OutlineInputBorder(), hintText: 'Select date',
                         suffixIcon: IconButton(
                           icon: const Icon(Icons.calendar_today_outlined, color: Color(0xFF718096)),
                           onPressed: () async {
@@ -911,112 +920,179 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
   }
 
   Widget _matRow(Map<String, TextEditingController> row, VoidCallback onRemove, StateSetter setModal, BuildContext ctx) {
-    final scanCtrl = TextEditingController();
     row.putIfAbsent('maxStock', () => TextEditingController(text: '99999'));
+    row.putIfAbsent('searchText', () => TextEditingController());
 
-    void lookup(String query) async {
-      final q = query.trim().toLowerCase();
-      if (q.isEmpty) return;
-      for (final entry in _itemMasterMap.entries) {
-        final d = entry.value;
-        if (entry.key.toLowerCase().contains(q) || d['barcode'] == query.trim() || d['qr'] == query.trim()) {
-          row['name']!.text = entry.key;
-          row['uom']!.text = d['uom'] as String? ?? '';
-          row['cost']!.text = (d['cost'] as String? ?? '0').replaceAll('₱', '').replaceAll(',', '').trim();
-          if (row['qty']!.text.isEmpty) row['qty']!.text = '1';
-          // Fetch available stock
-          final stockSnap = await FirebaseFirestore.instance
-              .collection('stock_inventory').where('name', isEqualTo: entry.key).limit(1).get();
-          final available = stockSnap.docs.isNotEmpty
-              ? (stockSnap.docs.first['stock'] as num?)?.toInt() ?? 99999
-              : 99999;
-          row['maxStock']!.text = '$available';
-          final currentQty = int.tryParse(row['qty']!.text) ?? 1;
-          if (currentQty > available) row['qty']!.text = '$available';
-          setModal(() {}); return;
-        }
-      }
-      row['name']!.text = ''; row['uom']!.text = ''; row['cost']!.text = '';
-      row['maxStock']!.text = '99999';
+    // Material names from item master (type == Material)
+    final materialNames = _itemMasterMap.entries
+        .where((e) => (e.value['type'] as String? ?? '').toLowerCase() == 'material')
+        .map((e) => e.key)
+        .toList()..sort();
+
+    Future<void> applyMaterial(String name) async {
+      final d = _itemMasterMap[name];
+      if (d == null) return;
+      row['name']!.text = name;
+      row['searchText']!.text = name;
+      row['uom']!.text = d['uom'] as String? ?? '';
+      row['cost']!.text = (d['cost'] as String? ?? '0').replaceAll('₱', '').replaceAll(',', '').trim();
+      if (row['qty']!.text.isEmpty) row['qty']!.text = '1';
+      final stockSnap = await FirebaseFirestore.instance
+          .collection('stock_inventory').where('name', isEqualTo: name).limit(1).get();
+      final available = stockSnap.docs.isNotEmpty
+          ? (stockSnap.docs.first['stock'] as num?)?.toInt() ?? 99999
+          : 99999;
+      row['maxStock']!.text = '$available';
+      final currentQty = int.tryParse(row['qty']!.text) ?? 1;
+      if (currentQty > available) row['qty']!.text = '$available';
       setModal(() {});
     }
 
     final maxStock = int.tryParse(row['maxStock']!.text) ?? 99999;
+    final isSelected = row['name']!.text.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Expanded(child: TextField(
-            controller: scanCtrl,
-            decoration: InputDecoration(
-              hintText: 'Scan or type item name / barcode...',
-              hintStyle: const TextStyle(fontSize: 11),
-              border: const OutlineInputBorder(),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              isDense: true,
-              suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
-                IconButton(icon: const Icon(Icons.search, size: 18, color: Color(0xFF718096)), padding: EdgeInsets.zero, onPressed: () => lookup(scanCtrl.text)),
-                IconButton(
-                  icon: const Icon(Icons.qr_code_scanner, size: 18, color: Color(0xFF003087)),
-                  padding: EdgeInsets.zero,
-                  onPressed: () async {
-                    final result = await Navigator.push<String>(ctx, MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()));
-                    if (result != null) { scanCtrl.text = result; lookup(result); }
+          Expanded(
+            child: isSelected
+              ? Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFe2e8f0)),
+                  ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      const Icon(Icons.inventory_2_outlined, size: 16, color: Color(0xFF003087)),
+                      const SizedBox(width: 6),
+                      Expanded(child: Text(row['name']!.text, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+                      GestureDetector(
+                        onTap: () {
+                          row['name']!.text = '';
+                          row['searchText']!.text = '';
+                          row['uom']!.text = '';
+                          row['cost']!.text = '';
+                          row['maxStock']!.text = '99999';
+                          setModal(() {});
+                        },
+                        child: const Icon(Icons.close, size: 14, color: Color(0xFF718096)),
+                      ),
+                    ]),
+                    const SizedBox(height: 4),
+                    Text('UOM: ${row['uom']!.text}  •  Unit Cost: ₱${row['cost']!.text}',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+                    if (maxStock < 99999) ...[
+                      const SizedBox(height: 4),
+                      Text('Available stock: $maxStock',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                          color: maxStock == 0 ? Colors.red : maxStock <= 5 ? Colors.orange : Colors.green)),
+                    ],
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: row['qty'],
+                      keyboardType: TextInputType.number,
+                      enabled: maxStock > 0,
+                      onChanged: (v) {
+                        final entered = int.tryParse(v) ?? 0;
+                        if (maxStock < 99999 && entered > maxStock) {
+                          row['qty']!.text = '$maxStock';
+                          row['qty']!.selection = TextSelection.collapsed(offset: '$maxStock'.length);
+                        }
+                        setModal(() {});
+                      },
+                      decoration: InputDecoration(
+                        labelText: maxStock == 99999 ? 'Quantity *' : 'Quantity * (max $maxStock)',
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        isDense: true,
+                        errorText: maxStock == 0 ? 'Out of stock' : null,
+                      ),
+                    ),
+                  ]),
+                )
+              : RawAutocomplete<String>(
+                  textEditingController: row['searchText']!,
+                  focusNode: FocusNode(),
+                  optionsBuilder: (value) {
+                    final q = value.text.trim().toLowerCase();
+                    if (q.isEmpty) return materialNames;
+                    return materialNames.where((n) => n.toLowerCase().contains(q));
                   },
+                  onSelected: (name) => applyMaterial(name),
+                  fieldViewBuilder: (ctx2, ctrl, focusNode, onSubmit) => TextField(
+                    controller: ctrl,
+                    focusNode: focusNode,
+                    decoration: InputDecoration(
+                      hintText: 'Search material name...',
+                      hintStyle: const TextStyle(fontSize: 11),
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                      isDense: true,
+                      prefixIcon: const Icon(Icons.search, size: 18, color: Color(0xFF718096)),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.qr_code_scanner, size: 18, color: Color(0xFF003087)),
+                        padding: EdgeInsets.zero,
+                        onPressed: () async {
+                          final result = await Navigator.push<String>(ctx,
+                            MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()));
+                          if (result != null) {
+                            final match = _itemMasterMap.entries.firstWhere(
+                              (e) => e.value['barcode'] == result || e.value['qr'] == result,
+                              orElse: () => MapEntry('', {}),
+                            );
+                            if (match.key.isNotEmpty) applyMaterial(match.key);
+                          }
+                        },
+                      ),
+                    ),
+                    onSubmitted: (v) {
+                      final q = v.trim().toLowerCase();
+                      final match = materialNames.firstWhere(
+                        (n) => n.toLowerCase() == q, orElse: () => '');
+                      if (match.isNotEmpty) applyMaterial(match);
+                    },
+                  ),
+                  optionsViewBuilder: (ctx2, onSelected, options) => Align(
+                    alignment: Alignment.topLeft,
+                    child: Material(
+                      elevation: 6,
+                      borderRadius: BorderRadius.circular(10),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 200),
+                        child: ListView.separated(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: options.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (_, i) {
+                            final name = options.elementAt(i);
+                            final d = _itemMasterMap[name];
+                            return ListTile(
+                              dense: true,
+                              leading: const Icon(Icons.inventory_2_outlined, size: 16, color: Color(0xFF003087)),
+                              title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                              subtitle: d != null
+                                ? Text('${d['uom'] ?? ''}  •  ₱${(d['cost'] as String? ?? '0').replaceAll('₱', '').replaceAll(',', '').trim()}',
+                                    style: const TextStyle(fontSize: 11))
+                                : null,
+                              onTap: () => onSelected(name),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              ]),
-            ),
-            onSubmitted: lookup,
-          )),
-          SizedBox(width: 32, child: IconButton(icon: const Icon(Icons.close, size: 16, color: Colors.red), padding: EdgeInsets.zero, onPressed: onRemove)),
-        ]),
-        if (row['name']!.text.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFe2e8f0)),
-            ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                const Icon(Icons.inventory_2_outlined, size: 16, color: Color(0xFF003087)),
-                const SizedBox(width: 6),
-                Expanded(child: Text(row['name']!.text, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
-                GestureDetector(onTap: () { row['name']!.text = ''; row['uom']!.text = ''; row['cost']!.text = ''; scanCtrl.clear(); setModal(() {}); },
-                  child: const Icon(Icons.close, size: 14, color: Color(0xFF718096))),
-              ]),
-              const SizedBox(height: 4),
-              Text('UOM: ${row['uom']!.text}  -  Unit Cost: ${row['cost']!.text}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
-              const SizedBox(height: 4),
-              Text('Available stock: $maxStock', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                color: maxStock == 0 ? Colors.red : maxStock <= 5 ? Colors.orange : Colors.green)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: row['qty'],
-                keyboardType: TextInputType.number,
-                enabled: maxStock > 0,
-                onChanged: (v) {
-                  final entered = int.tryParse(v) ?? 0;
-                  if (entered > maxStock) {
-                    row['qty']!.text = '$maxStock';
-                    row['qty']!.selection = TextSelection.collapsed(offset: '$maxStock'.length);
-                  }
-                  setModal(() {});
-                },
-                decoration: InputDecoration(
-                  labelText: 'Quantity * (max $maxStock)',
-                  border: const OutlineInputBorder(),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  isDense: true,
-                  errorText: maxStock == 0 ? 'Out of stock' : null,
-                ),
-              ),
-            ]),
           ),
-        ],
+          SizedBox(width: 32, child: IconButton(
+            icon: const Icon(Icons.close, size: 16, color: Colors.red),
+            padding: EdgeInsets.zero,
+            onPressed: onRemove,
+          )),
+        ]),
       ]),
     );
   }

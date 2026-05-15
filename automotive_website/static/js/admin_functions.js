@@ -12,6 +12,75 @@ function showToast(msg, type) {
     }, 3000);
 }
 
+// ── Pagination utility ──────────────────────────────────────
+var _apPages = {};  // tableId -> currentPage
+
+/**
+ * Render paginated rows into a container and append pagination controls.
+ * @param {string} containerId  - id of the list container element
+ * @param {Array}  rows         - full array of rendered HTML strings
+ * @param {number} [perPage=10] - items per page
+ * @param {string} [renderFn]   - name of the render function to call on page change
+ */
+function apRenderPaged(containerId, rows, perPage, renderFn) {
+    perPage = perPage || 10;
+    var container = document.getElementById(containerId);
+    if (!container) return;
+
+    var total = rows.length;
+    if (total === 0) { container.innerHTML = ''; _apPages[containerId] = 1; return; }
+
+    var totalPages = Math.ceil(total / perPage);
+    var page = _apPages[containerId] || 1;
+    if (page > totalPages) page = totalPages;
+    _apPages[containerId] = page;
+
+    var start = (page - 1) * perPage;
+    var end   = Math.min(start + perPage, total);
+    var pageRows = rows.slice(start, end);
+
+    // Build pagination bar
+    var from = start + 1;
+    var to   = end;
+    var info = 'Showing ' + from + '–' + to + ' of ' + total;
+
+    var btns = '';
+    // Prev
+    btns += '<button class="ap-page-btn" onclick="apGoPage(\'' + containerId + '\',' + (page-1) + ',\'' + (renderFn||'') + '\')" ' + (page <= 1 ? 'disabled' : '') + '>'
+          + '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>'
+          + '</button>';
+
+    // Page numbers — show at most 5 around current
+    var pStart = Math.max(1, page - 2);
+    var pEnd   = Math.min(totalPages, pStart + 4);
+    if (pEnd - pStart < 4) pStart = Math.max(1, pEnd - 4);
+
+    for (var p = pStart; p <= pEnd; p++) {
+        btns += '<button class="ap-page-btn' + (p === page ? ' active' : '') + '" onclick="apGoPage(\'' + containerId + '\',' + p + ',\'' + (renderFn||'') + '\')">' + p + '</button>';
+    }
+
+    // Next
+    btns += '<button class="ap-page-btn" onclick="apGoPage(\'' + containerId + '\',' + (page+1) + ',\'' + (renderFn||'') + '\')" ' + (page >= totalPages ? 'disabled' : '') + '>'
+          + '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>'
+          + '</button>';
+
+    var pagination = '<div class="ap-pagination"><span class="ap-pagination-info">' + info + '</span><div class="ap-pagination-btns">' + btns + '</div></div>';
+
+    container.innerHTML = pageRows.join('') + pagination;
+}
+
+function apGoPage(containerId, page, renderFn) {
+    _apPages[containerId] = page;
+    if (renderFn && typeof window[renderFn] === 'function') {
+        window[renderFn]();
+    }
+}
+
+// Reset page to 1 when search/filter changes
+function apResetPage(containerId) {
+    _apPages[containerId] = 1;
+}
+
 // ── Shared state ────────────────────────────────────────────
 var currentEditingAsset = null;
 var currentEditingInventoryItem = null;
@@ -185,7 +254,7 @@ function renderAssetsList() {
         return (a.plateNumber || '').localeCompare(b.plateNumber || '');
     });
 
-    assetsList.innerHTML = filtered.map(function(asset) {
+    var rows = filtered.map(function(asset) {
         return '<div class="table-row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 120px;">'
             + '<div>' + asset.plateNumber + '</div>'
             + '<div>' + (asset.icon||'') + ' ' + (asset.type||'-') + '</div>'
@@ -198,7 +267,8 @@ function renderAssetsList() {
             +   '<button class="btn-small btn-secondary" onclick="editAsset(\'' + asset.assetNum + '\')" title="Edit" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
             +   '<button class="btn-small btn-danger" onclick="deleteAsset(\'' + asset.assetNum + '\')" title="Delete" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>'
             + '</div></div>';
-    }).join('');
+    });
+    apRenderPaged('assetsList', rows, 10, 'renderAssetsList');
 }
 
 function openAssetPlateScanModal() {
@@ -441,7 +511,7 @@ function renderServicesList() {
         return;
     }
 
-    list.innerHTML = filtered.map(function(s) {
+    var rows = filtered.map(function(s) {
         var statusColors = {
             'completed': { bg: 'rgba(56,161,105,0.1)', color: '#38a169' },
             'ongoing':   { bg: 'rgba(214,158,46,0.1)', color: '#d69e2e' },
@@ -467,7 +537,8 @@ function renderServicesList() {
             + '<div>' + statusBadge + '</div>'
             + '<div style="display:flex;gap:0.3rem;">' + topActions + '</div>'
             + '</div>';
-    }).join('');
+    });
+    apRenderPaged('servicesList', rows, 10, 'renderServicesList');
 }
 
 function updateServiceStats() {
@@ -647,8 +718,15 @@ function editService(docId) {
         svcPlateSelect(plate);
 
         document.getElementById('svcMechanic').value = s.mechanic || '';
-        // Convert stored date string to YYYY-MM-DD for the date input
-        document.getElementById('svcDate').value = svcParseToInputDate(s.date || '');
+        // Convert stored date string to YYYY-MM-DD for the date input, and format for display
+        var _isoDate = svcParseToInputDate(s.date || '');
+        document.getElementById('svcDate').value = _isoDate;
+        if (typeof svcFormatDateDisplay === 'function' && _isoDate) {
+          svcFormatDateDisplay(_isoDate);
+        } else {
+          var dispEl = document.getElementById('svcDateDisplay');
+          if (dispEl) dispEl.value = s.date || '';
+        }
         document.getElementById('svcSvcRows').innerHTML = '';
         document.getElementById('svcMatRows').innerHTML = '';
         (s.svcRows || []).forEach(function(r){ svcAddSvcRow(r.name, r.qty, r.uom, r.cost); });
@@ -987,16 +1065,17 @@ function renderInventoryList() {
         return;
     }
 
-    inventoryList.innerHTML = filtered.map(function(item) {
+    var rows = filtered.map(function(item) {
         var isLow = item.stock <= item.minLevel;
         var statusBadge = isLow
             ? '<span class="status-badge status-overdue">Low Stock</span>'
             : '<span class="status-badge status-active">In Stock</span>';
-        return '<div class="table-row" style="grid-template-columns:100px 1.5fr 1fr 100px 90px 90px 90px 110px 110px;">'
+        return '<div class="table-row" style="grid-template-columns:100px 1.5fr 1fr 80px 80px 90px 90px 90px 110px 110px;">'
             + '<div><strong>' + item.itemNum + '</strong></div>'
             + '<div>' + item.itemName + '</div>'
             + '<div>' + (item.commodityGroup||'-') + '</div>'
-            + '<div style="font-weight:700;color:'+(isLow?'#e53e3e':'#1a202c')+';">' + item.stock + ' ' + (item.unit||'') + '</div>'
+            + '<div>' + (item.unit||'-') + '</div>'
+            + '<div style="font-weight:700;color:'+(isLow?'#e53e3e':'#1a202c')+';">' + item.stock + '</div>'
             + '<div>' + (item.minLevel||0) + '</div>'
             + '<div>' + (item.maxLevel||0) + '</div>'
             + '<div>' + (item.reorderQty || item.reorderLevel || '—') + '</div>'
@@ -1006,7 +1085,8 @@ function renderInventoryList() {
             +   '<button class="btn-small btn-secondary" onclick="editInventoryItem(\''+item.id+'\')" title="Edit" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
             +   '<button class="btn-small btn-danger" onclick="deleteInventoryItem(\''+item.id+'\')" title="Delete" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>'
             + '</div></div>';
-    }).join('');
+    });
+    apRenderPaged('inventoryList', rows, 10, 'renderInventoryList');
 }
 
 function openAddInventoryModal() {
@@ -1267,7 +1347,7 @@ function renderInventoryTransactions(filter) {
         list.innerHTML = '<div class="table-row" style="text-align:center;color:#718096;padding:2rem;">No transactions found.</div>';
         return;
     }
-    list.innerHTML = filtered.map(function(t) {
+    var rows = filtered.map(function(t) {
         var isIn = t.type === 'IN';
         var typeColor = isIn ? '#003087' : '#E8001C';
         var typeBg    = isIn ? '#ebf8ff' : '#fed7d7';
@@ -1280,7 +1360,8 @@ function renderInventoryTransactions(filter) {
             + '<div>' + t.qty + '</div>'
             + '<div>' + t.by + '</div>'
             + '</div>';
-    }).join('');
+    });
+    apRenderPaged('txnList', rows, 10, 'renderInventoryTransactions');
 }
 
 function exportInventoryTransactions() {
@@ -1312,7 +1393,7 @@ function renderItemMasterList() {
         return;
     }
 
-    list.innerHTML = filtered.map(function(item) {
+    var rows = filtered.map(function(item) {
         return '<div class="table-row" style="grid-template-columns:1fr 1fr 1.5fr 1fr 1fr 1fr 1fr 120px;">'
             + '<div><strong>' + item.itemNum + '</strong></div>'
             + '<div>' + item.itemName + '</div>'
@@ -1326,7 +1407,8 @@ function renderItemMasterList() {
             +   '<button class="btn-small btn-secondary" onclick="editItemMaster(\'' + item.itemNum + '\')" title="Edit" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
             +   '<button class="btn-small btn-danger" onclick="deleteItemMaster(\'' + item.itemNum + '\')" title="Delete" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>'
             + '</div></div>';
-    }).join('');
+    });
+    apRenderPaged('itemMasterList', rows, 10, 'renderItemMasterList');
 }
 
 function populateItemMasterDropdowns() {
@@ -1648,23 +1730,57 @@ function renderIssuancesList() {
     s('totalIssuanceServices', issuances.filter(function(i){ return i.itemType==='Service'; }).length);
     s('totalMaterials', issuances.filter(function(i){ return i.itemType!=='Service'; }).length);
 
+    // Populate month filter dropdown from available dates
+    var monthSel = document.getElementById('issuanceMonthFilter');
+    if (monthSel) {
+        var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        var monthSet = {};
+        issuances.forEach(function(i) {
+            if (!i.date) return;
+            var parts = i.date.split(' ');
+            if (parts.length >= 3) {
+                var key = parts[0] + ' ' + parts[2]; // e.g. "May 2026"
+                monthSet[key] = true;
+            }
+        });
+        var months = Object.keys(monthSet).sort(function(a, b) {
+            var pa = a.split(' '), pb = b.split(' ');
+            var ya = parseInt(pa[1]), yb = parseInt(pb[1]);
+            if (ya !== yb) return yb - ya;
+            return MONTHS.indexOf(pb[0]) - MONTHS.indexOf(pa[0]);
+        });
+        var current = monthSel.value;
+        monthSel.innerHTML = '<option value="">All Months</option>'
+            + months.map(function(m) {
+                return '<option value="' + m + '"' + (m === current ? ' selected' : '') + '>' + m + '</option>';
+            }).join('');
+    }
+
+    // Filter by month
+    var selectedMonth = (monthSel && monthSel.value) || '';
+    var afterMonth = selectedMonth ? issuances.filter(function(i) {
+        if (!i.date) return false;
+        var parts = i.date.split(' ');
+        return parts.length >= 3 && (parts[0] + ' ' + parts[2]) === selectedMonth;
+    }) : issuances;
+
     // Filter by search
     var q = ((document.getElementById('issuanceSearch') || {}).value || '').trim().toLowerCase();
-    var filtered = q ? issuances.filter(function(i) {
+    var filtered = q ? afterMonth.filter(function(i) {
         return (i.assetNum||'').toLowerCase().includes(q)
             || (i.itemNum||'').toLowerCase().includes(q)
             || (i.itemName||'').toLowerCase().includes(q)
             || (i.itemType||'').toLowerCase().includes(q)
             || (i.commodityGroup||'').toLowerCase().includes(q)
             || (i.date||'').toLowerCase().includes(q);
-    }) : issuances;
+    }) : afterMonth;
 
     if (filtered.length === 0) {
         list.innerHTML = '<div style="text-align:center;color:#718096;padding:2rem;">No issuances found.</div>';
         return;
     }
 
-    list.innerHTML = filtered.map(function(i) {
+    var rows = filtered.map(function(i) {
         return '<div class="table-row" style="min-width:1100px;grid-template-columns:110px 130px 120px 1fr 100px 140px 70px 80px 110px 110px;">'
             + '<div>' + (i.date ? new Date(i.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '-') + '</div>'
             + '<div>' + (i.assetNum||'-') + '</div>'
@@ -1677,7 +1793,8 @@ function renderIssuancesList() {
             + '<div>₱' + ((i.unitCost||0).toLocaleString('en-PH',{minimumFractionDigits:2})) + '</div>'
             + '<div>₱' + (((i.quantity||0)*(i.unitCost||0)).toLocaleString('en-PH',{minimumFractionDigits:2})) + '</div>'
             + '</div>';
-    }).join('');
+    });
+    apRenderPaged('issuancesList', rows, 10, 'renderIssuancesList');
 }
 
 function deleteIssuance(id) {
@@ -1731,7 +1848,7 @@ function renderUsersList() {
     }
 
     var roleColors = { admin:'#E31E24', staff:'#003087', customer:'#38a169' };
-    container.innerHTML = filtered.map(function(u, idx) {
+    var rows = filtered.map(function(u, idx) {
         var roleColor = roleColors[(u.role||'').toLowerCase()] || '#718096';
         var statusLower = (u.status||'').toLowerCase();
         var statusColor = statusLower === 'active' ? '#38a169' : '#718096';
@@ -1752,7 +1869,8 @@ function renderUsersList() {
                 ? '<button class="btn-small btn-danger" onclick="toggleUserStatus(\''+u.id+'\',\''+statusLower+'\')" title="'+(statusLower==='active'?'Deactivate':'Activate')+'" style="display:inline-flex;align-items:center;justify-content:center;">'+(statusLower==='active'?'<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>':'<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>')+'</button>'
                 : '')
             + '</div></div>';
-    }).join('');
+    });
+    apRenderPaged('userCardsList', rows, 10, 'renderUsersList');
 }
 
 function openAddUserModal() {
@@ -1857,7 +1975,7 @@ function renderDomainsList() {
         return;
     }
 
-    list.innerHTML = filtered.map(function(d, idx) {
+    var rows = filtered.map(function(d, idx) {
         var chips = (d.list||[]).map(function(v){
             return '<span style="background:#e2e8f0;color:#4a5568;padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:600;margin:0.1rem;">'+v+'</span>';
         }).join('');
@@ -1869,7 +1987,8 @@ function renderDomainsList() {
             +   '<button class="btn-small btn-primary" onclick="editDomain(\'' + d.id + '\')" title="Edit" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
             +   '<button class="btn-small btn-danger" onclick="deleteDomain(\'' + d.id + '\')" title="Delete" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>'
             + '</div></div>';
-    }).join('');
+    });
+    apRenderPaged('domainsList', rows, 10, 'renderDomainsList');
 }
 
 function openAddDomainModal() {
