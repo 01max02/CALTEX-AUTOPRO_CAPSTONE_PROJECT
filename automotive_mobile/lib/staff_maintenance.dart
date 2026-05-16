@@ -366,7 +366,20 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
                             ),
                           );
                           if (confirm != true) return;
+                          // 1. Update status immediately
                           await _db.doc(s['docId'] as String).update({'status': 'Completed'});
+
+                          // 2. Close modal + show success right away
+                          if (mounted) {
+                            Navigator.pop(sheetCtx);
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Service marked as Completed!')]),
+                              backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                          }
+
+                          // 3. Run the rest in the background (non-blocking)
+                          () async {
                           final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
                           final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
                           final byName = (userDoc.data()?['name'] as String?) ?? 'Staff';
@@ -445,13 +458,7 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
                               'lastSvcDate': '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
                             });
                           }
-                          if (mounted) {
-                            Navigator.pop(sheetCtx);
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                              content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Service marked as Completed!')]),
-                              backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
-                          }
+                          }(); // end background lambda
                         },
                         icon: const Icon(Icons.done_all, size: 16),
                         label: const Text('Mark as Completed'),
@@ -697,7 +704,7 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
                     // ── Vehicle Issues ──
                     const Text('Vehicle Issues', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF4a5568))),
                     const SizedBox(height: 4),
-                    Text('Select all that apply', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                    Text('Optional — select all that apply', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 6,
@@ -889,8 +896,8 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
               if (v != null) {
                 row['name']!.text = v;
                 final d = _itemMasterMap[v];
-                row['uom']!.text = d?['uom'] as String? ?? 'job';
-                row['cost']!.text = (d?['cost'] as String? ?? '0').replaceAll('₱', '').replaceAll(',', '').trim();
+                row['uom']!.text = (d?['uom'] ?? 'job').toString();
+                row['cost']!.text = (d?['cost'] ?? '0').toString().replaceAll('₱', '').replaceAll(',', '').trim();
                 if (row['qty']!.text.isEmpty) row['qty']!.text = '1';
               }
               setModal(() {});
@@ -934,8 +941,11 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
       if (d == null) return;
       row['name']!.text = name;
       row['searchText']!.text = name;
-      row['uom']!.text = d['uom'] as String? ?? '';
-      row['cost']!.text = (d['cost'] as String? ?? '0').replaceAll('₱', '').replaceAll(',', '').trim();
+      row['uom']!.text = (d['uom'] ?? '').toString();
+      final rawCost = d['cost'];
+      row['cost']!.text = rawCost == null
+          ? '0'
+          : rawCost.toString().replaceAll('₱', '').replaceAll(',', '').trim();
       if (row['qty']!.text.isEmpty) row['qty']!.text = '1';
       final stockSnap = await FirebaseFirestore.instance
           .collection('stock_inventory').where('name', isEqualTo: name).limit(1).get();
@@ -1075,7 +1085,7 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
                               leading: const Icon(Icons.inventory_2_outlined, size: 16, color: Color(0xFF003087)),
                               title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                               subtitle: d != null
-                                ? Text('${d['uom'] ?? ''}  •  ₱${(d['cost'] as String? ?? '0').replaceAll('₱', '').replaceAll(',', '').trim()}',
+                                ? Text('${d['uom'] ?? ''}  •  ₱${(d['cost'] ?? '0').toString().replaceAll('₱', '').replaceAll(',', '').trim()}',
                                     style: const TextStyle(fontSize: 11))
                                 : null,
                               onTap: () => onSelected(name),

@@ -1730,24 +1730,38 @@ function renderIssuancesList() {
     s('totalIssuanceServices', issuances.filter(function(i){ return i.itemType==='Service'; }).length);
     s('totalMaterials', issuances.filter(function(i){ return i.itemType!=='Service'; }).length);
 
-    // Populate month filter dropdown from available dates
+    var MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    // Parse any date string → { month: 'May', year: '2026' } or null
+    function parseDateToMonthYear(dateStr) {
+        if (!dateStr) return null;
+        // "May 7, 2026" or "May 7 2026"
+        var m1 = dateStr.match(/^([A-Za-z]+)\s+\d+,?\s+(\d{4})/);
+        if (m1) return { month: m1[1].slice(0,3), year: m1[2] };
+        // "5/7/2026" or "05/07/2026"
+        var m2 = dateStr.match(/^(\d{1,2})\/\d{1,2}\/(\d{4})/);
+        if (m2) return { month: MONTHS_SHORT[parseInt(m2[1]) - 1], year: m2[2] };
+        // "2026-05-07"
+        var m3 = dateStr.match(/^(\d{4})-(\d{2})-\d{2}/);
+        if (m3) return { month: MONTHS_SHORT[parseInt(m3[2]) - 1], year: m3[1] };
+        return null;
+    }
+
+    // Populate month filter dropdown
     var monthSel = document.getElementById('issuanceMonthFilter');
     if (monthSel) {
-        var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
         var monthSet = {};
         issuances.forEach(function(i) {
-            if (!i.date) return;
-            var parts = i.date.split(' ');
-            if (parts.length >= 3) {
-                var key = parts[0] + ' ' + parts[2]; // e.g. "May 2026"
-                monthSet[key] = true;
+            var parsed = parseDateToMonthYear(i.date);
+            if (parsed) {
+                var key = parsed.month + ' ' + parsed.year;
+                monthSet[key] = { month: parsed.month, year: parseInt(parsed.year) };
             }
         });
         var months = Object.keys(monthSet).sort(function(a, b) {
-            var pa = a.split(' '), pb = b.split(' ');
-            var ya = parseInt(pa[1]), yb = parseInt(pb[1]);
-            if (ya !== yb) return yb - ya;
-            return MONTHS.indexOf(pb[0]) - MONTHS.indexOf(pa[0]);
+            var da = monthSet[a], db = monthSet[b];
+            if (da.year !== db.year) return db.year - da.year;
+            return MONTHS_SHORT.indexOf(db.month) - MONTHS_SHORT.indexOf(da.month);
         });
         var current = monthSel.value;
         monthSel.innerHTML = '<option value="">All Months</option>'
@@ -1756,15 +1770,15 @@ function renderIssuancesList() {
             }).join('');
     }
 
-    // Filter by month
+    // Apply month filter
     var selectedMonth = (monthSel && monthSel.value) || '';
     var afterMonth = selectedMonth ? issuances.filter(function(i) {
-        if (!i.date) return false;
-        var parts = i.date.split(' ');
-        return parts.length >= 3 && (parts[0] + ' ' + parts[2]) === selectedMonth;
+        var parsed = parseDateToMonthYear(i.date);
+        if (!parsed) return false;
+        return (parsed.month + ' ' + parsed.year) === selectedMonth;
     }) : issuances;
 
-    // Filter by search
+    // Apply search filter
     var q = ((document.getElementById('issuanceSearch') || {}).value || '').trim().toLowerCase();
     var filtered = q ? afterMonth.filter(function(i) {
         return (i.assetNum||'').toLowerCase().includes(q)

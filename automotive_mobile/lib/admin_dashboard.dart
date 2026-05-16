@@ -382,7 +382,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               .snapshots(),
                           builder: (context, usersSnap) {
                 final maintDocs = maintSnap.data?.docs ?? [];
-                final allServices = maintDocs.map((d) => d.data() as Map<String, dynamic>).toList();
+                final allServices = maintDocs.map((d) {
+                  final data = d.data() as Map<String, dynamic>;
+                  return {...data, 'docId': d.id};
+                }).toList();
 
                 // Stats
                 final totalVehicles = vehicleSnap.data?.docs.length ?? 0;
@@ -1188,12 +1191,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         final serviceName = (rows != null && rows.isNotEmpty)
                             ? (rows.first['name'] as String? ?? '—')
                             : (s['desc'] as String? ?? '—');
-                        return _serviceRow(
-                          s['plate'] as String? ?? '—',
-                          serviceName,
-                          s['mechanic'] as String? ?? '—',
-                          s['status'] as String? ?? '—',
-                        );
+                        return _serviceRow(s);
                       }),
                   ]),
                 );
@@ -1358,36 +1356,369 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _serviceRow(String plate, String service, String mechanic, String status) {
+  Widget _serviceRow(Map<String, dynamic> s) {
+    final plate    = s['plate']    as String? ?? '—';
+    final mechanic = s['mechanic'] as String? ?? '—';
+    final status   = s['status']   as String? ?? '—';
+    final rows = s['svcRows'] as List?;
+    final serviceName = (rows != null && rows.isNotEmpty)
+        ? (rows.first['name'] as String? ?? '—')
+        : (s['desc'] as String? ?? '—');
+
     final statusColor = status == 'Completed' ? Colors.green
         : status == 'Ongoing' ? Colors.orange
         : status == 'Pending' ? const Color(0xFF718096)
         : Colors.green;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
+
+    return GestureDetector(
+      onTap: () => _showAdminServiceDetails(s),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
+        ),
+        child: Row(children: [
+          Container(
+            width: 40, height: 40,
+            decoration: BoxDecoration(color: const Color(0xFFF0F4FF), borderRadius: BorderRadius.circular(10)),
+            child: const Icon(Icons.build_outlined, color: _red, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(plate, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            Text('$serviceName • $mechanic', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+          ])),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+            child: Text(status, style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w600)),
+          ),
+        ]),
       ),
-      child: Row(children: [
-        Container(
-          width: 40, height: 40,
-          decoration: BoxDecoration(color: const Color(0xFFF0F4FF), borderRadius: BorderRadius.circular(10)),
-          child: const Icon(Icons.build_outlined, color: _red, size: 18),
-        ),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(plate, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          Text('$service • $mechanic', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
-        ])),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-          child: Text(status, style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w600)),
-        ),
+    );
+  }
+
+  void _showAdminServiceDetails(Map<String, dynamic> s) {
+    Color statusColor(String st) {
+      if (st == 'Completed') return Colors.green;
+      if (st == 'Ongoing')   return Colors.orange;
+      return const Color(0xFF718096);
+    }
+
+    String formatCost(String raw) {
+      final clean = raw.replaceAll('₱', '').replaceAll(',', '').trim();
+      final val = double.tryParse(clean);
+      if (val == null) return raw.startsWith('₱') ? raw : '₱$raw';
+      return '₱${val.toStringAsFixed(2)}';
+    }
+
+    Widget detailRow(String label, String value) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SizedBox(width: 130, child: Text(label,
+          style: const TextStyle(fontSize: 12, color: Color(0xFF718096), fontWeight: FontWeight.w500))),
+        Expanded(child: Text(value.isNotEmpty ? value : '—',
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1a202c)))),
       ]),
+    );
+
+    Widget rowDetailCard(dynamic r, {required bool isService}) {
+      final name     = r['name'] as String? ?? '';
+      final qty      = r['qty']  as String? ?? '1';
+      final uom      = r['uom']  as String? ?? '';
+      final cost     = r['cost'] as String? ?? '0';
+      final subtotal = (double.tryParse(cost) ?? 0) * (double.tryParse(qty) ?? 1);
+      return Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isService ? const Color(0xFFebf8ff) : const Color(0xFFF0F4FF),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: isService ? const Color(0xFF90cdf4) : const Color(0xFFbee3f8)),
+        ),
+        child: Row(children: [
+          Icon(isService ? Icons.build_outlined : Icons.inventory_2_outlined,
+            size: 16, color: isService ? const Color(0xFF003087) : _red),
+          const SizedBox(width: 8),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            Text('$qty $uom  •  ₱$cost / unit',
+              style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+          ])),
+          Text('₱${subtotal.toStringAsFixed(2)}',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1a202c))),
+        ]),
+      );
+    }
+
+    final sc = statusColor(s['status'] as String? ?? '');
+
+    showModalBottomSheet(
+      context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => DraggableScrollableSheet(
+        expand: false, initialChildSize: 0.6, maxChildSize: 0.92,
+        builder: (_, ctrl) => SingleChildScrollView(
+          controller: ctrl,
+          child: Column(children: [
+            // Header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+              decoration: const BoxDecoration(color: _red,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+              child: Row(children: [
+                Container(width: 44, height: 44,
+                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
+                  child: const Icon(Icons.build_outlined, color: Colors.white, size: 22)),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(s['plate'] as String? ?? '—',
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text(s['desc'] as String? ?? '',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                ])),
+                GestureDetector(onTap: () => Navigator.pop(context),
+                  child: const Icon(Icons.close, color: Colors.white)),
+              ]),
+            ),
+            // Body
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                detailRow('Plate Number', s['plate'] as String? ?? ''),
+                detailRow('Mechanic',     s['mechanic'] as String? ?? ''),
+                detailRow('Service Date', s['date'] as String? ?? ''),
+                detailRow('Total Cost',   formatCost(s['cost'] as String? ?? '0')),
+                Row(children: [
+                  const SizedBox(width: 130, child: Text('Status',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF718096), fontWeight: FontWeight.w500))),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: sc.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                    child: Text(s['status'] as String? ?? '',
+                      style: TextStyle(fontSize: 12, color: sc, fontWeight: FontWeight.w600)),
+                  ),
+                ]),
+                const SizedBox(height: 16),
+                // Issues
+                if ((s['issues'] as List?)?.isNotEmpty == true) ...[
+                  const Text('Vehicle Issues Reported',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4a5568))),
+                  const SizedBox(height: 8),
+                  Wrap(spacing: 6, runSpacing: 6,
+                    children: (s['issues'] as List).map<Widget>((issue) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF5F5),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFFED7D7), width: 1.5),
+                      ),
+                      child: Text(issue.toString(),
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFE8001C))),
+                    )).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                // Services rendered
+                if ((s['svcRows'] as List?)?.isNotEmpty == true) ...[
+                  const Text('Services Rendered',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4a5568))),
+                  const SizedBox(height: 8),
+                  ...(s['svcRows'] as List)
+                      .where((r) => (r['name'] as String? ?? '').isNotEmpty)
+                      .map((r) => rowDetailCard(r, isService: true)),
+                  const SizedBox(height: 12),
+                ],
+                // Materials used
+                if ((s['matRows'] as List?)?.isNotEmpty == true) ...[
+                  const Text('Materials Used',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4a5568))),
+                  const SizedBox(height: 8),
+                  ...(s['matRows'] as List)
+                      .where((r) => (r['name'] as String? ?? '').isNotEmpty)
+                      .map((r) => rowDetailCard(r, isService: false)),
+                  const SizedBox(height: 12),
+                ],
+                // Approve button (Pending)
+                if (s['status'] == 'Pending')
+                  SizedBox(width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            title: const Text('Approve Service'),
+                            content: Text('Approve service for ${s['plate']} and set to Ongoing?'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                              TextButton(onPressed: () => Navigator.pop(context, true),
+                                child: const Text('Approve', style: TextStyle(color: Colors.orange))),
+                            ],
+                          ),
+                        );
+                        if (confirm != true) return;
+                        final docId = s['docId'] as String? ?? '';
+                        if (docId.isEmpty) return;
+                        await FirebaseFirestore.instance
+                            .collection('maintenance').doc(docId)
+                            .update({'status': 'Ongoing'});
+                        final plate = (s['plate'] as String? ?? '').trim().toUpperCase();
+                        final vSnap = await FirebaseFirestore.instance
+                            .collection('vehicles').where('plate', isEqualTo: plate).limit(1).get();
+                        if (vSnap.docs.isNotEmpty) {
+                          await vSnap.docs.first.reference.update({'status': 'Under Maintenance'});
+                        }
+                        if (mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: const Row(children: [
+                              Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                              SizedBox(width: 8),
+                              Text('Service approved — status set to Ongoing!'),
+                            ]),
+                            backgroundColor: Colors.orange, behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                        }
+                      },
+                      icon: const Icon(Icons.check_circle_outline, size: 16),
+                      label: const Text('Approve — Ongoing'),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
+                    )),
+                // Complete button (Ongoing)
+                if (s['status'] == 'Ongoing') ...[
+                  SizedBox(width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            title: const Text('Complete Service'),
+                            content: Text('Mark service for ${s['plate']} as Completed?'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                              TextButton(onPressed: () => Navigator.pop(context, true),
+                                child: const Text('Complete', style: TextStyle(color: Colors.green))),
+                            ],
+                          ),
+                        );
+                        if (confirm != true) return;
+                        final docId = s['docId'] as String? ?? '';
+                        if (docId.isEmpty) return;
+
+                        // 1. Update status immediately
+                        await FirebaseFirestore.instance
+                            .collection('maintenance').doc(docId)
+                            .update({'status': 'Completed'});
+
+                        // 2. Close + show success right away
+                        if (mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: const Row(children: [
+                              Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                              SizedBox(width: 8),
+                              Text('Service marked as Completed!'),
+                            ]),
+                            backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                        }
+
+                        // 3. Background: issuances + stock + vehicle update
+                        () async {
+                          final uid  = FirebaseAuth.instance.currentUser?.uid ?? '';
+                          final uDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+                          final byName = (uDoc.data()?['name'] as String?) ?? 'Admin';
+                          final now    = DateTime.now();
+                          final dateStr = '${now.month}/${now.day}/${now.year}';
+                          final plate   = (s['plate'] as String? ?? '').trim().toUpperCase();
+                          for (final r in (s['matRows'] as List<dynamic>? ?? [])) {
+                            final name = r['name'] as String? ?? '';
+                            final qty  = int.tryParse(r['qty']  as String? ?? '1') ?? 1;
+                            final uom  = r['uom']  as String? ?? '';
+                            final cost = double.tryParse(r['cost'] as String? ?? '0') ?? 0;
+                            if (name.isEmpty || qty <= 0) continue;
+                            final iSnap = await FirebaseFirestore.instance
+                                .collection('item_master').where('name', isEqualTo: name).limit(1).get();
+                            final iData = iSnap.docs.isNotEmpty ? iSnap.docs.first.data() as Map<String, dynamic> : <String, dynamic>{};
+                            await FirebaseFirestore.instance.collection('issuances').add({
+                              'id': 'ISS-AUTO-${DateTime.now().millisecondsSinceEpoch}',
+                              'date': dateStr, 'plate': plate,
+                              'assetDesc': s['desc'] ?? '', 'itemNum': iData['num'] ?? '',
+                              'itemName': name, 'itemType': 'Material',
+                              'commodityGroup': iData['group'] ?? '', 'uom': uom,
+                              'qty': '$qty', 'unitCost': cost.toStringAsFixed(2),
+                              'subtotal': (cost * qty).toStringAsFixed(2),
+                              'createdBy': byName, 'maintenanceId': s['id'],
+                              'createdAt': FieldValue.serverTimestamp(),
+                            });
+                            final stockSnap = await FirebaseFirestore.instance
+                                .collection('stock_inventory').where('name', isEqualTo: name).limit(1).get();
+                            if (stockSnap.docs.isNotEmpty) {
+                              final stockDoc    = stockSnap.docs.first;
+                              final currentStock = (stockDoc['stock'] as num?)?.toInt() ?? 0;
+                              final newStock     = (currentStock - qty).clamp(0, 99999);
+                              final minLevel     = (stockDoc['min'] as num?)?.toInt() ?? 0;
+                              await stockDoc.reference.update({
+                                'stock': newStock,
+                                'status': newStock >= minLevel ? 'OK' : 'Low',
+                                'updatedAt': FieldValue.serverTimestamp(),
+                              });
+                            }
+                            await FirebaseFirestore.instance.collection('transactions').add({
+                              'item': name,
+                              'desc': 'Issued for maintenance ${s['id']} — $plate',
+                              'type': 'OUT', 'qty': '-$qty', 'date': dateStr, 'by': byName,
+                              'createdAt': FieldValue.serverTimestamp(),
+                            });
+                          }
+                          for (final r in (s['svcRows'] as List<dynamic>? ?? [])) {
+                            final name = r['name'] as String? ?? '';
+                            final qty  = int.tryParse(r['qty']  as String? ?? '1') ?? 1;
+                            final uom  = r['uom']  as String? ?? '';
+                            final cost = double.tryParse(r['cost'] as String? ?? '0') ?? 0;
+                            if (name.isEmpty) continue;
+                            final iSnap = await FirebaseFirestore.instance
+                                .collection('item_master').where('name', isEqualTo: name).limit(1).get();
+                            final iData = iSnap.docs.isNotEmpty ? iSnap.docs.first.data() as Map<String, dynamic> : <String, dynamic>{};
+                            await FirebaseFirestore.instance.collection('issuances').add({
+                              'id': 'ISS-AUTO-${DateTime.now().millisecondsSinceEpoch}-S',
+                              'date': dateStr, 'plate': plate,
+                              'assetDesc': s['desc'] ?? '', 'itemNum': iData['num'] ?? '',
+                              'itemName': name, 'itemType': 'Service',
+                              'commodityGroup': iData['group'] ?? '', 'uom': uom,
+                              'qty': '$qty', 'unitCost': cost.toStringAsFixed(2),
+                              'subtotal': (cost * qty).toStringAsFixed(2),
+                              'createdBy': byName, 'maintenanceId': s['id'],
+                              'createdAt': FieldValue.serverTimestamp(),
+                            });
+                          }
+                          final vSnap = await FirebaseFirestore.instance
+                              .collection('vehicles').where('plate', isEqualTo: plate).limit(1).get();
+                          if (vSnap.docs.isNotEmpty) {
+                            await vSnap.docs.first.reference.update({
+                              'status': 'Completed',
+                              'completedAt': FieldValue.serverTimestamp(),
+                              'lastSvcDate': '${now.year}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}',
+                            });
+                          }
+                        }();
+                      },
+                      icon: const Icon(Icons.done_all, size: 16),
+                      label: const Text('Mark as Completed'),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                    )),
+                  const SizedBox(height: 8),
+                ],
+              ]),
+            ),
+          ]),
+        ),
+      ),
     );
   }
 

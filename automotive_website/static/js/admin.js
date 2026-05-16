@@ -57,6 +57,8 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 // ── Build notification list from live data ──────────────────
+const _adminBellIcon = '<span style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;background:rgba(0,48,135,0.1);border-radius:8px;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#003087" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>';
+
 function buildAdminNotifications() {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const notifs = [];
@@ -64,7 +66,7 @@ function buildAdminNotifications() {
     // Under maintenance
     (window.assets || []).filter(a => a.status === 'maintenance').forEach(a => {
         notifs.push({
-            icon: '🔵', type: 'info', unread: false,
+            icon: _adminBellIcon, type: 'info', unread: false,
             title: 'Under Maintenance',
             msg: `${a.assetDescription} (${a.plateNumber}) is currently being serviced.`,
             time: 'Ongoing',
@@ -76,7 +78,7 @@ function buildAdminNotifications() {
     (window.inventory || []).filter(i => i.stock <= i.minLevel).forEach(i => {
         const isOut = i.stock === 0;
         notifs.push({
-            icon: isOut ? '🚨' : '⚠️', type: isOut ? 'danger' : 'warning', unread: true,
+            icon: _adminBellIcon, type: isOut ? 'danger' : 'warning', unread: true,
             title: isOut ? 'Out of Stock' : 'Low Stock',
             msg: `${i.itemName} — ${i.stock} ${i.unit} remaining (min: ${i.minLevel})`,
             time: 'Inventory alert',
@@ -88,7 +90,7 @@ function buildAdminNotifications() {
     const pending = (window.serviceTransactions || []).filter(s => s.status === 'pending');
     if (pending.length > 0) {
         notifs.push({
-            icon: '⏳', type: 'info', unread: false,
+            icon: _adminBellIcon, type: 'info', unread: false,
             title: 'Pending Services',
             msg: `${pending.length} service transaction(s) awaiting approval.`,
             time: 'Action required',
@@ -113,16 +115,15 @@ function renderAdminNotifications() {
         badge.style.display = unread > 0 ? 'inline-flex' : 'none';
     }
 
-    // ── Also update the header badge to include local PMS/stock alerts ──
+    // ── Update the header badge — use only Firestore unread count ──
     const headerBadge = document.getElementById('adminHeaderNotifBadge');
     if (headerBadge) {
-        const fbUnread = (window._fbNotifications || []).filter(n => {
-            const uid = (firebase.auth().currentUser || {}).uid;
-            return uid && (n.readBy || {})[uid] !== true;
-        }).length;
-        const totalUnread = unread + fbUnread;
-        headerBadge.textContent = totalUnread > 9 ? '9+' : totalUnread;
-        headerBadge.style.display = totalUnread > 0 ? 'flex' : 'none';
+        const uid = (firebase.auth().currentUser || {}).uid;
+        const fbUnread = uid ? (window._fbNotifications || []).filter(n => {
+            return (n.readBy || {})[uid] !== true;
+        }).length : 0;
+        headerBadge.textContent = fbUnread > 99 ? '99+' : fbUnread;
+        headerBadge.style.display = fbUnread > 0 ? 'flex' : 'none';
     }
     if (countEl) countEl.textContent = notifs.length + ' alert' + (notifs.length !== 1 ? 's' : '');
 
@@ -188,7 +189,7 @@ window.toggleAdminNotifPanel = function () {
                         window._adminUnreadCount = unread;
                         const badge = document.getElementById('adminHeaderNotifBadge');
                         if (badge) {
-                            badge.textContent = unread > 9 ? '9+' : unread;
+                            badge.textContent = unread > 99 ? '99+' : unread;
                             badge.style.display = unread > 0 ? 'flex' : 'none';
                         }
                     })
@@ -202,7 +203,7 @@ window.toggleAdminNotifPanel = function () {
             const badge = document.getElementById('adminHeaderNotifBadge');
             if (badge) {
                 const u = window._adminUnreadCount;
-                badge.textContent = u > 9 ? '9+' : u;
+                badge.textContent = u > 99 ? '99+' : u;
                 badge.style.display = u > 0 ? 'flex' : 'none';
             }
         }
@@ -219,8 +220,9 @@ function _renderAdminNotifPanel() {
 
     // Firestore notifications
     const uid = (firebase.auth().currentUser || {}).uid;
+    const _bellIcon = '<span style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;background:rgba(0,48,135,0.1);border-radius:8px;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#003087" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>';
     const fbNotifs = (window._fbNotifications || []).map(n => ({
-        icon: n.type === 'warning' ? '⚠️' : n.type === 'success' ? '✅' : n.type === 'danger' ? '🚨' : '🔔',
+        icon: _bellIcon,
         type: n.type || 'info',
         unread: uid ? (n.readBy || {})[uid] !== true : false,
         title: n.title || '',
@@ -231,12 +233,13 @@ function _renderAdminNotifPanel() {
     }));
 
     const all = [...fbNotifs, ...localNotifs];
-    const unread = all.filter(n => n.unread).length;
+    // Badge counts only Firestore unread (local alerts don't persist as "read")
+    const fbUnreadCount = fbNotifs.filter(n => n.unread).length;
 
     const badge = document.getElementById('adminHeaderNotifBadge');
     if (badge) {
-        badge.textContent = unread > 9 ? '9+' : unread;
-        badge.style.display = unread > 0 ? 'flex' : 'none';
+        badge.textContent = fbUnreadCount > 99 ? '99+' : fbUnreadCount;
+        badge.style.display = fbUnreadCount > 0 ? 'flex' : 'none';
     }
     if (countEl) countEl.textContent = all.length + ' notification' + (all.length !== 1 ? 's' : '');
 

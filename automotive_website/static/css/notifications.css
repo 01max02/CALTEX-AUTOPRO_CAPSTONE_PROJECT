@@ -23,7 +23,7 @@ body.portal-body {
 .cu-topbar-actions { display: flex; align-items: center; gap: 8px; }
 .cu-notif-btn { background: rgba(255,255,255,0.15); border: none; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; position: relative; transition: background .2s; }
 .cu-notif-btn:hover { background: rgba(255,255,255,0.25); }
-.cu-notif-badge { position: absolute; top: 4px; right: 4px; background: #fff; color: #E8001C; font-size: 9px; font-weight: 800; min-width: 14px; height: 14px; border-radius: 7px; display: flex; align-items: center; justify-content: center; padding: 0 3px; }
+.cu-notif-badge { position: absolute; top: 4px; right: 4px; background: #FFC107; color: #000; font-size: 9px; font-weight: 800; min-width: 14px; height: 14px; border-radius: 7px; display: flex; align-items: center; justify-content: center; padding: 0 3px; }
 .cu-avatar { width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.25); color: white; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; }
 .cu-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .cu-tabs { background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; padding: 0 20px; gap: 4px; flex-shrink: 0; }
@@ -80,7 +80,7 @@ body.portal-body {
 .admin-topbar-actions { display: flex; align-items: center; gap: 8px; }
 .admin-notif-btn { background: rgba(255,255,255,0.15); border: none; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; position: relative; transition: background .2s; }
 .admin-notif-btn:hover { background: rgba(255,255,255,0.25); }
-.admin-notif-badge { position: absolute; top: 4px; right: 4px; background: #fff; color: #E8001C; font-size: 9px; font-weight: 800; min-width: 14px; height: 14px; border-radius: 7px; display: flex; align-items: center; justify-content: center; padding: 0 3px; }
+.admin-notif-badge { position: absolute; top: 4px; right: 4px; background: #FFC107; color: #000; font-size: 9px; font-weight: 800; min-width: 14px; height: 14px; border-radius: 7px; display: flex; align-items: center; justify-content: center; padding: 0 3px; }
 .admin-avatar { width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.25); color: white; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; }
 .admin-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .admin-sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 299; }

@@ -79,7 +79,7 @@ function bindHeaderControls() {
         const badge = document.getElementById('adminHeaderNotifBadge');
         if (badge) {
             const unread = window._adminUnreadCount;
-            badge.textContent = unread > 9 ? '9+' : unread;
+            badge.textContent = unread > 99 ? '99+' : unread;
             badge.style.display = unread > 0 ? 'flex' : 'none';
         }
     }

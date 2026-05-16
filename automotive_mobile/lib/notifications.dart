@@ -918,10 +918,17 @@ class _AppNotificationsState extends State<AppNotifications> {
                                     else
                                       Padding(
                                         padding: const EdgeInsets.only(right: 12, top: 2),
-                                        child: Icon(
-                                          _typeIcon(type),
-                                          color: _typeColor(type),
-                                          size: 24,
+                                        child: Container(
+                                          width: 36, height: 36,
+                                          decoration: BoxDecoration(
+                                            color: _blue.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          child: const Icon(
+                                            Icons.notifications_outlined,
+                                            color: _blue,
+                                            size: 20,
+                                          ),
                                         ),
                                       ),
                                     // ── Text ──

@@ -1297,10 +1297,21 @@
 
         // Apply month filter
         var selectedMonth = ((document.getElementById('issuanceMonthFilter') || {}).value || '').trim();
+        var MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        function parseDateToMonthYear(dateStr) {
+          if (!dateStr) return null;
+          var m1 = dateStr.match(/^([A-Za-z]+)\s+\d+,?\s+(\d{4})/);
+          if (m1) return { month: m1[1].slice(0,3), year: m1[2] };
+          var m2 = dateStr.match(/^(\d{1,2})\/\d{1,2}\/(\d{4})/);
+          if (m2) return { month: MONTHS_SHORT[parseInt(m2[1]) - 1], year: m2[2] };
+          var m3 = dateStr.match(/^(\d{4})-(\d{2})-\d{2}/);
+          if (m3) return { month: MONTHS_SHORT[parseInt(m3[2]) - 1], year: m3[1] };
+          return null;
+        }
         var afterMonth = selectedMonth ? issuances.filter(function(i) {
-          if (!i.date) return false;
-          var parts = i.date.split(' ');
-          return parts.length >= 3 && (parts[0] + ' ' + parts[2]) === selectedMonth;
+          var parsed = parseDateToMonthYear(i.date);
+          if (!parsed) return false;
+          return (parsed.month + ' ' + parsed.year) === selectedMonth;
         }) : issuances;
 
         // Apply search filter

@@ -60,8 +60,8 @@
 .admin-notif-badge {
     position: absolute;
     top: 4px; right: 4px;
-    background: #fff;
-    color: #E8001C;
+    background: #FFC107;
+    color: #000;
     font-size: 9px;
     font-weight: 800;
     min-width: 14px;

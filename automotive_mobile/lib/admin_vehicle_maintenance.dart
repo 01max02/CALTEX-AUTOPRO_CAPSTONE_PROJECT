@@ -816,7 +816,7 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                     // ── Vehicle Issues ──
                     const Text('Vehicle Issues', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF4a5568))),
                     const SizedBox(height: 4),
-                    Text('Select all that apply', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                    Text('Optional — select all that apply', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 6,
@@ -1016,8 +1016,8 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
               if (v != null) {
                 row['name']!.text = v;
                 final d = _itemMasterMap[v];
-                row['uom']!.text = d?['uom'] as String? ?? 'job';
-                row['cost']!.text = (d?['cost'] as String? ?? '0').replaceAll('₱', '');
+                row['uom']!.text = (d?['uom'] ?? 'job').toString();
+                row['cost']!.text = (d?['cost'] ?? '0').toString().replaceAll('₱', '').replaceAll(',', '').trim();
                 if (row['qty']!.text.isEmpty) row['qty']!.text = '1';
               }
               setModal(() {});
@@ -1056,8 +1056,11 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
       if (d == null) return;
       row['name']!.text = name;
       row['searchText']!.text = name;
-      row['uom']!.text = d['uom'] as String? ?? '';
-      row['cost']!.text = (d['cost'] as String? ?? '0').replaceAll('₱', '').replaceAll(',', '').trim();
+      row['uom']!.text = (d['uom'] ?? '').toString();
+      final rawCost = d['cost'];
+      row['cost']!.text = rawCost == null
+          ? '0'
+          : rawCost.toString().replaceAll('₱', '').replaceAll(',', '').trim();
       if (row['qty']!.text.isEmpty) row['qty']!.text = '1';
       final stockSnap = await FirebaseFirestore.instance
           .collection('stock_inventory').where('name', isEqualTo: name).limit(1).get();
@@ -1197,7 +1200,7 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                               leading: const Icon(Icons.inventory_2_outlined, size: 16, color: Color(0xFF003087)),
                               title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                               subtitle: d != null
-                                ? Text('${d['uom'] ?? ''}  •  ₱${(d['cost'] as String? ?? '0').replaceAll('₱', '').replaceAll(',', '').trim()}',
+                                ? Text('${d['uom'] ?? ''}  •  ₱${(d['cost'] ?? '0').toString().replaceAll('₱', '').replaceAll(',', '').trim()}',
                                     style: const TextStyle(fontSize: 11))
                                 : null,
                               onTap: () => onSelected(name),

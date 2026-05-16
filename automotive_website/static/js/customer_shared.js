@@ -126,10 +126,9 @@
     }
 
     function _typeIcon(type) {
-        if (type === 'warning') return '⚠️';
-        if (type === 'success') return '✅';
-        if (type === 'danger')  return '🚨';
-        return '🔔';
+        return '<span style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;background:rgba(0,48,135,0.1);border-radius:8px;flex-shrink:0;">'
+            + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#003087" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>'
+            + '</span>';
     }
 
     function _renderNotifPanel() {
@@ -140,7 +139,7 @@
 
         var unread = _cuNotifs.filter(function (n) { return !n.read; }).length;
         if (badge) {
-            badge.textContent = unread > 9 ? '9+' : String(unread);
+            badge.textContent = unread > 99 ? '99+' : String(unread);
             badge.style.display = unread > 0 ? 'flex' : 'none';
         }
         if (countEl) {
@@ -242,7 +241,7 @@
         }).catch(function () {});
 
         var roleQuery = db.collection('notifications')
-            .where('targetRole', 'in', ['customer', 'all'])
+            .where('targetRole', '==', 'customer')
             .limit(30);
         var personalQuery = db.collection('notifications')
             .where('targetUid', '==', uid)

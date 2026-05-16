@@ -254,6 +254,7 @@
       const recordsHtml = records.map(r => {
         const svcRows = (r.svcRows || []).filter(s => s.name);
         const matRows = (r.matRows || []).filter(m => m.name);
+        const issues  = (r.issues  || []).filter(i => i && i.toString().trim());
 
         // Compute subtotals per section (mirrors mobile _lineItem: unitCost * qty)
         function rowSubtotal(row) {
@@ -278,6 +279,17 @@
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 Mechanic: ${r.mechanic || '—'}
               </div>
+              ${issues.length ? `
+                <div class="phd-section-label" style="color:#E8001C;margin-bottom:8px;">
+                  <span style="background:#fff5f5;padding:3px 5px;border-radius:6px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#E8001C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  </span>
+                  Vehicle Issues Reported
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
+                  ${issues.map(issue => `<span style="background:#fff5f5;border:1.5px solid #fed7d7;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;color:#E8001C;">${issue}</span>`).join('')}
+                </div>
+              ` : ''}
               ${svcRows.length ? `
                 <div class="phd-section-label" style="color:#2b6cb0;">
                   <span style="background:#ebf8ff;padding:3px 5px;border-radius:6px;">

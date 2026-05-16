@@ -222,6 +222,10 @@ class _ServiceRecordCard extends StatelessWidget {
     final matRows = (data['matRows'] as List<dynamic>? ?? [])
         .where((x) => (x['name'] as String? ?? '').isNotEmpty)
         .toList();
+    final issues = (data['issues'] as List<dynamic>? ?? [])
+        .map((e) => e.toString())
+        .where((e) => e.isNotEmpty)
+        .toList();
 
     return Container(
       decoration: BoxDecoration(
@@ -283,6 +287,26 @@ class _ServiceRecordCard extends StatelessWidget {
                   style: const TextStyle(
                       fontSize: 12, color: Color(0xFF718096))),
             ]),
+
+            if (issues.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _sectionLabel(Icons.warning_amber_outlined, 'Vehicle Issues Reported', const Color(0xFFE8001C)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: issues.map((issue) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF5F5),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFFED7D7), width: 1.5),
+                  ),
+                  child: Text(issue,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFE8001C))),
+                )).toList(),
+              ),
+            ],
 
             if (svcRows.isNotEmpty) ...[
               const SizedBox(height: 14),

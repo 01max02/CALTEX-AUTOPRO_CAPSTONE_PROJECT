@@ -357,7 +357,7 @@
         function _applyBadge() {
           const badge = document.getElementById('adminHeaderNotifBadge');
           if (badge) {
-            badge.textContent = unread > 9 ? '9+' : unread;
+            badge.textContent = unread > 99 ? '99+' : unread;
             badge.style.display = unread > 0 ? 'flex' : 'none';
           } else {
             // Header not loaded yet — retry after a short delay

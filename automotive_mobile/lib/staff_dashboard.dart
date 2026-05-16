@@ -23,6 +23,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
   static const _bg = Color(0xFFF7F8FA);
   String _initials = '?';
   String? _photoUrl;
+  String _staffName = '';
 
   @override
   void initState() {
@@ -45,7 +46,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
           ? '${parts[0][0]}${parts[1][0]}'.toUpperCase()
           : parts[0][0].toUpperCase();
     }
-    if (mounted) setState(() { _initials = ini; _photoUrl = photo; });
+    if (mounted) setState(() { _initials = ini; _photoUrl = photo; _staffName = name; });
   }
 
   @override
@@ -290,15 +291,30 @@ class _StaffDashboardState extends State<StaffDashboard> {
           builder: (context, stockSnap) {
             // Maintenance stats
             final maintDocs = maintSnap.data?.docs ?? [];
-            final allServices = maintDocs.map((d) => d.data() as Map<String, dynamic>).toList();
-            final ongoing = allServices.where((s) => s['status'] == 'Ongoing').length;
-            final completed = allServices.where((s) => s['status'] == 'Completed').length;
+            final allServices = maintDocs.map((d) {
+              final data = d.data() as Map<String, dynamic>;
+              return {
+                ...data,
+                'docId': d.id,
+              };
+            }).toList();
+
+            // Filter all stats to only this staff member's services
+            final myServices = _staffName.isEmpty
+                ? allServices
+                : allServices.where((s) {
+                    final mechanic = (s['mechanic'] as String? ?? '').trim().toLowerCase();
+                    return mechanic == _staffName.trim().toLowerCase();
+                  }).toList();
+
+            final ongoing = myServices.where((s) => s['status'] == 'Ongoing').length;
+            final pending = myServices.where((s) => s['status'] == 'Pending').length;
 
             // Today's services — date stored as "Mon D, YYYY" e.g. "Apr 10, 2026"
             final now = DateTime.now();
             const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
             final todayFormatted = '${months[now.month - 1]} ${now.day}, ${now.year}';
-            final todayServices = allServices.where((s) {
+            final todayServices = myServices.where((s) {
               final date = s['date'] as String? ?? '';
               return date == todayFormatted;
             }).toList();
@@ -320,9 +336,9 @@ class _StaffDashboardState extends State<StaffDashboard> {
                   crossAxisCount: 2, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
                   crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.4,
                   children: [
-                    _statCard('Total Services', isLoading ? '…' : '${allServices.length}', Icons.build_outlined, _red),
+                    _statCard("Today's Services", isLoading ? '…' : '${todayServices.length}', Icons.today_outlined, _red),
                     _statCard('Ongoing', isLoading ? '…' : '$ongoing', Icons.autorenew, Colors.orange),
-                    _statCard('Completed', isLoading ? '…' : '$completed', Icons.check_circle_outline, const Color(0xFF2c7a7b)),
+                    _statCard('Pending', isLoading ? '…' : '$pending', Icons.pending_outlined, const Color(0xFF718096)),
                     _statCard('Low Stock', isLoading ? '…' : '$lowStock', Icons.warning_amber_outlined, const Color(0xFF003087)),
                   ],
                 ),
@@ -348,19 +364,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
                       style: TextStyle(color: Color(0xFF718096), fontSize: 13))),
                   )
                 else
-                  ...todayServices.take(5).map((s) => _buildScheduleCard(
-                    s['plate'] as String? ?? '—',
-                    s['plate'] as String? ?? '—',
-                    (() {
-                      final rows = s['svcRows'] as List?;
-                      if (rows != null && rows.isNotEmpty) {
-                        final name = rows.first['name'] as String? ?? '';
-                        if (name.isNotEmpty) return name;
-                      }
-                      return s['desc'] as String? ?? '—';
-                    })(),
-                    s['status'] as String? ?? '—',
-                  )),
+                  ...todayServices.take(5).map((s) => _buildScheduleCard(s)),
               ]),
             );
           },
@@ -390,33 +394,360 @@ class _StaffDashboardState extends State<StaffDashboard> {
     );
   }
 
-  Widget _buildScheduleCard(String id, String plate, String service, String status) {
-    final statusColor = status == 'Completed' ? Colors.green : status == 'Ongoing' ? Colors.orange : const Color(0xFF718096);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
+  Widget _buildScheduleCard(Map<String, dynamic> s) {
+    final plate   = s['plate']  as String? ?? '—';
+    final status  = s['status'] as String? ?? '—';
+    final statusColor = status == 'Completed' ? Colors.green
+        : status == 'Ongoing' ? Colors.orange
+        : const Color(0xFF718096);
+
+    // First service name from svcRows, fallback to desc
+    final rows = s['svcRows'] as List?;
+    String service = '—';
+    if (rows != null && rows.isNotEmpty) {
+      final n = rows.first['name'] as String? ?? '';
+      if (n.isNotEmpty) service = n;
+    }
+    if (service == '—') service = s['desc'] as String? ?? '—';
+
+    return GestureDetector(
+      onTap: () => _showScheduleDetails(s),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
+        ),
+        child: Row(children: [
+          Container(
+            width: 40, height: 40,
+            decoration: BoxDecoration(color: const Color(0xFFF0F4FF), borderRadius: BorderRadius.circular(10)),
+            child: const Icon(Icons.build_outlined, color: _red, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(plate, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            Text(service, style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+          ])),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+            child: Text(status, style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w600)),
+          ),
+        ]),
       ),
-      child: Row(children: [
-        Container(
-          width: 40, height: 40,
-          decoration: BoxDecoration(color: const Color(0xFFF0F4FF), borderRadius: BorderRadius.circular(10)),
-          child: const Icon(Icons.build_outlined, color: _red, size: 18),
-        ),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(plate, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          Text(service, style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
-        ])),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-          child: Text(status, style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w600)),
-        ),
+    );
+  }
+
+  // ── Schedule card details modal (same as StaffMaintenance._showServiceDetails) ──
+  void _showScheduleDetails(Map<String, dynamic> s) {
+    Color statusColor(String st) {
+      if (st == 'Completed') return Colors.green;
+      if (st == 'Ongoing')   return Colors.orange;
+      return const Color(0xFF718096);
+    }
+
+    String formatCost(String raw) {
+      final clean = raw.replaceAll('₱', '').replaceAll(',', '').trim();
+      final val = double.tryParse(clean);
+      if (val == null) return raw.startsWith('₱') ? raw : '₱$raw';
+      return '₱${val.toStringAsFixed(2)}';
+    }
+
+    Widget detailRow(String label, String value) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SizedBox(width: 130, child: Text(label,
+          style: const TextStyle(fontSize: 12, color: Color(0xFF718096), fontWeight: FontWeight.w500))),
+        Expanded(child: Text(value.isNotEmpty ? value : '-',
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1a202c)))),
       ]),
+    );
+
+    Widget rowDetailCard(dynamic r, {required bool isService}) {
+      final name     = r['name'] as String? ?? '';
+      final qty      = r['qty']  as String? ?? '1';
+      final uom      = r['uom']  as String? ?? '';
+      final cost     = r['cost'] as String? ?? '0';
+      final subtotal = (double.tryParse(cost) ?? 0) * (double.tryParse(qty) ?? 1);
+      return Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFe2e8f0)),
+        ),
+        child: Row(children: [
+          Icon(isService ? Icons.build_outlined : Icons.inventory_2_outlined,
+            size: 16, color: isService ? const Color(0xFF003087) : _red),
+          const SizedBox(width: 8),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            Text('$qty $uom  •  $cost / unit',
+              style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+          ])),
+          Text(subtotal.toStringAsFixed(2),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1a202c))),
+        ]),
+      );
+    }
+
+    final sc = statusColor(s['status'] as String? ?? '');
+
+    showModalBottomSheet(
+      context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sheetCtx, setSheet) => AnimatedPadding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
+          duration: const Duration(milliseconds: 150),
+          child: SingleChildScrollView(
+            child: Column(children: [
+              // Header
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                decoration: const BoxDecoration(color: _red,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+                child: Row(children: [
+                  Container(width: 44, height: 44,
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
+                    child: const Icon(Icons.build_outlined, color: Colors.white, size: 22)),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(s['plate'] as String? ?? '—',
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text(s['desc'] as String? ?? '',
+                      style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  ])),
+                  GestureDetector(onTap: () => Navigator.pop(sheetCtx),
+                    child: const Icon(Icons.close, color: Colors.white)),
+                ]),
+              ),
+              // Body
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  detailRow('Plate Number', s['plate'] as String? ?? ''),
+                  detailRow('Mechanic',     s['mechanic'] as String? ?? ''),
+                  detailRow('Service Date', s['date'] as String? ?? ''),
+                  detailRow('Total Cost',   formatCost(s['cost'] as String? ?? '0')),
+                  Row(children: [
+                    const SizedBox(width: 130, child: Text('Status',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF718096), fontWeight: FontWeight.w500))),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: sc.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                      child: Text(s['status'] as String? ?? '',
+                        style: TextStyle(fontSize: 12, color: sc, fontWeight: FontWeight.w600)),
+                    ),
+                  ]),
+                  const SizedBox(height: 16),
+                  // Issues
+                  if ((s['issues'] as List?)?.isNotEmpty == true) ...[
+                    const Text('Vehicle Issues Reported',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4a5568))),
+                    const SizedBox(height: 8),
+                    Wrap(spacing: 6, runSpacing: 6,
+                      children: (s['issues'] as List).map<Widget>((issue) => Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF5F5),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFFED7D7), width: 1.5),
+                        ),
+                        child: Text(issue.toString(),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFE8001C))),
+                      )).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  // Services rendered
+                  if ((s['svcRows'] as List?)?.isNotEmpty == true) ...[
+                    const Text('Services Rendered',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4a5568))),
+                    const SizedBox(height: 8),
+                    ...(s['svcRows'] as List)
+                        .where((r) => (r['name'] as String? ?? '').isNotEmpty)
+                        .map((r) => rowDetailCard(r, isService: true)),
+                    const SizedBox(height: 12),
+                  ],
+                  // Materials used
+                  if ((s['matRows'] as List?)?.isNotEmpty == true) ...[
+                    const Text('Materials Used',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4a5568))),
+                    const SizedBox(height: 8),
+                    ...(s['matRows'] as List)
+                        .where((r) => (r['name'] as String? ?? '').isNotEmpty)
+                        .map((r) => rowDetailCard(r, isService: false)),
+                    const SizedBox(height: 12),
+                  ],
+                  // Pending notice
+                  if (s['status'] == 'Pending')
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.orange.shade200),
+                      ),
+                      child: const Row(children: [
+                        Icon(Icons.info_outline, color: Colors.orange, size: 16),
+                        SizedBox(width: 8),
+                        Expanded(child: Text('Waiting for admin approval.',
+                          style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.w500))),
+                      ]),
+                    ),
+                  // Mark as Completed button (Ongoing only)
+                  if (s['status'] == 'Ongoing') ...[
+                    const SizedBox(height: 8),
+                    SizedBox(width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              title: const Text('Complete Service'),
+                              content: Text('Mark service for ${s['plate']} as Completed?'),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(context, false),
+                                  child: const Text('Cancel')),
+                                TextButton(onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('Complete',
+                                    style: TextStyle(color: Colors.green))),
+                              ],
+                            ),
+                          );
+                          if (confirm != true) return;
+
+                          final docId = s['docId'] as String? ?? '';
+                          if (docId.isEmpty) return;
+
+                          // 1. Update status immediately
+                          await FirebaseFirestore.instance
+                              .collection('maintenance').doc(docId)
+                              .update({'status': 'Completed'});
+
+                          // 2. Close modal + show success right away
+                          if (mounted) {
+                            Navigator.pop(sheetCtx);
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: const Row(children: [
+                                Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                                SizedBox(width: 8),
+                                Text('Service marked as Completed!'),
+                              ]),
+                              backgroundColor: Colors.green,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ));
+                          }
+
+                          // 3. Run the rest in the background (non-blocking)
+                          () async {
+                          final uid  = FirebaseAuth.instance.currentUser?.uid ?? '';
+                          final uDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+                          final byName = (uDoc.data()?['name'] as String?) ?? 'Staff';
+                          final now    = DateTime.now();
+                          final dateStr = '${now.month}/${now.day}/${now.year}';
+                          final plate   = (s['plate'] as String? ?? '').trim().toUpperCase();
+
+                          // Deduct stock + create issuances for materials
+                          for (final r in (s['matRows'] as List<dynamic>? ?? [])) {
+                            final name = r['name'] as String? ?? '';
+                            final qty  = int.tryParse(r['qty']  as String? ?? '1') ?? 1;
+                            final uom  = r['uom']  as String? ?? '';
+                            final cost = double.tryParse(r['cost'] as String? ?? '0') ?? 0;
+                            if (name.isEmpty || qty <= 0) continue;
+                            final iSnap = await FirebaseFirestore.instance
+                                .collection('item_master').where('name', isEqualTo: name).limit(1).get();
+                            final iData = iSnap.docs.isNotEmpty
+                                ? iSnap.docs.first.data() as Map<String, dynamic>
+                                : <String, dynamic>{};
+                            await FirebaseFirestore.instance.collection('issuances').add({
+                              'id': 'ISS-AUTO-${DateTime.now().millisecondsSinceEpoch}',
+                              'date': dateStr, 'plate': plate,
+                              'assetDesc': s['desc'] ?? '', 'itemNum': iData['num'] ?? '',
+                              'itemName': name, 'itemType': 'Material',
+                              'commodityGroup': iData['group'] ?? '', 'uom': uom,
+                              'qty': '$qty', 'unitCost': cost.toStringAsFixed(2),
+                              'subtotal': (cost * qty).toStringAsFixed(2),
+                              'createdBy': byName, 'maintenanceId': s['id'],
+                              'createdAt': FieldValue.serverTimestamp(),
+                            });
+                            final stockSnap = await FirebaseFirestore.instance
+                                .collection('stock_inventory').where('name', isEqualTo: name).limit(1).get();
+                            if (stockSnap.docs.isNotEmpty) {
+                              final stockDoc    = stockSnap.docs.first;
+                              final currentStock = (stockDoc['stock'] as num?)?.toInt() ?? 0;
+                              final newStock     = (currentStock - qty).clamp(0, 99999);
+                              final minLevel     = (stockDoc['min'] as num?)?.toInt() ?? 0;
+                              await stockDoc.reference.update({
+                                'stock': newStock,
+                                'status': newStock >= minLevel ? 'OK' : 'Low',
+                                'updatedAt': FieldValue.serverTimestamp(),
+                              });
+                            }
+                            await FirebaseFirestore.instance.collection('transactions').add({
+                              'item': name,
+                              'desc': 'Issued for maintenance ${s['id']} - $plate',
+                              'type': 'OUT', 'qty': '-$qty', 'date': dateStr, 'by': byName,
+                              'createdAt': FieldValue.serverTimestamp(),
+                            });
+                          }
+                          // Issuances for service rows
+                          for (final r in (s['svcRows'] as List<dynamic>? ?? [])) {
+                            final name = r['name'] as String? ?? '';
+                            final qty  = int.tryParse(r['qty']  as String? ?? '1') ?? 1;
+                            final uom  = r['uom']  as String? ?? '';
+                            final cost = double.tryParse(r['cost'] as String? ?? '0') ?? 0;
+                            if (name.isEmpty) continue;
+                            final iSnap = await FirebaseFirestore.instance
+                                .collection('item_master').where('name', isEqualTo: name).limit(1).get();
+                            final iData = iSnap.docs.isNotEmpty
+                                ? iSnap.docs.first.data() as Map<String, dynamic>
+                                : <String, dynamic>{};
+                            await FirebaseFirestore.instance.collection('issuances').add({
+                              'id': 'ISS-AUTO-${DateTime.now().millisecondsSinceEpoch}-S',
+                              'date': dateStr, 'plate': plate,
+                              'assetDesc': s['desc'] ?? '', 'itemNum': iData['num'] ?? '',
+                              'itemName': name, 'itemType': 'Service',
+                              'commodityGroup': iData['group'] ?? '', 'uom': uom,
+                              'qty': '$qty', 'unitCost': cost.toStringAsFixed(2),
+                              'subtotal': (cost * qty).toStringAsFixed(2),
+                              'createdBy': byName, 'maintenanceId': s['id'],
+                              'createdAt': FieldValue.serverTimestamp(),
+                            });
+                          }
+                          // Update vehicle status
+                          final vSnap = await FirebaseFirestore.instance
+                              .collection('vehicles').where('plate', isEqualTo: plate).limit(1).get();
+                          if (vSnap.docs.isNotEmpty) {
+                            await vSnap.docs.first.reference.update({
+                              'status': 'Completed',
+                              'completedAt': FieldValue.serverTimestamp(),
+                              'lastSvcDate': '${now.year}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}',
+                            });
+                          }
+                          }(); // end background lambda
+                        },
+                        icon: const Icon(Icons.done_all, size: 16),
+                        label: const Text('Mark as Completed'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green, foregroundColor: Colors.white),
+                      )),
+                  ],
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      ),
     );
   }
 
