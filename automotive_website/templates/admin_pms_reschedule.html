@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PMS Reschedule Requests</title>
+    <link rel="icon" type="image/png" href="../static/img/LOGO_CALTEX.png" />
+    <link rel="stylesheet" href="../static/css/style.css">
+    <link rel="stylesheet" href="../static/css/admin.css">
+</head>
+<body class="portal-body" data-page="pms-reschedule">
+
+<div class="admin-dashboard" style="display:flex;flex-direction:column;">
+    <div id="headerContainer"></div>
+    <div class="admin-dashboard-body">
+    <div id="sidebarContainer"></div>
+
+    <div class="admin-main">
+        <div class="admin-header">
+            <div>
+                <div class="breadcrumb">Admin Portal › Vehicle Maintenance Management</div>
+                <div class="admin-header-title">PMS Reschedule Requests</div>
+            </div>
+            <div style="margin-left:auto;display:flex;align-items:center;gap:0.75rem;">
+                <!-- Filter -->
+                <select id="statusFilter" onchange="renderRescheduleList()"
+                    style="padding:0.5rem 0.75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.83rem;font-family:inherit;background:white;color:#4a5568;cursor:pointer;">
+                    <option value="all">All Requests</option>
+                    <option value="Pending" selected>Pending</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Dismissed">Dismissed</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="admin-content">
+            <!-- Stat chips -->
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background:rgba(214,158,46,0.1);color:#d69e2e;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div class="stat-number" id="statPending" style="color:#d69e2e;">0</div>
+                    <div class="stat-label">Pending</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </div>
+                    <div class="stat-number" id="statApproved">0</div>
+                    <div class="stat-label">Approved</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background:rgba(113,128,150,0.1);color:#718096;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </div>
+                    <div class="stat-number" id="statDismissed" style="color:#718096;">0</div>
+                    <div class="stat-label">Dismissed</div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="data-table">
+                <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:1fr 1.5fr 1fr 1fr 1fr 140px;">
+                    <div>Plate</div>
+                    <div>Customer</div>
+                    <div>Preferred Date</div>
+                    <div>Requested</div>
+                    <div>Status</div>
+                    <div>Actions</div>
+                </div>
+                <div id="rescheduleTableBody">
+                    <div style="padding:3rem;text-align:center;color:#718096;font-size:13px;">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+<style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+  if (!firebase.apps.length) {
+    firebase.initializeApp({
+      apiKey: "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
+      authDomain: "caltex-autopro-1e664.firebaseapp.com",
+      projectId: "caltex-autopro-1e664",
+      storageBucket: "caltex-autopro-1e664.firebasestorage.app",
+      messagingSenderId: "930140433367",
+      appId: "1:930140433367:web:cf67bfa388fa517422b992"
+    });
+  }
+</script>
+<script src="../static/js/admin_firebase.js"></script>
+<script src="../static/js/admin_functions.js"></script>
+<script src="../static/js/admin.js"></script>
+<script src="../static/js/admin_sidebar.js"></script>
+<script>
+(function () {
+  var db = firebase.firestore();
+  var _allDocs = [];
+
+  function _timeAgo(ts) {
+    if (!ts || !ts.toMillis) return '—';
+    var diff = Date.now() - ts.toMillis();
+    var mins = Math.floor(diff / 60000);
+    if (mins < 1)  return 'Just now';
+    if (mins < 60) return mins + ' min ago';
+    var hrs = Math.floor(mins / 60);
+    if (hrs < 24)  return hrs + ' hr ago';
+    var days = Math.floor(hrs / 24);
+    return days === 1 ? 'Yesterday' : days + ' days ago';
+  }
+
+  var _MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  function _formatDate(dateStr) {
+    // Expects YYYY-MM-DD
+    if (!dateStr) return '—';
+    var parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    var y = parseInt(parts[0]);
+    var m = parseInt(parts[1]) - 1;
+    var d = parseInt(parts[2]);
+    if (isNaN(y) || isNaN(m) || isNaN(d)) return dateStr;
+    return _MONTHS[m] + ' ' + d + ', ' + y;
+  }
+
+  window.renderRescheduleList = function () {
+    var filter = (document.getElementById('statusFilter') || {}).value || 'all';
+    var body = document.getElementById('rescheduleTableBody');
+    if (!body) return;
+
+    var docs = filter === 'all'
+      ? _allDocs
+      : _allDocs.filter(function(d) { return d.data().status === filter; });
+
+    if (docs.length === 0) {
+      body.innerHTML = '<div style="padding:3rem;text-align:center;color:#718096;font-size:13px;">No requests found.</div>';
+      return;
+    }
+
+    body.innerHTML = docs.map(function(d) {
+      var r = d.data();
+      var isPending  = r.status === 'Pending';
+      var isApproved = r.status === 'Approved';
+      var sc = isPending ? '#d69e2e' : isApproved ? '#38a169' : '#718096';
+      var sb = isPending ? 'rgba(214,158,46,0.1)' : isApproved ? 'rgba(56,161,105,0.1)' : 'rgba(113,128,150,0.1)';
+      return '<div class="table-row" style="grid-template-columns:1fr 1.5fr 1fr 1fr 1fr 140px;align-items:center;">'
+        + '<div style="font-weight:700;color:#1a202c;">' + (r.plate || '—') + '</div>'
+        + '<div style="color:#4a5568;font-size:13px;">' + (r.customerName || '—') + '</div>'
+        + '<div style="font-weight:600;color:#003087;">' + _formatDate(r.preferredDate) + '</div>'
+        + '<div style="color:#718096;font-size:12px;">' + _timeAgo(r.createdAt) + '</div>'
+        + '<div><span style="background:' + sb + ';color:' + sc + ';font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">' + (r.status || 'Pending') + '</span></div>'
+        + '<div style="display:flex;gap:6px;">'
+        + (isPending
+          ? '<button onclick="approveRequest(\'' + d.id + '\',\'' + (r.plate||'') + '\',\'' + (r.preferredDate||'') + '\')" style="padding:5px 12px;background:#38a169;border:none;border-radius:7px;color:white;font-size:12px;font-weight:600;cursor:pointer;">Approve</button>'
+            + '<button onclick="dismissRequest(\'' + d.id + '\')" style="padding:5px 12px;background:#e53e3e;border:none;border-radius:7px;color:white;font-size:12px;font-weight:600;cursor:pointer;">Dismiss</button>'
+          : '<span style="font-size:12px;color:#a0aec0;">—</span>')
+        + '</div>'
+        + '</div>';
+    }).join('');
+  };
+
+  window.approveRequest = function(docId, plate, preferredDate) {
+    if (!confirm('Approve reschedule for ' + plate + ' on ' + _formatDate(preferredDate) + '?')) return;
+    db.collection('pms_reschedule_requests').doc(docId).update({ status: 'Approved' })
+      .then(function() { showToast('Reschedule approved for ' + plate, 'success'); })
+      .catch(function(err) { showToast('Error: ' + err.message, 'error'); });
+  };
+
+  window.dismissRequest = function(docId) {
+    if (!confirm('Dismiss this reschedule request?')) return;
+    db.collection('pms_reschedule_requests').doc(docId).update({ status: 'Dismissed' })
+      .then(function() { showToast('Request dismissed.', 'success'); })
+      .catch(function(err) { showToast('Error: ' + err.message, 'error'); });
+  };
+
+  // Load customer names then render
+  function _loadAndRender(docs) {
+    var uids = [...new Set(docs.map(function(d) { return d.data().customerId; }).filter(Boolean))];
+    if (uids.length === 0) {
+      _allDocs = docs.map(function(d) {
+        var data = Object.assign({}, d.data(), { customerName: '—' });
+        return { id: d.id, data: function() { return data; } };
+      });
+      _updateStats();
+      renderRescheduleList();
+      return;
+    }
+    db.collection('users').where(firebase.firestore.FieldPath.documentId(), 'in', uids.slice(0, 10)).get()
+      .then(function(snap) {
+        var nameMap = {};
+        snap.docs.forEach(function(u) { nameMap[u.id] = u.data().name || '—'; });
+        _allDocs = docs.map(function(d) {
+          var data = Object.assign({}, d.data(), { customerName: nameMap[d.data().customerId] || '—' });
+          return { id: d.id, data: function() { return data; } };
+        });
+        _updateStats();
+        renderRescheduleList();
+      }).catch(function() {
+        _allDocs = docs.map(function(d) {
+          var data = Object.assign({}, d.data(), { customerName: '—' });
+          return { id: d.id, data: function() { return data; } };
+        });
+        _updateStats();
+        renderRescheduleList();
+      });
+  }
+
+  function _updateStats() {
+    var all = _allDocs.map(function(d) { return d.data(); });
+    var s = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; };
+    s('statPending',   all.filter(function(r) { return r.status === 'Pending'; }).length);
+    s('statApproved',  all.filter(function(r) { return r.status === 'Approved'; }).length);
+    s('statDismissed', all.filter(function(r) { return r.status === 'Dismissed'; }).length);
+  }
+
+  // Real-time listener
+  db.collection('pms_reschedule_requests')
+    .orderBy('createdAt', 'desc')
+    .onSnapshot(function(snap) {
+      _loadAndRender(snap.docs);
+    }, function() {
+      db.collection('pms_reschedule_requests').get().then(function(snap) {
+        _loadAndRender(snap.docs);
+      });
+    });
+})();
+</script>
+</body>
+</html>

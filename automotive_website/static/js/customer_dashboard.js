@@ -251,9 +251,44 @@
       ${detailRow('#2b6cb0', 'M3 4h18v18H3zM16 2v4M8 2v4M3 10h18', 'Last Service', v.lastSvcDate || '—')}
       ${detailRow(color, 'M8 6l4-4 4 4M8 18l4 4 4-4M4 12h16', 'Next PMS Due', nextPms)}
       ${detailRow(color, 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'Status', `<span style="background:${bg};color:${color};padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:700;">${statusLabel}</span>`)}
+      ${status === 'Overdue' ? `
+        <div style="margin-top:14px;padding:12px;background:#fff5f5;border-radius:12px;border:1.5px solid #fed7d7;" id="cuRescheduleSection">
+          <div style="font-size:12px;font-weight:600;color:#E8001C;margin-bottom:8px;">⚠️ PMS is overdue — request a reschedule</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="date" id="cuRescheduleDate" min="${new Date().toISOString().split('T')[0]}"
+              style="flex:1;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;font-family:inherit;outline:none;"
+              onfocus="this.style.borderColor='#E8001C'" onblur="this.style.borderColor='#e2e8f0'">
+            <button onclick="cuRequestReschedule('${v.id}','${v.plate}')"
+              style="padding:8px 14px;background:#E8001C;border:none;border-radius:8px;color:white;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit;">
+              Request
+            </button>
+          </div>
+        </div>` : ''}
     `;
 
     document.getElementById('cuVehicleModal').classList.add('active');
+
+    // Check for existing pending reschedule request
+    if (status === 'Overdue') {
+      const user = auth.currentUser;
+      if (user) {
+        db.collection('pms_reschedule_requests')
+          .where('vehicleId', '==', v.id)
+          .where('customerId', '==', user.uid)
+          .where('status', '==', 'Pending')
+          .limit(1).get()
+          .then(function(snap) {
+            const sec = document.getElementById('cuRescheduleSection');
+            if (sec && !snap.empty) {
+              sec.style.background = '#fffbeb';
+              sec.style.borderColor = '#fcd34d';
+              sec.innerHTML = '<div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#d97706;">'
+                + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'
+                + 'You already have a pending reschedule request for this vehicle.</div>';
+            }
+          }).catch(function() {});
+      }
+    }
   };
 
   function detailRow(color, svgPath, label, value) {
@@ -271,6 +306,49 @@
 
   window.cuCloseModal = function () {
     document.getElementById('cuVehicleModal').classList.remove('active');
+  };
+
+  window.cuRequestReschedule = function (vehicleId, plate) {
+    const dateInput = document.getElementById('cuRescheduleDate');
+    const preferredDate = dateInput ? dateInput.value : '';
+    if (!preferredDate) {
+      alert('Please select a preferred reschedule date.');
+      return;
+    }
+    const user = auth.currentUser;
+    if (!user) return;
+
+    // Check for existing pending request first
+    db.collection('pms_reschedule_requests')
+      .where('vehicleId', '==', vehicleId)
+      .where('customerId', '==', user.uid)
+      .where('status', '==', 'Pending')
+      .limit(1).get()
+      .then(function(snap) {
+        if (!snap.empty) {
+          alert('You already have a pending reschedule request for this vehicle. Please wait for the admin to review it.');
+          return;
+        }
+        return db.collection('pms_reschedule_requests').add({
+          vehicleId: vehicleId,
+          plate: plate,
+          customerId: user.uid,
+          preferredDate: preferredDate,
+          status: 'Pending',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+      }).then(function(ref) {
+        if (!ref) return; // was blocked by duplicate check
+        cuCloseModal();
+        const toast = document.getElementById('cuToast');
+        if (toast) {
+          toast.textContent = '✅ Reschedule request sent! The admin will review it shortly.';
+          toast.className = 'cu-toast show';
+          setTimeout(function () { toast.className = 'cu-toast'; }, 4000);
+        }
+      }).catch(function (err) {
+        alert('Failed to send request: ' + err.message);
+      });
   };
 
   // Close modal on backdrop click

@@ -136,12 +136,24 @@ erDiagram
         array values
     }
 
+    PMS_RESCHEDULE_REQUESTS {
+        string id PK
+        string vehicleId FK
+        string plate FK
+        string customerId FK
+        string preferredDate
+        string status
+        timestamp createdAt
+    }
+
     USERS ||--o{ VEHICLES : "owns (ownerId)"
     USERS ||--o{ MAINTENANCE : "created by (createdBy)"
     USERS ||--o{ ISSUANCES : "issued by (createdBy)"
     USERS ||--o{ NOTIFICATIONS : "targeted (targetUid)"
+    USERS ||--o{ PMS_RESCHEDULE_REQUESTS : "requests (customerId)"
     VEHICLES ||--o{ MAINTENANCE : "has (plate)"
     VEHICLES ||--o{ ISSUANCES : "issued to (plate)"
+    VEHICLES ||--o{ PMS_RESCHEDULE_REQUESTS : "requested for (vehicleId)"
     ITEM_MASTER ||--o{ STOCK_INVENTORY : "tracked in (num)"
     ITEM_MASTER ||--o{ ISSUANCES : "issued as (itemNum)"
     ITEM_MASTER ||--o{ TRANSACTIONS : "moved in (item)"
@@ -351,3 +363,23 @@ Since Firebase Firestore is a **NoSQL document database**, there are no enforced
 - **Denormalization** — some fields like `itemName`, `assetDesc`, and `createdBy` are stored as strings (not just IDs) to avoid extra reads at display time.
 - **Real-time listeners** — `onSnapshot()` is used across all collections so the UI updates automatically when any document changes.
 - **Sub-arrays** — `svcRows[]` and `matRows[]` inside `maintenance` documents store embedded line items instead of a separate sub-collection, keeping reads efficient.
+
+---
+
+### Table 10: `pms_reschedule_requests`
+Stores customer-submitted PMS reschedule requests for overdue vehicles.
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | String (PK) | Auto-generated Firestore document ID |
+| `vehicleId` | String (FK → vehicles.id) | Firestore document ID of the vehicle |
+| `plate` | String (FK → vehicles.plate) | Vehicle plate number (for display) |
+| `customerId` | String (FK → users.uid) | Firebase UID of the customer who submitted the request |
+| `preferredDate` | String | Customer's preferred reschedule date (YYYY-MM-DD) |
+| `status` | String | Request status: `Pending`, `Approved`, or `Dismissed` |
+| `createdAt` | Timestamp | Timestamp when the request was submitted |
+
+**Status flow:**
+- `Pending` — submitted by customer, awaiting admin review
+- `Approved` — admin approved the preferred date
+- `Dismissed` — admin dismissed the request

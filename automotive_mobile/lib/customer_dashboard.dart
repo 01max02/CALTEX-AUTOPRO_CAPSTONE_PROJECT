@@ -441,6 +441,10 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                     ]),
                   ),
                   const SizedBox(height: 16),
+                  if (status == 'Overdue') ...[
+                    _RescheduleWidget(vehicleId: v['id']!, plate: v['plate']!),
+                    const SizedBox(height: 12),
+                  ],
                   SizedBox(width: double.infinity,
                     child: OutlinedButton.icon(
                       onPressed: () => Navigator.pop(context),
@@ -738,4 +742,182 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
     ]);
   }
 
+}
+
+// ── PMS Reschedule Request Widget ────────────────────────────
+class _RescheduleWidget extends StatefulWidget {
+  final String vehicleId;
+  final String plate;
+  const _RescheduleWidget({required this.vehicleId, required this.plate});
+
+  @override
+  State<_RescheduleWidget> createState() => _RescheduleWidgetState();
+}
+
+class _RescheduleWidgetState extends State<_RescheduleWidget> {
+  DateTime? _selectedDate;
+  bool _loading = false;
+  bool _sent = false;
+  bool _alreadyPending = false;
+  bool _checking = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkExisting();
+  }
+
+  Future<void> _checkExisting() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final snap = await FirebaseFirestore.instance
+        .collection('pms_reschedule_requests')
+        .where('vehicleId', isEqualTo: widget.vehicleId)
+        .where('customerId', isEqualTo: uid)
+        .where('status', isEqualTo: 'Pending')
+        .limit(1)
+        .get();
+    if (mounted) setState(() { _alreadyPending = snap.docs.isNotEmpty; _checking = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_checking) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+      );
+    }
+
+    if (_alreadyPending) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.amber.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.amber.shade200),
+        ),
+        child: const Row(children: [
+          Icon(Icons.schedule_outlined, color: Colors.amber, size: 20),
+          SizedBox(width: 10),
+          Expanded(child: Text(
+            'You already have a pending reschedule request for this vehicle.',
+            style: TextStyle(fontSize: 12, color: Colors.amber, fontWeight: FontWeight.w600),
+          )),
+        ]),
+      );
+    }
+
+    if (_sent) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.green.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.green.shade200),
+        ),
+        child: const Row(children: [
+          Icon(Icons.check_circle_outline, color: Colors.green, size: 20),
+          SizedBox(width: 10),
+          Expanded(child: Text(
+            'Reschedule request sent! The admin will review it shortly.',
+            style: TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.w600),
+          )),
+        ]),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF5F5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFED7D7), width: 1.5),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Row(children: [
+          Icon(Icons.warning_amber_outlined, color: Color(0xFFE8001C), size: 16),
+          SizedBox(width: 6),
+          Text('PMS is overdue — request a reschedule',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFE8001C))),
+        ]),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.now().add(const Duration(days: 1)),
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                  builder: (c, child) => Theme(
+                    data: Theme.of(c).copyWith(
+                      colorScheme: const ColorScheme.light(primary: Color(0xFFE8001C))),
+                    child: child!),
+                );
+                if (picked != null) setState(() => _selectedDate = picked);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFe2e8f0)),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.calendar_today_outlined, size: 15, color: Color(0xFF718096)),
+                  const SizedBox(width: 8),
+                  Text(
+                    _selectedDate != null
+                        ? '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2,'0')}-${_selectedDate!.day.toString().padLeft(2,'0')}'
+                        : 'Select preferred date',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _selectedDate != null ? const Color(0xFF1a202c) : const Color(0xFFa0aec0),
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            height: 40,
+            child: ElevatedButton(
+              onPressed: _loading || _selectedDate == null ? null : () async {
+                setState(() => _loading = true);
+                try {
+                  final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+                  final dateStr = '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2,'0')}-${_selectedDate!.day.toString().padLeft(2,'0')}';
+                  await FirebaseFirestore.instance.collection('pms_reschedule_requests').add({
+                    'vehicleId': widget.vehicleId,
+                    'plate': widget.plate,
+                    'customerId': uid,
+                    'preferredDate': dateStr,
+                    'status': 'Pending',
+                    'createdAt': FieldValue.serverTimestamp(),
+                  });
+                  if (mounted) setState(() { _sent = true; _loading = false; });
+                } catch (e) {
+                  if (mounted) {
+                    setState(() => _loading = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE8001C),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: _loading
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Request', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+            ),
+          ),
+        ]),
+      ]),
+    );
+  }
 }

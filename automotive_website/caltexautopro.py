@@ -464,6 +464,14 @@ def admin_smart_reports():
 def admin_domains():
     return render_template('admin_domain_management.html')
 
+@app.route('/admin_pms_reschedule.html')
+def admin_pms_reschedule():
+    return render_template('admin_pms_reschedule.html')
+
+@app.route('/admin_receiving.html')
+def admin_receiving():
+    return render_template('admin_receiving.html')
+
 @app.route('/print_layout.html')
 def print_layout():
     return render_template('print_layout.html')

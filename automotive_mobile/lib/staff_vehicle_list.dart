@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class StaffVehicleList extends StatefulWidget {
@@ -342,6 +343,7 @@ class _StaffVehicleListState extends State<StaffVehicleList> {
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     TextField(controller: plateCtrl,
                       textCapitalization: TextCapitalization.characters,
+                      inputFormatters: [_PlateNumberFormatter()],
                       decoration: const InputDecoration(labelText: 'Plate Number *', border: OutlineInputBorder(), hintText: 'e.g. ABC-1234')),
                     const SizedBox(height: 10),
                     TextField(controller: descCtrl,
@@ -364,28 +366,6 @@ class _StaffVehicleListState extends State<StaffVehicleList> {
                     const SizedBox(height: 10),
                     TextField(controller: lastSvcOdoCtrl, keyboardType: TextInputType.number,
                       decoration: const InputDecoration(labelText: 'Last Service Odometer (km)', border: OutlineInputBorder(), suffixText: 'km')),
-                    const SizedBox(height: 10),
-                    TextField(controller: lastSvcDateCtrl,
-                      readOnly: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Last Service Date',
-                        border: OutlineInputBorder(),
-                        hintText: 'Select date',
-                        suffixIcon: Icon(Icons.calendar_today_outlined, size: 18),
-                      ),
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: sheetCtx,
-                          initialDate: DateTime.tryParse(lastSvcDateCtrl.text) ?? DateTime.now(),
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime.now(),
-                        );
-                        if (picked != null) {
-                          lastSvcDateCtrl.text =
-                            '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
-                        }
-                      },
-                    ),
                     const SizedBox(height: 10),
                     TextField(controller: svcFreqCtrl, keyboardType: TextInputType.number,
                       decoration: const InputDecoration(labelText: 'Service Frequency (months)', border: OutlineInputBorder(), hintText: 'e.g. 3')),
@@ -603,6 +583,33 @@ class _OwnerAutocompleteState extends State<_OwnerAutocomplete> {
           suffixIcon: Icon(Icons.person_search_outlined, size: 20, color: Color(0xFF718096)),
         ),
       ),
+    );
+  }
+}
+
+/// Philippine plate number formatter: AAA-1234 (3 letters, dash, 4 digits)
+class _PlateNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    final raw = newValue.text.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+
+    final buffer = StringBuffer();
+    for (int i = 0; i < raw.length && i < 7; i++) {
+      if (i < 3) {
+        if (RegExp(r'[A-Z]').hasMatch(raw[i])) buffer.write(raw[i]);
+      } else if (i == 3) {
+        if (buffer.length == 3) buffer.write('-');
+        if (RegExp(r'[0-9]').hasMatch(raw[i])) buffer.write(raw[i]);
+      } else {
+        if (RegExp(r'[0-9]').hasMatch(raw[i])) buffer.write(raw[i]);
+      }
+    }
+
+    final result = buffer.toString();
+    return TextEditingValue(
+      text: result,
+      selection: TextSelection.collapsed(offset: result.length),
     );
   }
 }

@@ -108,7 +108,11 @@
         <form id="addAssetForm" style="padding:1.25rem 1.5rem;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:0.85rem;">
             <div class="form-group" style="margin:0;">
                 <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Plate Number *</label>
-                <input type="text" name="plateNumber" placeholder="e.g. ABC-1234" required style="margin-top:0.3rem;text-transform:uppercase;">
+                <input type="text" name="plateNumber" placeholder="e.g. ABC-1234" required
+                    maxlength="8"
+                    style="margin-top:0.3rem;text-transform:uppercase;"
+                    oninput="formatPlateNumber(this)"
+                    onkeydown="return filterPlateKey(event, this)">
             </div>
             <div class="form-group" style="margin:0;">
                 <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Description *</label>
@@ -126,7 +130,13 @@
             </div>
             <div class="form-group" style="margin:0;">
                 <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Owner</label>
-                <input type="text" name="ownerName" placeholder="e.g. Juan Dela Cruz" style="margin-top:0.3rem;">
+                <div style="position:relative;margin-top:0.3rem;">
+                    <svg style="position:absolute;left:0.65rem;top:50%;transform:translateY(-50%);pointer-events:none;color:#a0aec0;" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <input type="text" name="ownerName" id="ownerNameInput" placeholder="Search customer name..." autocomplete="off"
+                        style="width:100%;padding:0.55rem 0.75rem 0.55rem 2.1rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.83rem;box-sizing:border-box;"
+                        oninput="ownerNameLookup(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();}">
+                </div>
+                <div id="ownerNameSuggestions" style="display:none;background:white;border:1px solid #e2e8f0;border-radius:8px;margin-top:2px;max-height:180px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.08);z-index:100;position:relative;"></div>
             </div>
             <div class="form-group" style="margin:0;">
                 <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Current Odometer (km)</label>
@@ -135,10 +145,6 @@
             <div class="form-group" style="margin:0;">
                 <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Last Service Odometer (km)</label>
                 <input type="number" name="lastServiceOdometer" placeholder="e.g. 40000" min="0" style="margin-top:0.3rem;">
-            </div>
-            <div class="form-group" style="margin:0;">
-                <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Last Service Date</label>
-                <input type="date" name="lastServiceDate" style="margin-top:0.3rem;">
             </div>
             <div class="form-group" style="margin:0;">
                 <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Service Frequency (months)</label>
@@ -270,6 +276,9 @@
     form.elements.plateNumber.value = asset.plateNumber || asset.plate || '';
     form.elements.assetDescription.value = asset.assetDescription || asset.desc || '';
     form.elements.ownerName.value = asset.owner || '';
+    // Also sync the visible input with id
+    var ownerInput = document.getElementById('ownerNameInput');
+    if (ownerInput) ownerInput.value = asset.owner || '';
     form.elements.currentOdometer.value = asset.odometer ? String(asset.odometer).replace(/[^0-9]/g, '') : '';
     form.elements.lastServiceOdometer.value = asset.lastSvcOdo || asset.lastServiceOdometer || '';
     form.elements.lastServiceDate.value = asset.lastServiceDate || asset.lastSvcDate || '';
@@ -296,7 +305,7 @@
       e.preventDefault();
       var plate = form.elements.plateNumber.value.trim().toUpperCase();
       if (!plate) return;
-      var lastSvcDate = form.elements.lastServiceDate.value;
+      var lastSvcDate = form.elements.lastServiceDate ? form.elements.lastServiceDate.value : '';
       var svcFreq = form.elements.serviceFrequency.value;
       var ownerName = form.elements.ownerName.value.trim();
       var data = {
@@ -364,5 +373,93 @@
       }
     });
   });
+
+  // ── Owner name autocomplete (customers only) ─────────────
+  var _ownerNames = [];
+  var _ownerNamesLoaded = false;
+
+  function _loadOwnerNames() {
+    if (_ownerNamesLoaded) return Promise.resolve();
+    return firebase.firestore().collection('users')
+      .where('role', '==', 'customer').get()
+      .then(function(snap) {
+        _ownerNames = snap.docs
+          .map(function(d) { return d.data().name || ''; })
+          .filter(function(n) { return n.trim() !== ''; })
+          .sort();
+        _ownerNamesLoaded = true;
+      }).catch(function() {});
+  }
+
+  function ownerNameLookup(input) {
+    var q = input.value.trim().toLowerCase();
+    var suggestions = document.getElementById('ownerNameSuggestions');
+    if (!q) { suggestions.style.display = 'none'; return; }
+
+    _loadOwnerNames().then(function() {
+      var matches = _ownerNames.filter(function(n) {
+        return n.toLowerCase().includes(q);
+      });
+      if (matches.length === 0) { suggestions.style.display = 'none'; return; }
+      suggestions.innerHTML = matches.map(function(name) {
+        return '<div style="padding:0.6rem 0.85rem;cursor:pointer;border-bottom:1px solid #f0f4f8;display:flex;align-items:center;gap:0.6rem;font-size:0.85rem;" '
+          + 'onmousedown="event.preventDefault();ownerNameSelect(\'' + name.replace(/'/g, "\\'") + '\');">'
+          + '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#003087" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+          + '<span style="font-weight:600;color:#1a202c;">' + name + '</span>'
+          + '</div>';
+      }).join('');
+      suggestions.style.display = 'block';
+    });
+  }
+
+  function ownerNameSelect(name) {
+    var input = document.getElementById('ownerNameInput');
+    if (input) input.value = name;
+    document.getElementById('ownerNameSuggestions').style.display = 'none';
+  }
+
+  // Close suggestions on outside click
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('#ownerNameInput') && !e.target.closest('#ownerNameSuggestions')) {
+      var s = document.getElementById('ownerNameSuggestions');
+      if (s) s.style.display = 'none';
+    }
+  });
+
+  // Pre-load owner names when modal opens
+  var _origOpenAddAssetModal = window.openAddAssetModal;
+  window.openAddAssetModal = function() {
+    _loadOwnerNames();
+    if (typeof _origOpenAddAssetModal === 'function') _origOpenAddAssetModal();
+  };
+
+  // ── Plate number formatter: AAA-1234 ──────────────────────
+  function formatPlateNumber(input) {
+    var raw = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    var result = '';
+    var letters = 0, digits = 0;
+    for (var i = 0; i < raw.length; i++) {
+      var ch = raw[i];
+      if (letters < 3 && /[A-Z]/.test(ch)) {
+        result += ch; letters++;
+        if (letters === 3) result += '-';
+      } else if (letters === 3 && digits < 4 && /[0-9]/.test(ch)) {
+        result += ch; digits++;
+      }
+    }
+    input.value = result;
+  }
+
+  function filterPlateKey(e, input) {
+    var val = input.value;
+    var letters = val.replace(/[^A-Z]/gi, '').length;
+    var digits  = val.replace(/[^0-9]/g, '').length;
+    var key = e.key;
+    // Always allow control keys
+    if (key.length > 1) return true;
+    if (letters < 3 && /[a-zA-Z]/.test(key)) return true;
+    if (letters >= 3 && digits < 4 && /[0-9]/.test(key)) return true;
+    e.preventDefault(); return false;
+  }
 </script>
 </html>

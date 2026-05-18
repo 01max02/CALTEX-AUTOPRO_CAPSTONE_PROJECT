@@ -1,5 +1,9 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 class AdminSmartReports extends StatefulWidget {
   const AdminSmartReports({super.key});
@@ -113,11 +117,142 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
     });
     _scrollToBottom();
 
-    Future.delayed(const Duration(milliseconds: 600), () {
-      final result = _processQuery(text);
-      setState(() => _messages.add(_ChatMessage(role: 'ai', result: result)));
-      _scrollToBottom();
+    // Detect export intent
+    final tl = text.toLowerCase();
+    final wantPdf   = tl.contains('pdf') || (tl.contains('generate') && tl.contains('report') && !tl.contains('excel') && !tl.contains('csv'));
+    final wantCsv   = tl.contains('excel') || tl.contains('csv') || tl.contains('spreadsheet');
+    final wantExport = wantPdf || wantCsv || tl.contains('export') || tl.contains('download') || tl.contains('generate report');
+
+    // Strip export keywords to get the actual data query
+    final dataQuery = text
+        .replaceAll(RegExp(r'generate\s+(a\s+)?report\s*(for|of|about|on)?', caseSensitive: false), '')
+        .replaceAll(RegExp(r'export\s+(to\s+)?(pdf|excel|csv|spreadsheet)?', caseSensitive: false), '')
+        .replaceAll(RegExp(r'download\s+(as\s+)?(pdf|excel|csv)?', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\b(pdf|excel|csv|spreadsheet)\b', caseSensitive: false), '')
+        .trim();
+
+    Future.delayed(const Duration(milliseconds: 600), () async {
+      final result = _processQuery(dataQuery.isEmpty ? text : dataQuery);
+
+      if (wantExport && result.rows.isNotEmpty) {
+        setState(() => _messages.add(_ChatMessage(
+          role: 'ai',
+          result: _QueryResult(
+            type: 'success', icon: wantCsv ? '📊' : '📄',
+            title: wantCsv ? 'Generating CSV Report…' : 'Generating PDF Report…',
+            body: 'Preparing "${result.title}" — please wait.',
+            rows: [],
+          ),
+        )));
+        _scrollToBottom();
+
+        if (wantCsv) {
+          await _exportCsv(result);
+        } else {
+          await _exportPdf(result);
+        }
+      } else if (wantExport && result.rows.isEmpty) {
+        setState(() => _messages.add(_ChatMessage(
+          role: 'ai',
+          result: _QueryResult(
+            type: 'warning', icon: '⚠️',
+            title: 'No Data to Export',
+            body: 'No records found for that query. Try a more specific question first.',
+            rows: [],
+          ),
+        )));
+        _scrollToBottom();
+      } else {
+        setState(() => _messages.add(_ChatMessage(role: 'ai', result: result)));
+        _scrollToBottom();
+      }
     });
+  }
+
+  Future<void> _exportPdf(_QueryResult result) async {
+    final doc = pw.Document();
+    final now = DateTime.now();
+    final dateStr = '${now.day}/${now.month}/${now.year}';
+
+    doc.addPage(pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(32),
+      build: (ctx) => [
+        // Header
+        pw.Container(
+          padding: const pw.EdgeInsets.only(bottom: 12),
+          decoration: const pw.BoxDecoration(
+            border: pw.Border(bottom: pw.BorderSide(color: PdfColors.red, width: 2))),
+          child: pw.Row(children: [
+            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text('Caltex AutoPro', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.red)),
+              pw.Text('Smart Reports AI — Generated Report', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
+            ]),
+          ]),
+        ),
+        pw.SizedBox(height: 16),
+        pw.Text(result.title, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+        pw.SizedBox(height: 4),
+        pw.Text('Generated: $dateStr  ·  ${result.rows.length} record(s)',
+          style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
+        pw.SizedBox(height: 12),
+        pw.Text(result.body, style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700)),
+        pw.SizedBox(height: 12),
+        if (result.rows.isNotEmpty)
+          pw.Table(
+            border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+            children: [
+              // Header row
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(color: PdfColors.blue900),
+                children: [
+                  pw.Padding(padding: const pw.EdgeInsets.all(7),
+                    child: pw.Text('Item', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 11))),
+                  pw.Padding(padding: const pw.EdgeInsets.all(7),
+                    child: pw.Text('Value', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 11))),
+                ],
+              ),
+              ...result.rows.asMap().entries.map((e) => pw.TableRow(
+                decoration: pw.BoxDecoration(color: e.key.isEven ? PdfColors.grey100 : PdfColors.white),
+                children: [
+                  pw.Padding(padding: const pw.EdgeInsets.all(6),
+                    child: pw.Text(e.value.label, style: pw.TextStyle(fontSize: 10, fontWeight: e.value.isBold ? pw.FontWeight.bold : pw.FontWeight.normal))),
+                  pw.Padding(padding: const pw.EdgeInsets.all(6),
+                    child: pw.Text(e.value.value, style: pw.TextStyle(fontSize: 10, fontWeight: e.value.isBold ? pw.FontWeight.bold : pw.FontWeight.normal))),
+                ],
+              )),
+            ],
+          ),
+        pw.SizedBox(height: 24),
+        pw.Text('Caltex AutoPro · JA Noble Enterprise INC · Confidential',
+          style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+      ],
+    ));
+
+    await Printing.sharePdf(
+      bytes: await doc.save(),
+      filename: '${result.title.replaceAll(RegExp(r'[^a-zA-Z0-9 ]'), '').replaceAll(' ', '_')}_${now.year}${now.month.toString().padLeft(2,'0')}${now.day.toString().padLeft(2,'0')}.pdf',
+    );
+  }
+
+  Future<void> _exportCsv(_QueryResult result) async {
+    final now = DateTime.now();
+    final lines = <String>['Item,Value'];
+    for (final row in result.rows) {
+      final label = '"${row.label.replaceAll('"', '""')}"';
+      final value = '"${row.value.replaceAll('"', '""')}"';
+      lines.add('$label,$value');
+    }
+    lines.add('');
+    lines.add('"Generated by Caltex AutoPro Smart Reports AI","${now.day}/${now.month}/${now.year}"');
+
+    final csv = lines.join('\r\n');
+    final bytes = csv.codeUnits;
+
+    await Printing.sharePdf(
+      bytes: Uint8List.fromList(bytes),
+      filename: '${result.title.replaceAll(RegExp(r'[^a-zA-Z0-9 ]'), '').replaceAll(' ', '_')}_${now.year}${now.month.toString().padLeft(2,'0')}${now.day.toString().padLeft(2,'0')}.csv',
+    );
   }
 
   _QueryResult _processQuery(String query) {
@@ -301,6 +436,8 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
       ('⚠️ PMS overdue assets', 'Assets with PMS overdue'),
       ('🔵 Under maintenance', 'Which assets are under maintenance?'),
       ('📋 All vehicles', 'List all vehicles'),
+      ('📄 PDF: PMS Overdue', 'Generate PDF report for PMS overdue assets'),
+      ('📊 CSV: Low Stock', 'Export CSV for low stock items'),
     ];
 
     return SingleChildScrollView(
@@ -315,7 +452,7 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
         const SizedBox(height: 14),
         const Text('Smart Reports AI', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1a202c))),
         const SizedBox(height: 6),
-        const Text('Ask me anything about your fleet — assets, inventory, maintenance costs, and more.',
+        const Text('Ask me anything about your fleet — assets, inventory, maintenance costs, and more. Say "generate PDF report for…" or "export CSV for…" to download a report.',
           style: TextStyle(fontSize: 13, color: Color(0xFF718096)), textAlign: TextAlign.center),
         const SizedBox(height: 24),
         Wrap(
