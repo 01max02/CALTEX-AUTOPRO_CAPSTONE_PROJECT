@@ -943,6 +943,28 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                             }
                           }
 
+                          // Duplicate plate check — prevent adding if plate already has Pending/Ongoing service
+                          if (!isEdit) {
+                            final dupCheck = await _db
+                                .where('plate', isEqualTo: plateCtrl.text.trim().toUpperCase())
+                                .where('status', whereIn: ['Pending', 'Ongoing'])
+                                .limit(1)
+                                .get();
+                            if (dupCheck.docs.isNotEmpty) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                  content: Row(children: const [
+                                    Icon(Icons.warning_amber_rounded, color: Colors.white, size: 18),
+                                    SizedBox(width: 8),
+                                    Expanded(child: Text('This plate already has a Pending or Ongoing service. Complete or delete it first.')),
+                                  ]),
+                                  backgroundColor: Colors.orange, behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                              }
+                              return;
+                            }
+                          }
+
                           final svcId = isEdit ? service!['id'] as String : await _nextSvcId();
                           final data = <String, dynamic>{
                             'id': svcId,

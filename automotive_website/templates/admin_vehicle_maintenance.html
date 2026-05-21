@@ -968,8 +968,22 @@ function svcSave() {
   } else {
     data.status = 'Pending';
     data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-    db.collection('maintenance').add(data)
-      .then(function() { closeModal('svcAddModal'); showToast('Service added successfully!', 'success'); })
+    // Check for existing Pending/Ongoing service for this plate
+    db.collection('maintenance')
+      .where('plate', '==', plate)
+      .where('status', 'in', ['Pending', 'Ongoing'])
+      .limit(1).get()
+      .then(function(snap) {
+        if (!snap.empty) {
+          showToast('This vehicle already has a Pending or Ongoing service. Complete or cancel it first.', 'error');
+          if (sBtn) { sBtn.disabled = false; sBtn.innerHTML = sBtnOrigHtml; }
+          return;
+        }
+        return db.collection('maintenance').add(data);
+      })
+      .then(function(ref) {
+        if (ref) { closeModal('svcAddModal'); showToast('Service added successfully!', 'success'); }
+      })
       .catch(function(err) { showToast('Save failed: ' + err.message, 'error'); })
       .finally(function() { if (sBtn) { sBtn.disabled = false; sBtn.innerHTML = sBtnOrigHtml; } });
   }

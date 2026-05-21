@@ -98,19 +98,24 @@ class _StaffDashboardState extends State<StaffDashboard> {
   }
 
   Widget _buildBody() {
-    switch (_currentIndex) {
-      case 0: return _buildDashboard();
-      case 1: return const StaffInventory();
-      case 2: return const StaffMaintenance();
-      case 3: return const StaffVehicleList();
-      default: return _buildDashboard();
-    }
+    // Only dashboard renders inline; other tabs navigate to their own pages
+    return _buildDashboard();
   }
 
   Widget _buildBottomNav() {
     return StaffBottomNavBar(
       currentIndex: _currentIndex,
-      onIndexChanged: (index) => setState(() => _currentIndex = index),
+      onIndexChanged: (index) {
+        if (index == 0) {
+          setState(() => _currentIndex = 0);
+        } else if (index == 1) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const StaffInventory()));
+        } else if (index == 2) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const StaffMaintenance()));
+        } else if (index == 3) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const StaffVehicleList()));
+        }
+      },
       onScanPressed: _showScanModal,
     );
   }

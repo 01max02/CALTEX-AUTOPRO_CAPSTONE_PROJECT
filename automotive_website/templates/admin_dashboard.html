@@ -287,7 +287,7 @@
                                 <canvas id="topPartsBarChart"></canvas>
                             </div>
                             <div id="topPartsEmpty" style="display:none;text-align:center;padding:2rem;color:#718096;font-size:0.85rem;">
-                                No material issuances recorded this month.
+                                No material issuances recorded yet.
                             </div>
                         </div>
 
@@ -884,33 +884,25 @@
         }
 
         // ════════════════════════════════════════
-        // 4. BAR CHART — Top 10 Most Used Parts (This Month)
+        // 4. BAR CHART — Top 10 Most Used Parts (All Time)
         // ════════════════════════════════════════
         const issuances = window._fbIssuances || [];
         const nowDate   = new Date();
         const curMonth  = nowDate.getMonth();
         const curYear   = nowDate.getFullYear();
 
-        // Filter issuances to current month, materials only (exclude services)
-        const thisMonthIssuances = issuances.filter(iss => {
-          if ((iss.itemType || '').toLowerCase() === 'service') return false;
-          const dateStr = iss.date || '';
-          if (!dateStr) return false;
-          // Format: "Jan 5, 2025"
-          const parts = dateStr.split(' ');
-          if (parts.length < 3) return false;
-          const m = MONTHS.indexOf(parts[0]);
-          const y = parseInt(parts[2]);
-          return m === curMonth && y === curYear;
+        // Use ALL material issuances (not just current month) for better visibility
+        const materialIssuances = issuances.filter(iss => {
+          return (iss.itemType || '').toLowerCase() !== 'service';
         });
 
         // Aggregate qty by item name
         const partUsage = {};
-        thisMonthIssuances.forEach(iss => {
+        materialIssuances.forEach(iss => {
           const name = iss.itemName || iss.item || '—';
           const qty  = typeof iss.quantity === 'number' ? iss.quantity
                      : parseFloat(String(iss.quantity || iss.qty || '0').replace(/[^0-9.]/g, '')) || 0;
-          partUsage[name] = (partUsage[name] || 0) + qty;
+          if (qty > 0) partUsage[name] = (partUsage[name] || 0) + qty;
         });
 
         // Sort descending, take top 10
@@ -923,8 +915,8 @@
         const topPartsBadge  = document.getElementById('topPartsBadge');
         const topPartsSub    = document.getElementById('topPartsSubLabel');
 
-        // Update subtitle with current month name
-        if (topPartsSub) topPartsSub.textContent = MONTHS[curMonth] + ' ' + curYear + ' · Materials only';
+        // Update subtitle
+        if (topPartsSub) topPartsSub.textContent = 'All time · Materials only';
 
         if (sorted.length === 0) {
           if (topPartsEmpty)  topPartsEmpty.style.display  = 'block';
