@@ -221,12 +221,9 @@ class _AdminUsersState extends State<AdminUsers> {
           final admins = users.where((u) => u['role'] == 'admin').length;
 
           // Split pending vs active/inactive
-          final pending  = filtered.where((u) => u['status']?.toLowerCase() == 'pending').toList();
           final nonPending = filtered.where((u) => u['status']?.toLowerCase() != 'pending').toList();
 
-          return DefaultTabController(
-            length: 2,
-            child: Column(children: [
+          return Column(children: [
               // ── Stat chips ──
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -240,63 +237,19 @@ class _AdminUsersState extends State<AdminUsers> {
                   _statChip('Staff', '$staff', const Color(0xFF003087)),
                 ]),
               ),
-              // ── Tabs ──
-              TabBar(
-                labelColor: _red,
-                unselectedLabelColor: const Color(0xFF718096),
-                indicatorColor: _red,
-                tabs: [
-                  const Tab(text: 'All Users'),
-                  Tab(
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Text('Pending'),
-                      if (pending.isNotEmpty) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.orange,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text('${pending.length}',
-                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ]),
-                  ),
-                ],
-              ),
-              // ── Tab views ──
+              const SizedBox(height: 8),
+              // ── User list ──
               Expanded(
-                child: TabBarView(children: [
-                  // ── All Users tab ──
-                  nonPending.isEmpty
-                      ? const Center(child: Text('No users found.', style: TextStyle(color: Color(0xFF718096))))
-                      : ListView.separated(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: nonPending.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 10),
-                          itemBuilder: (_, i) => _userCard(nonPending[i]),
-                        ),
-                  // ── Pending tab ──
-                  pending.isEmpty
-                      ? const Center(
-                          child: Column(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(Icons.check_circle_outline, size: 48, color: Color(0xFFcbd5e0)),
-                            SizedBox(height: 12),
-                            Text('No pending registrations', style: TextStyle(color: Color(0xFF718096))),
-                          ]),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: pending.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 10),
-                          itemBuilder: (_, i) => _pendingCard(pending[i]),
-                        ),
-                ]),
+                child: nonPending.isEmpty
+                    ? const Center(child: Text('No users found.', style: TextStyle(color: Color(0xFF718096))))
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: nonPending.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (_, i) => _userCard(nonPending[i]),
+                      ),
               ),
-            ]),
-          );
+            ]);
         },
       ),
     );

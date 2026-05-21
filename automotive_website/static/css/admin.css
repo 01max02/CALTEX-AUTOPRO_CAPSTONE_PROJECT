@@ -122,9 +122,33 @@
 
 /* ── Sidebar footer — user info ── */
 .admin-sidebar-footer {
-    padding: 1rem 1.25rem;
-    border-top: 1px solid #e2e8f0;
-    background: #fff;
+    padding: 0 !important;
+    border-top: 1px solid #e2e8f0 !important;
+    background: #fff !important;
+    flex-shrink: 0 !important;
+    display: block !important;
+    margin-top: auto;
+}
+
+.admin-sidebar-footer .logout-btn {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    width: calc(100% - 24px);
+    margin: 0 12px 12px;
+    padding: 10px 14px;
+    background: #fff5f5;
+    color: #E8001C;
+    border: 1.5px solid #fed7d7;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    justify-content: center;
+}
+.admin-sidebar-footer .logout-btn:hover {
+    background: #fee2e2;
 }
 
 .admin-user-info {
@@ -773,7 +797,17 @@
 .admin-sidebar {
     width: 256px;
     min-width: 256px;
+    display: flex;
+    flex-direction: column;
 }
+
+.admin-sidebar .admin-nav {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.admin-sidebar .admin-nav::-webkit-scrollbar { display: none; }
 
 /* ── Portal body — no scroll on outer body ── */
 .portal-body {

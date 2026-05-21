@@ -62,20 +62,7 @@
                 </div>
             </div>
 
-            <!-- ── Tabs ── -->
-            <div style="display:flex;gap:0;border-bottom:2px solid #e2e8f0;margin-bottom:1.25rem;">
-                <button id="tabAllBtn" onclick="switchTab('all')"
-                    style="padding:0.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:0.88rem;font-weight:700;color:#E31E24;border-bottom:2px solid #E31E24;margin-bottom:-2px;transition:all 0.2s;">
-                    All Users
-                </button>
-                <button id="tabPendingBtn" onclick="switchTab('pending')"
-                    style="padding:0.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:0.88rem;font-weight:700;color:#718096;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s;display:flex;align-items:center;gap:0.4rem;">
-                    Pending
-                    <span id="pendingBadge" style="display:none;background:#f6ad55;color:white;font-size:0.7rem;font-weight:800;padding:1px 7px;border-radius:10px;"></span>
-                </button>
-            </div>
-
-            <!-- ── All Users Tab ── -->
+            <!-- ── Users Table ── -->
             <div id="tabAll">
                 <div class="data-table">
                     <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:40px 2fr 2fr 1fr 1fr 140px;">
@@ -83,11 +70,6 @@
                     </div>
                     <div id="userCardsList"></div>
                 </div>
-            </div>
-
-            <!-- ── Pending Tab ── -->
-            <div id="tabPending" style="display:none;">
-                <div id="pendingCardsList"></div>
             </div>
         </div>
     </div>

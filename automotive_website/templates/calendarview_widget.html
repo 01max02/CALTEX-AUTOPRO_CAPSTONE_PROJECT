@@ -103,6 +103,9 @@
     <span style="display:flex;align-items:center;gap:4px;font-size:0.68rem;color:#4a5568;">
       <span style="width:8px;height:8px;border-radius:2px;background:#0d9488;display:inline-block;"></span>Today
     </span>
+    <span style="display:flex;align-items:center;gap:4px;font-size:0.68rem;color:#4a5568;">
+      <span style="width:8px;height:8px;border-radius:2px;background:#7c3aed;display:inline-block;"></span>Booked
+    </span>
   </div>
 </div>
 
@@ -197,6 +200,20 @@
   // ── Build PMS events ──
   // Uses window.assets (mapped, always has nextPMSDue computed) if available,
   // falls back to window._fbVehicles (raw Firestore) for pages without admin_firebase.js
+  // Also includes approved service bookings from service_bookings collection
+  let _approvedBookings = [];
+
+  function _loadApprovedBookings() {
+    if (typeof firebase === 'undefined' || !firebase.firestore) return;
+    firebase.firestore().collection('service_bookings')
+      .where('status', '==', 'Approved')
+      .onSnapshot(function(snap) {
+        _approvedBookings = snap.docs.map(function(d) { return d.data(); });
+        _buildPmsEvents();
+        if (_panelOpen) _renderCalendar();
+      }, function() {});
+  }
+
   function _buildPmsEvents() {
     _pmsEvents = {};
     const today = new Date();
@@ -252,11 +269,27 @@
     // Show/hide dot on toggle button
     const dot = document.getElementById('pmsCalDot');
     if (dot) dot.style.display = urgentCount > 0 ? 'block' : 'none';
+
+    // ── Add approved service bookings to calendar ──
+    _approvedBookings.forEach(function(b) {
+      if (!b.preferredDate) return;
+      const key = b.preferredDate; // already YYYY-MM-DD format
+      const due = new Date(b.preferredDate + 'T00:00:00');
+      if (isNaN(due.getTime())) return;
+      const daysUntil = Math.round((due - today) / 86400000);
+      if (!_pmsEvents[key]) _pmsEvents[key] = [];
+      _pmsEvents[key].push({
+        plate: (b.plate || '—') + ' (Booked)',
+        daysUntil: daysUntil,
+        urgency: 'booking'
+      });
+    });
   }
 
   function _urgencyColor(u) {
     if (u === 'overdue') return '#E8001C';
     if (u === 'week')    return '#ed8936';
+    if (u === 'booking') return '#7c3aed';
     return '#003087';
   }
 
@@ -348,7 +381,9 @@
 
     list.innerHTML = events.map(function(e) {
       const color = _urgencyColor(e.urgency);
-      const lbl   = e.daysUntil < 0
+      const lbl   = e.urgency === 'booking'
+        ? (e.daysUntil < 0 ? 'Past' : e.daysUntil === 0 ? 'Today' : 'In ' + e.daysUntil + ' day' + (e.daysUntil !== 1 ? 's' : ''))
+        : e.daysUntil < 0
         ? Math.abs(e.daysUntil) + ' day' + (Math.abs(e.daysUntil) !== 1 ? 's' : '') + ' overdue'
         : e.daysUntil === 0 ? 'Due today'
         : 'Due in ' + e.daysUntil + ' day' + (e.daysUntil !== 1 ? 's' : '');
@@ -392,6 +427,7 @@
 
   // Init — wait for either window.assets or window._fbVehicles to be populated
   document.addEventListener('DOMContentLoaded', function() {
+    _loadApprovedBookings();
     const iv = setInterval(function() {
       const hasAssets   = window.assets   && window.assets.length   > 0;
       const hasVehicles = window._fbVehicles && window._fbVehicles.length > 0;

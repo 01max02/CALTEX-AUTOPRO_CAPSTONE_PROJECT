@@ -82,54 +82,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
         'name':       '$firstName $lastName',
         'email':      email,
         'role':       'customer',
-        'status':     'pending',
+        'status':     'active',
         'createdAt':  FieldValue.serverTimestamp(),
       });
-
-      // Notify all admins in Firestore so it shows in their notification list
-      final adminSnap = await FirebaseFirestore.instance
-          .collection('users')
-          .where('role', isEqualTo: 'admin')
-          .get();
-
-      await FirebaseFirestore.instance.collection('notifications').add({
-        'title':      '🆕 New Account Registration',
-        'message':    '$firstName $lastName ($email) has registered and is awaiting approval.',
-        'type':       'info',
-        'targetRole': 'admin',
-        'targetUid':  '',
-        'createdAt':  FieldValue.serverTimestamp(),
-        'readBy':     <String, bool>{},
-        'isRead':     false,
-      });
-
-      // Also push OneSignal notification to each admin device
-      for (final adminDoc in adminSnap.docs) {
-        final subId = adminDoc.data()['oneSignalId'] as String?;
-        if (subId != null && subId.isNotEmpty) {
-          try {
-            await http.post(
-              Uri.parse('https://onesignal.com/api/v1/notifications'),
-              headers: {
-                'Authorization': 'Basic $_kOneSignalApiKey',
-                'Content-Type': 'application/json; charset=utf-8',
-              },
-              body: jsonEncode({
-                'app_id': _kOneSignalAppId,
-                'include_subscription_ids': [subId],
-                'headings': {'en': '🆕 New Account Registration'},
-                'contents': {'en': '$firstName $lastName ($email) is awaiting approval.'},
-                'data': {'type': 'new_registration'},
-              }),
-            );
-          } catch (_) {}
-        }
-      }
 
       if (!mounted) return;
-      // Sign out — they can't use the app until approved
+      // Sign out — they need to login with their new credentials
       await FirebaseAuth.instance.signOut();
-      _showPendingDialog();
+
+      // Show success and go back to login
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account created successfully! You can now sign in.'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      Navigator.pop(context); // go back to login
     } on FirebaseAuthException catch (e) {
       final msg = switch (e.code) {
         'email-already-in-use' => 'An account with this email already exists.',
@@ -206,50 +176,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(children: [
-            // ── Header ──
-            Stack(children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(20, 50, 20, 60),
-                color: _red,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Image.asset('assets/img/LOGO_CALTEX.png',
-                        width: 72, height: 72, fit: BoxFit.contain),
-                    const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Image.asset('assets/img/CALTEX_LETTER.png',
-                            height: 44, fit: BoxFit.contain),
-                        const SizedBox(height: 4),
-                        const Text('AutoPro',
-                            style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 4)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Positioned(
-                bottom: 0, left: 0, right: 0,
-                child: Container(
-                  height: 40,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(32),
-                      topRight: Radius.circular(32),
-                    ),
-                  ),
-                ),
-              ),
-            ]),
+            const SizedBox(height: 40),
 
             // ── Form ──
             Padding(
@@ -272,40 +199,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 28),
 
-                  // First Name & Last Name (side by side)
-                  Row(children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _label('First Name'),
-                          const SizedBox(height: 6),
-                          TextField(
-                            controller: _firstNameCtrl,
-                            textCapitalization: TextCapitalization.words,
-                            style: _inputTextStyle,
-                            decoration: _inputDecoration('First name', Icons.person_outline),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _label('Last Name'),
-                          const SizedBox(height: 6),
-                          TextField(
-                            controller: _lastNameCtrl,
-                            textCapitalization: TextCapitalization.words,
-                            style: _inputTextStyle,
-                            decoration: _inputDecoration('Last name', Icons.person_outline),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ]),
+                  // First Name
+                  _label('First Name'),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _firstNameCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    style: _inputTextStyle,
+                    decoration: _inputDecoration('First name', Icons.person_outline),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Last Name
+                  _label('Last Name'),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _lastNameCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    style: _inputTextStyle,
+                    decoration: _inputDecoration('Last name', Icons.person_outline),
+                  ),
                   const SizedBox(height: 16),
 
                   // Email

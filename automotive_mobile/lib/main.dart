@@ -7,6 +7,7 @@ import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:workmanager/workmanager.dart';
 import 'firebase_options.dart';
 import 'login.dart';
+import 'welcome_screen.dart';
 import 'staff_dashboard.dart';
 import 'background_dss.dart';
 
@@ -83,15 +84,16 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Caltex AutoPro',
+      title: 'JA Noble',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFE8001C)),
         fontFamily: 'Roboto',
       ),
-      initialRoute: '/',
+      home: const WelcomeScreen(),
       routes: {
-        '/': (_) => const LoginScreen(),
+        '/welcome': (_) => const WelcomeScreen(),
+        '/login': (_) => const LoginScreen(),
         '/staff': (_) => const StaffDashboard(),
       },
     );

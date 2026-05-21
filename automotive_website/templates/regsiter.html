@@ -86,19 +86,7 @@
 <body>
 
 <div class="card">
-  <!-- Left Panel -->
-  <div class="header">
-    <div class="header-content">
-      <img class="logo" src="../static/img/LOGO_CALTEX.png" alt="Caltex Logo" />
-      <div class="header-text">
-        <img class="wordmark-img" src="../static/img/CALTEX_LETTER.png" alt="Caltex" />
-        <span class="tagline">AutoPro</span>
-      </div>
-      <p class="header-desc">Your trusted automotive service partner.</p>
-    </div>
-  </div>
-
-  <!-- Right Panel / Form -->
+  <!-- Form -->
   <div class="form-area">
     <p class="form-title">Create Account</p>
     <p class="form-sub">Sign up to get started</p>
@@ -261,27 +249,16 @@
         name:      name,
         email:     email,
         role:      'customer',
-        status:    'pending',
+        status:    'active',
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
 
-      // 4. Write in-app notification for admins
-      await db.collection('notifications').add({
-        title:      '🆕 New Account Registration',
-        message:    `${name} (${email}) has registered and is awaiting approval.`,
-        type:       'info',
-        targetRole: 'admin',
-        targetUid:  '',
-        createdAt:  firebase.firestore.FieldValue.serverTimestamp(),
-        readBy:     {},
-        isRead:     false,
-      });
-
-      // 5. Sign out — can't use app until approved
+      // 4. Sign out — they need to login with their new credentials
       await firebase.auth().signOut();
 
-      // 6. Show pending dialog
-      document.getElementById('pendingOverlay').classList.add('show');
+      // 5. Show success toast and redirect to login
+      showToast('Account created successfully! You can now sign in.', 'success');
+      setTimeout(function() { window.location.href = 'login.html'; }, 2000);
 
     } catch (e) {
       let msg = 'Registration failed. Please try again.';

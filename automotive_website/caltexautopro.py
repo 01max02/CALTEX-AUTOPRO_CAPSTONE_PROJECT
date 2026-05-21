@@ -464,9 +464,9 @@ def admin_smart_reports():
 def admin_domains():
     return render_template('admin_domain_management.html')
 
-@app.route('/admin_pms_reschedule.html')
-def admin_pms_reschedule():
-    return render_template('admin_pms_reschedule.html')
+@app.route('/admin_service_bookings.html')
+def admin_service_bookings():
+    return render_template('admin_service_bookings.html')
 
 @app.route('/admin_receiving.html')
 def admin_receiving():
@@ -529,6 +529,10 @@ def customer_dashboard():
 @app.route('/customer_pms_history.html')
 def customer_pms_history():
     return render_template('customer_pms_history.html')
+
+@app.route('/customer_book_service.html')
+def customer_book_service():
+    return render_template('customer_book_service.html')
 
 @app.route('/pms_history_details.html')
 def pms_history_details():

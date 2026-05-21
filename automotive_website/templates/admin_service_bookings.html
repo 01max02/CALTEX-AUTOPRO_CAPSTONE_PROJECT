@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PMS Reschedule Requests</title>
+    <title>Service Bookings</title>
     <link rel="icon" type="image/png" href="../static/img/LOGO_CALTEX.png" />
     <link rel="stylesheet" href="../static/css/style.css">
     <link rel="stylesheet" href="../static/css/admin.css">
@@ -19,17 +19,9 @@
         <div class="admin-header">
             <div>
                 <div class="breadcrumb">Admin Portal › Vehicle Maintenance Management</div>
-                <div class="admin-header-title">PMS Reschedule Requests</div>
+                <div class="admin-header-title">Service Bookings</div>
             </div>
             <div style="margin-left:auto;display:flex;align-items:center;gap:0.75rem;">
-                <!-- Filter -->
-                <select id="statusFilter" onchange="renderRescheduleList()"
-                    style="padding:0.5rem 0.75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.83rem;font-family:inherit;background:white;color:#4a5568;cursor:pointer;">
-                    <option value="all">All Requests</option>
-                    <option value="Pending" selected>Pending</option>
-                    <option value="Approved">Approved</option>
-                    <option value="Dismissed">Dismissed</option>
-                </select>
             </div>
         </div>
 
@@ -59,11 +51,28 @@
                 </div>
             </div>
 
+            <!-- Tabs -->
+            <div style="display:flex;gap:0;border-bottom:2px solid #e2e8f0;margin-bottom:1.25rem;">
+                <button class="sb-tab active" data-filter="Pending" onclick="sbSwitchTab(this,'Pending')" style="padding:0.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:0.88rem;font-weight:700;color:#d69e2e;border-bottom:2px solid #d69e2e;margin-bottom:-2px;transition:all 0.2s;display:flex;align-items:center;gap:0.4rem;">
+                    Pending <span id="tabBadgePending" style="background:#d69e2e;color:white;font-size:0.7rem;font-weight:800;padding:1px 7px;border-radius:10px;">0</span>
+                </button>
+                <button class="sb-tab" data-filter="Approved" onclick="sbSwitchTab(this,'Approved')" style="padding:0.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:0.88rem;font-weight:700;color:#718096;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s;">
+                    Approved
+                </button>
+                <button class="sb-tab" data-filter="Dismissed" onclick="sbSwitchTab(this,'Dismissed')" style="padding:0.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:0.88rem;font-weight:700;color:#718096;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s;">
+                    Dismissed
+                </button>
+                <button class="sb-tab" data-filter="all" onclick="sbSwitchTab(this,'all')" style="padding:0.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:0.88rem;font-weight:700;color:#718096;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s;">
+                    All
+                </button>
+            </div>
+
             <!-- Table -->
             <div class="data-table">
-                <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:1fr 1.5fr 1fr 1fr 1fr 140px;">
+                <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:1fr 1.5fr 1.5fr 1fr 1fr 1fr 140px;">
                     <div>Plate</div>
                     <div>Customer</div>
+                    <div>Services</div>
                     <div>Preferred Date</div>
                     <div>Requested</div>
                     <div>Status</div>
@@ -121,7 +130,6 @@
   var _MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
   function _formatDate(dateStr) {
-    // Expects YYYY-MM-DD
     if (!dateStr) return '—';
     var parts = dateStr.split('-');
     if (parts.length !== 3) return dateStr;
@@ -132,104 +140,105 @@
     return _MONTHS[m] + ' ' + d + ', ' + y;
   }
 
+  var _currentFilter = 'Pending';
+
+  window.sbSwitchTab = function(btn, filter) {
+    _currentFilter = filter;
+    document.querySelectorAll('.sb-tab').forEach(function(t) {
+      t.style.color = '#718096';
+      t.style.borderBottom = '2px solid transparent';
+      t.classList.remove('active');
+    });
+    var colors = { 'Pending':'#d69e2e', 'Approved':'#38a169', 'Dismissed':'#718096', 'all':'#003087' };
+    btn.style.color = colors[filter] || '#003087';
+    btn.style.borderBottom = '2px solid ' + (colors[filter] || '#003087');
+    btn.classList.add('active');
+    renderRescheduleList();
+  };
+
   window.renderRescheduleList = function () {
-    var filter = (document.getElementById('statusFilter') || {}).value || 'all';
+    var filter = _currentFilter;
     var body = document.getElementById('rescheduleTableBody');
     if (!body) return;
 
     var docs = filter === 'all'
       ? _allDocs
-      : _allDocs.filter(function(d) { return d.data().status === filter; });
+      : _allDocs.filter(function(d) { return d.status === filter; });
 
     if (docs.length === 0) {
-      body.innerHTML = '<div style="padding:3rem;text-align:center;color:#718096;font-size:13px;">No requests found.</div>';
+      body.innerHTML = '<div style="padding:3rem;text-align:center;color:#718096;font-size:13px;">No bookings found.</div>';
       return;
     }
 
-    body.innerHTML = docs.map(function(d) {
-      var r = d.data();
+    body.innerHTML = docs.map(function(r) {
       var isPending  = r.status === 'Pending';
       var isApproved = r.status === 'Approved';
       var sc = isPending ? '#d69e2e' : isApproved ? '#38a169' : '#718096';
       var sb = isPending ? 'rgba(214,158,46,0.1)' : isApproved ? 'rgba(56,161,105,0.1)' : 'rgba(113,128,150,0.1)';
-      return '<div class="table-row" style="grid-template-columns:1fr 1.5fr 1fr 1fr 1fr 140px;align-items:center;">'
+      var svcList = (r.services || []).join(', ') || '—';
+      return '<div class="table-row" style="grid-template-columns:1fr 1.5fr 1.5fr 1fr 1fr 1fr 140px;align-items:center;">'
         + '<div style="font-weight:700;color:#1a202c;">' + (r.plate || '—') + '</div>'
         + '<div style="color:#4a5568;font-size:13px;">' + (r.customerName || '—') + '</div>'
+        + '<div style="color:#718096;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + svcList + '">' + svcList + '</div>'
         + '<div style="font-weight:600;color:#003087;">' + _formatDate(r.preferredDate) + '</div>'
         + '<div style="color:#718096;font-size:12px;">' + _timeAgo(r.createdAt) + '</div>'
         + '<div><span style="background:' + sb + ';color:' + sc + ';font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">' + (r.status || 'Pending') + '</span></div>'
         + '<div style="display:flex;gap:6px;">'
         + (isPending
-          ? '<button onclick="approveRequest(\'' + d.id + '\',\'' + (r.plate||'') + '\',\'' + (r.preferredDate||'') + '\')" style="padding:5px 12px;background:#38a169;border:none;border-radius:7px;color:white;font-size:12px;font-weight:600;cursor:pointer;">Approve</button>'
-            + '<button onclick="dismissRequest(\'' + d.id + '\')" style="padding:5px 12px;background:#e53e3e;border:none;border-radius:7px;color:white;font-size:12px;font-weight:600;cursor:pointer;">Dismiss</button>'
+          ? '<button onclick="approveBooking(\'' + r.id + '\',\'' + (r.plate||'') + '\')" style="padding:5px 12px;background:#38a169;border:none;border-radius:7px;color:white;font-size:12px;font-weight:600;cursor:pointer;">Approve</button>'
+            + '<button onclick="dismissBooking(\'' + r.id + '\')" style="padding:5px 12px;background:#e53e3e;border:none;border-radius:7px;color:white;font-size:12px;font-weight:600;cursor:pointer;">Dismiss</button>'
           : '<span style="font-size:12px;color:#a0aec0;">—</span>')
         + '</div>'
         + '</div>';
     }).join('');
   };
 
-  window.approveRequest = function(docId, plate, preferredDate) {
-    if (!confirm('Approve reschedule for ' + plate + ' on ' + _formatDate(preferredDate) + '?')) return;
-    db.collection('pms_reschedule_requests').doc(docId).update({ status: 'Approved' })
-      .then(function() { showToast('Reschedule approved for ' + plate, 'success'); })
+  window.approveBooking = function(docId, plate) {
+    if (!confirm('Approve service booking for ' + plate + '?')) return;
+    db.collection('service_bookings').doc(docId).update({ status: 'Approved' })
+      .then(function() { showToast('Booking approved for ' + plate, 'success'); })
       .catch(function(err) { showToast('Error: ' + err.message, 'error'); });
   };
 
-  window.dismissRequest = function(docId) {
-    if (!confirm('Dismiss this reschedule request?')) return;
-    db.collection('pms_reschedule_requests').doc(docId).update({ status: 'Dismissed' })
-      .then(function() { showToast('Request dismissed.', 'success'); })
+  window.dismissBooking = function(docId) {
+    if (!confirm('Dismiss this booking?')) return;
+    db.collection('service_bookings').doc(docId).update({ status: 'Dismissed' })
+      .then(function() { showToast('Booking dismissed.', 'success'); })
       .catch(function(err) { showToast('Error: ' + err.message, 'error'); });
   };
 
-  // Load customer names then render
-  function _loadAndRender(docs) {
-    var uids = [...new Set(docs.map(function(d) { return d.data().customerId; }).filter(Boolean))];
-    if (uids.length === 0) {
-      _allDocs = docs.map(function(d) {
-        var data = Object.assign({}, d.data(), { customerName: '—' });
-        return { id: d.id, data: function() { return data; } };
+  function _updateStats() {
+    var s = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; };
+    var pending = _allDocs.filter(function(r) { return r.status === 'Pending'; }).length;
+    s('statPending', pending);
+    s('statApproved',  _allDocs.filter(function(r) { return r.status === 'Approved'; }).length);
+    s('statDismissed', _allDocs.filter(function(r) { return r.status === 'Dismissed'; }).length);
+    // Update tab badge
+    var badge = document.getElementById('tabBadgePending');
+    if (badge) { badge.textContent = pending; badge.style.display = pending > 0 ? 'inline-block' : 'none'; }
+  }
+
+  // Real-time listener on service_bookings
+  db.collection('service_bookings')
+    .orderBy('createdAt', 'desc')
+    .onSnapshot(function(snap) {
+      _allDocs = snap.docs.map(function(d) {
+        var data = d.data();
+        data.id = d.id;
+        data.createdAt = data.createdAt || null;
+        return data;
       });
       _updateStats();
       renderRescheduleList();
-      return;
-    }
-    db.collection('users').where(firebase.firestore.FieldPath.documentId(), 'in', uids.slice(0, 10)).get()
-      .then(function(snap) {
-        var nameMap = {};
-        snap.docs.forEach(function(u) { nameMap[u.id] = u.data().name || '—'; });
-        _allDocs = docs.map(function(d) {
-          var data = Object.assign({}, d.data(), { customerName: nameMap[d.data().customerId] || '—' });
-          return { id: d.id, data: function() { return data; } };
-        });
-        _updateStats();
-        renderRescheduleList();
-      }).catch(function() {
-        _allDocs = docs.map(function(d) {
-          var data = Object.assign({}, d.data(), { customerName: '—' });
-          return { id: d.id, data: function() { return data; } };
-        });
-        _updateStats();
-        renderRescheduleList();
-      });
-  }
-
-  function _updateStats() {
-    var all = _allDocs.map(function(d) { return d.data(); });
-    var s = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; };
-    s('statPending',   all.filter(function(r) { return r.status === 'Pending'; }).length);
-    s('statApproved',  all.filter(function(r) { return r.status === 'Approved'; }).length);
-    s('statDismissed', all.filter(function(r) { return r.status === 'Dismissed'; }).length);
-  }
-
-  // Real-time listener
-  db.collection('pms_reschedule_requests')
-    .orderBy('createdAt', 'desc')
-    .onSnapshot(function(snap) {
-      _loadAndRender(snap.docs);
     }, function() {
-      db.collection('pms_reschedule_requests').get().then(function(snap) {
-        _loadAndRender(snap.docs);
+      db.collection('service_bookings').get().then(function(snap) {
+        _allDocs = snap.docs.map(function(d) {
+          var data = d.data();
+          data.id = d.id;
+          return data;
+        });
+        _updateStats();
+        renderRescheduleList();
       });
     });
 })();

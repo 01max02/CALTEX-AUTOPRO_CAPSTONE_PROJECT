@@ -66,15 +66,22 @@ class _StaffDashboardState extends State<StaffDashboard> {
       automaticallyImplyLeading: false,
       title: Row(
         children: [
-          Image.asset('assets/img/LOGO_CALTEX.png', width: 36, height: 36, fit: BoxFit.contain),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Image.asset('assets/img/CALTEX_LETTER.png', height: 18, fit: BoxFit.contain),
-              const Text('AutoPro', style: TextStyle(color: Colors.white70, fontSize: 11, letterSpacing: 2)),
-            ],
+          GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UserProfile(role: UserRole.staff)))
+                .then((_) => _loadInitials()),
+            child: CircleAvatar(
+              radius: 18,
+              backgroundColor: Colors.white24,
+              backgroundImage: _photoUrl != null ? NetworkImage(_photoUrl!) : null,
+              child: _photoUrl == null
+                  ? Text(_initials, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold))
+                  : null,
+            ),
           ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(_staffName.isNotEmpty ? _staffName : 'Staff Portal',
+            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+            overflow: TextOverflow.ellipsis)),
         ],
       ),
       actions: [
@@ -85,19 +92,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AppNotifications(role: NotificationRole.staff))),
           ),
         ),
-        CircleAvatar(
-          radius: 16,
-          backgroundColor: Colors.white24,
-          backgroundImage: _photoUrl != null ? NetworkImage(_photoUrl!) : null,
-          child: GestureDetector(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UserProfile(role: UserRole.staff)))
-                .then((_) => _loadInitials()),
-            child: _photoUrl == null
-                ? Text(_initials, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))
-                : null,
-          ),
-        ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
       ],
     );
   }

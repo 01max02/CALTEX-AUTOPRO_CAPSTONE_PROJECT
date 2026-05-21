@@ -10,86 +10,40 @@ body {
   padding: 24px;
 }
 
-/* ── Card: side-by-side ── */
+/* ── Card ── */
 .card {
   background: #fff;
   width: 100%;
-  max-width: 860px;
-  min-height: 520px;
-  border-radius: 24px;
+  max-width: 480px;
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.13);
-  display: flex;
-}
-
-/* ── Left panel (header) ── */
-.header {
-  background: #E8001C;
-  width: 300px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 32px;
-  position: relative;
-}
-
-.header-content {
+  box-shadow: 0 12px 40px rgba(0,0,0,0.1);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  text-align: center;
-  position: relative;
-  z-index: 1;
-}
-.header .logo {
-  width: 88px;
-  height: 88px;
-  object-fit: contain;
-}
-.header-text {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-.header-text .wordmark-img {
-  height: 40px;
-  object-fit: contain;
-}
-.header-text .tagline {
-  color: rgba(255,255,255,0.8);
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 5px;
-}
-.header-desc {
-  color: rgba(255,255,255,0.6);
-  font-size: 12px;
-  line-height: 1.6;
-  margin-top: 4px;
 }
 
-/* ── Right panel (form) ── */
+/* ── Header (hidden) ── */
+.header { display: none; }
+
+/* ── Form area ── */
 .form-area {
-  flex: 1;
   padding: 48px 40px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  overflow-y: auto;
 }
 
 .form-title {
   font-size: 22px;
   font-weight: 700;
   color: #1a202c;
+  text-align: center;
   margin-bottom: 4px;
 }
 .form-sub {
   font-size: 13px;
   color: #718096;
+  text-align: center;
   margin-bottom: 28px;
 }
 
@@ -124,28 +78,10 @@ label {
   color: #1a202c;
   outline: none;
   transition: border-color .2s;
+  font-family: inherit;
 }
 .input-wrap input::placeholder { color: #a0aec0; }
-.input-wrap input:focus { border-color: #E8001C; }
-.input-wrap input::placeholder { color: #a0aec0; }
-.input-wrap input:focus { border-color: #E8001C; }
-.input-wrap .toggle-pass {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #718096;
-  padding: 0;
-  display: none !important;
-  align-items: center;
-  justify-content: center;
-}
-.input-wrap .toggle-pass[style*="display: flex"] {
-  display: flex !important;
-}
+.input-wrap input:focus { border-color: #E8001C; background: #fff; }
 
 .forgot-row {
   display: flex;
@@ -162,7 +98,7 @@ label {
 
 .btn-signin {
   width: 100%;
-  padding: 14px;
+  padding: 15px;
   background: #E8001C;
   color: #fff;
   border: none;
@@ -170,12 +106,13 @@ label {
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(232,0,28,0.3);
+  box-shadow: 0 4px 14px rgba(232,0,28,0.3);
   transition: opacity .2s;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  font-family: inherit;
 }
 .btn-signin:hover { opacity: .88; }
 .btn-signin:disabled { opacity: .6; cursor: not-allowed; }
@@ -210,6 +147,7 @@ label {
   justify-content: center;
   gap: 10px;
   transition: background .2s;
+  font-family: inherit;
 }
 .btn-google:hover { background: #f7f8fa; }
 .btn-google:disabled { opacity: .6; cursor: not-allowed; }
@@ -253,21 +191,23 @@ label {
 #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 #toast.success { background: #38a169; }
 
-/* ── Responsive: stack on small screens ── */
+/* ══════════════════════════════════════════════
+   Responsive: Mobile view (matches Flutter app)
+   ══════════════════════════════════════════════ */
 @media (max-width: 640px) {
-  body { padding: 0; align-items: stretch; }
+  body {
+    padding: 0;
+    background: #fff;
+    align-items: flex-start;
+  }
   .card {
-    flex-direction: column;
     border-radius: 0;
-    min-height: 100vh;
+    box-shadow: none;
     max-width: 100%;
+    min-height: 100vh;
   }
-  .header {
-    width: 100%;
-    padding: 48px 24px 56px;
-    flex-direction: column;
+  .form-area {
+    padding: 40px 24px 32px;
+    justify-content: flex-start;
   }
-  .header-content { flex-direction: row; text-align: left; }
-  .header-text { align-items: flex-start; }
-  .form-area { padding: 24px 24px 40px; }
 }

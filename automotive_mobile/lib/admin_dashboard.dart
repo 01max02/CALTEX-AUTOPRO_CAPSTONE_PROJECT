@@ -27,6 +27,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   static const _bg = Color(0xFFF7F8FA);
   String _initials = '?';
   String? _photoUrl;
+  String _userName = '';
 
   @override
   void initState() {
@@ -48,7 +49,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ? '${parts[0][0]}${parts[1][0]}'.toUpperCase()
           : parts[0][0].toUpperCase();
     }
-    if (mounted) setState(() { _initials = ini; _photoUrl = photo; });
+    if (mounted) setState(() { _initials = ini; _photoUrl = photo; _userName = name; });
   }
 
   final _navItems = const [
@@ -74,12 +75,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
       elevation: 0,
       automaticallyImplyLeading: false,
       title: Row(children: [
-        Image.asset('assets/img/LOGO_CALTEX.png', width: 36, height: 36, fit: BoxFit.contain),
+        GestureDetector(
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UserProfile(role: UserRole.admin)))
+              .then((_) => _loadInitials()),
+          child: CircleAvatar(radius: 18, backgroundColor: Colors.white24,
+            backgroundImage: _photoUrl != null ? NetworkImage(_photoUrl!) : null,
+            child: _photoUrl == null
+                ? Text(_initials, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold))
+                : null),
+        ),
         const SizedBox(width: 10),
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Image.asset('assets/img/CALTEX_LETTER.png', height: 18, fit: BoxFit.contain),
-          const Text('AutoPro', style: TextStyle(color: Colors.white70, fontSize: 11, letterSpacing: 2)),
-        ]),
+        Expanded(child: Text(_userName.isNotEmpty ? _userName : 'Admin Portal',
+          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+          overflow: TextOverflow.ellipsis)),
       ]),
       actions: [
         Padding(
@@ -89,16 +97,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AppNotifications(role: NotificationRole.admin))),
           ),
         ),
-        GestureDetector(
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UserProfile(role: UserRole.admin)))
-              .then((_) => _loadInitials()),
-          child: CircleAvatar(radius: 16, backgroundColor: Colors.white24,
-            backgroundImage: _photoUrl != null ? NetworkImage(_photoUrl!) : null,
-            child: _photoUrl == null
-                ? Text(_initials, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))
-                : null),
-        ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
       ],
     );
   }

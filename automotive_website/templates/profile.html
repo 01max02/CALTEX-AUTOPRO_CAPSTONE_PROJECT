@@ -54,6 +54,7 @@
 
 <div id="toast"></div>
 
+<script src="../static/js/data.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -90,10 +91,42 @@ if (!_profileRole) {
     window.location.replace('/login.html');
 } else if (_profileRole === 'admin') {
     document.getElementById('adminWrap').style.display = 'flex';
-    // Load admin sidebar script for header/sidebar injection
-    var s = document.createElement('script');
-    s.src = '../static/js/admin_sidebar.js';
-    document.body.appendChild(s);
+    // Load admin scripts sequentially: sidebar first (injects header HTML), then firebase (populates data)
+    function loadScript(src) {
+        return new Promise(function(resolve) {
+            var s = document.createElement('script');
+            s.src = src;
+            s.onload = resolve;
+            s.onerror = resolve;
+            document.body.appendChild(s);
+        });
+    }
+    loadScript('../static/js/data.js')
+        .then(function() { return loadScript('../static/js/admin_sidebar.js'); })
+        .then(function() {
+            // Wait for sidebar to inject header HTML
+            return new Promise(function(r) { setTimeout(r, 500); });
+        })
+        .then(function() {
+            // Set name from sessionStorage immediately (don't wait for admin_firebase.js)
+            var sess = JSON.parse(sessionStorage.getItem('apUser') || '{}');
+            var name = sess.name || 'Administrator';
+            var parts = name.trim().split(' ').filter(Boolean);
+            var ini = parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : (parts[0] ? parts[0][0].toUpperCase() : 'AD');
+            var nameEl = document.getElementById('adminName');
+            var avatarEl = document.getElementById('adminAvatar');
+            var avatarMenuName = document.getElementById('adminAvatarName');
+            var sidebarNameEl = document.getElementById('sidebarName');
+            var sidebarAvatarEl = document.getElementById('sidebarAvatar');
+            if (nameEl) nameEl.textContent = name;
+            if (avatarEl) avatarEl.textContent = ini;
+            if (avatarMenuName) avatarMenuName.textContent = name;
+            if (sidebarNameEl) sidebarNameEl.textContent = name;
+            if (sidebarAvatarEl) sidebarAvatarEl.textContent = ini;
+        })
+        .then(function() { return loadScript('../static/js/admin_firebase.js'); })
+        .then(function() { return loadScript('../static/js/admin_functions.js'); })
+        .then(function() { return loadScript('../static/js/admin.js'); });
 } else {
     document.getElementById('standaloneWrap').style.display = 'flex';
     // Load customer header

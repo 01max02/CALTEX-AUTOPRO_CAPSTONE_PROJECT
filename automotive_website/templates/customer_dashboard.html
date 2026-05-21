@@ -379,6 +379,19 @@ firebase.auth().onAuthStateChanged(function(user) {
 <script>
   fetch('customer_header.html').then(r => r.text()).then(html => {
     document.getElementById('customerHeader').innerHTML = html;
+    // Set avatar initials and name from session
+    var sess = JSON.parse(sessionStorage.getItem('cpUser') || '{}');
+    var name = sess.name || '';
+    if (name) {
+      var parts = name.trim().split(' ').filter(Boolean);
+      var ini = parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : (parts[0] ? parts[0][0].toUpperCase() : 'CU');
+      var av = document.getElementById('cuAvatar');
+      if (av) av.textContent = ini;
+      var headerName = document.getElementById('cuHeaderName');
+      if (headerName) headerName.textContent = name;
+      var menuName = document.getElementById('cuAvatarName');
+      if (menuName) menuName.textContent = name;
+    }
   });
 </script>
 </body>

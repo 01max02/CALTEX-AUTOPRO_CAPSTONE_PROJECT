@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book a Service</title>
+    <link rel="icon" type="image/png" href="../static/img/LOGO_CALTEX.png" />
+    <link rel="stylesheet" href="../static/css/customer_dashboard.css">
+    <style>
+        .bs-page { max-width:900px; margin:0 auto; padding:28px 40px 40px; }
+        .bs-header { margin-bottom:28px; }
+        .bs-header h2 { font-size:22px; font-weight:800; color:#1a202c; margin:0 0 4px; }
+        .bs-header p { font-size:13px; color:#718096; margin:0; }
+        .bs-grid { display:grid; grid-template-columns:1fr 1fr; gap:28px; }
+        .bs-col { }
+        .bs-section-title { font-size:12px; font-weight:700; color:#4a5568; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px; }
+        .bs-card { background:white; border-radius:14px; border:1.5px solid #e2e8f0; padding:14px 16px; margin-bottom:10px; cursor:pointer; transition:all .15s; display:flex; align-items:center; gap:14px; }
+        .bs-card:hover { border-color:#cbd5e0; box-shadow:0 2px 8px rgba(0,0,0,0.04); }
+        .bs-card.selected { border-color:#E8001C; border-width:2px; background:#fff5f5; }
+        .bs-card-icon { width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .bs-card-title { font-size:14px; font-weight:600; color:#1a202c; }
+        .bs-card.selected .bs-card-title { color:#E8001C; }
+        .bs-card-sub { font-size:12px; color:#718096; margin-top:2px; }
+        .bs-check { width:22px; height:22px; border-radius:6px; border:2px solid #e2e8f0; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all .15s; }
+        .bs-check.checked { background:#E8001C; border-color:#E8001C; }
+        .bs-svc-list { max-height:360px; overflow-y:auto; padding-right:4px; }
+        .bs-date-btn { width:100%; padding:16px; background:white; border:1.5px solid #e2e8f0; border-radius:14px; font-size:14px; color:#a0aec0; cursor:pointer; display:flex; align-items:center; gap:12px; font-family:inherit; text-align:left; transition:all .15s; position:relative; }
+        .bs-date-btn:hover { border-color:#cbd5e0; box-shadow:0 2px 8px rgba(0,0,0,0.04); }
+        .bs-date-btn.has-value { color:#1a202c; font-weight:600; border-color:#E8001C; }
+        .bs-notes { width:100%; padding:14px; border:1.5px solid #e2e8f0; border-radius:14px; font-size:13px; font-family:inherit; color:#1a202c; background:white; resize:vertical; outline:none; transition:border-color .15s; min-height:80px; }
+        .bs-notes:focus { border-color:#E8001C; }
+        .bs-submit { width:100%; padding:16px; background:#E8001C; color:white; border:none; border-radius:14px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; box-shadow:0 4px 16px rgba(232,0,28,0.3); transition:all .15s; }
+        .bs-submit:hover { opacity:.9; transform:translateY(-1px); }
+        .bs-submit:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+        .bs-empty { text-align:center; padding:28px; color:#718096; font-size:13px; background:white; border-radius:14px; border:1.5px solid #e2e8f0; }
+        .bs-bottom { margin-top:28px; }
+
+        /* ── Mobile view ── */
+        @media (max-width: 768px) {
+            .bs-page { padding:16px 16px 32px; }
+            .bs-grid { grid-template-columns:1fr; gap:20px; }
+            .bs-header h2 { font-size:20px; }
+            .bs-card { padding:12px; gap:12px; border-radius:12px; }
+            .bs-card-icon { width:36px; height:36px; border-radius:10px; }
+            .bs-card-title { font-size:13px; }
+            .bs-card-sub { font-size:11px; }
+            .bs-svc-list { max-height:none; }
+            .bs-date-btn { padding:14px; border-radius:12px; }
+            .bs-notes { padding:12px; border-radius:12px; }
+            .bs-submit { padding:15px; border-radius:12px; }
+        }
+    </style>
+</head>
+<body data-page="book-service">
+
+<div id="customerHeader"></div>
+
+<main class="cu-main">
+  <div class="bs-page">
+    <div class="bs-header">
+      <h2>Book a Service</h2>
+      <p>Select your vehicle, choose services, and pick a preferred date.</p>
+    </div>
+
+    <div class="bs-grid">
+      <!-- Left column: Vehicle + Date + Notes -->
+      <div class="bs-col">
+        <div class="bs-section-title">Select Vehicle</div>
+        <div id="bsVehicles"><div class="bs-empty">Loading vehicles...</div></div>
+
+        <div style="height:20px;"></div>
+
+        <div class="bs-section-title">Preferred Date</div>
+        <div id="bsDateSuggestion" style="display:none;margin-bottom:10px;padding:12px;background:#f0f4ff;border:1.5px solid #bee3f8;border-radius:12px;cursor:pointer;display:flex;align-items:center;gap:10px;" onclick="bsUseSuggestion()">
+            <div style="width:32px;height:32px;background:rgba(0,48,135,0.1);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#003087" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            </div>
+            <div style="flex:1;">
+                <div style="font-size:11px;font-weight:700;color:#003087;">AI Suggested Date</div>
+                <div id="bsDateSuggestionText" style="font-size:11px;color:#718096;"></div>
+            </div>
+            <span style="font-size:12px;font-weight:700;color:#003087;">Use</span>
+        </div>
+        <button class="bs-date-btn" id="bsDateBtn" onclick="document.getElementById('bsDateInput').showPicker ? document.getElementById('bsDateInput').showPicker() : document.getElementById('bsDateInput').click()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span id="bsDateText">Tap to select date</span>
+            <input type="date" id="bsDateInput" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none;"
+                onchange="window._onDatePicked(this.value)">
+        </button>
+
+        <div style="height:20px;"></div>
+
+        <div class="bs-section-title">Notes <span style="font-weight:400;color:#a0aec0;">(optional)</span></div>
+        <textarea id="bsNotes" class="bs-notes" rows="3" placeholder="Any special requests or details..."></textarea>
+      </div>
+
+      <!-- Right column: Services -->
+      <div class="bs-col">
+        <div class="bs-section-title">Select Services</div>
+        <div id="bsServices" class="bs-svc-list"><div class="bs-empty">Loading services...</div></div>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="bs-bottom">
+      <button class="bs-submit" id="bsSubmitBtn" onclick="bsSubmit()">Book Service</button>
+    </div>
+  </div>
+</main>
+
+<div id="cuToast"></div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+  firebase.initializeApp({
+    apiKey: "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
+    authDomain: "caltex-autopro-1e664.firebaseapp.com",
+    projectId: "caltex-autopro-1e664",
+    storageBucket: "caltex-autopro-1e664.firebasestorage.app",
+    messagingSenderId: "930140433367",
+    appId: "1:930140433367:web:cf67bfa388fa517422b992"
+  });
+</script>
+<script src="../static/js/customer_shared.js"></script>
+<script>
+var _bsVehicles = [], _bsServices = [];
+var _bsSelectedVehicle = null;
+var _bsSelectedServices = {};
+var _bsDate = '';
+
+// Load header
+fetch('customer_header.html').then(function(r){return r.text();}).then(function(html){
+  document.getElementById('customerHeader').innerHTML = html;
+  var sess = JSON.parse(sessionStorage.getItem('cpUser') || '{}');
+  if (sess.name) {
+    var parts = sess.name.trim().split(' ').filter(Boolean);
+    var ini = parts.length >= 2 ? (parts[0][0]+parts[1][0]).toUpperCase() : (parts[0]?parts[0][0].toUpperCase():'CU');
+    var av = document.getElementById('cuAvatar'); if(av) av.textContent = ini;
+    var hn = document.getElementById('cuHeaderName'); if(hn) hn.textContent = sess.name;
+    var mn = document.getElementById('cuAvatarName'); if(mn) mn.textContent = sess.name;
+  }
+});
+
+// Load data
+firebase.auth().onAuthStateChanged(function(user){
+  if (!user) { window.location.href = 'login.html'; return; }
+  _loadBookingData(user);
+});
+
+async function _loadBookingData(user) {
+  var db = firebase.firestore();
+  // Get user name
+  var uDoc = await db.collection('users').doc(user.uid).get();
+  var userName = (uDoc.exists ? uDoc.data().name : '') || '';
+
+  // Load vehicles
+  var vSnap = await db.collection('vehicles').get();
+  _bsVehicles = vSnap.docs
+    .map(function(d){ return Object.assign({id:d.id}, d.data()); })
+    .filter(function(v){ return (v.owner||'').toLowerCase() === userName.toLowerCase(); });
+
+  // Load services from item_master
+  var iSnap = await db.collection('item_master').get();
+  _bsServices = iSnap.docs
+    .map(function(d){ return Object.assign({id:d.id}, d.data()); })
+    .filter(function(i){ return (i.type||i.itemType||'').toLowerCase() === 'service'; });
+
+  _renderVehicles();
+  _renderServices();
+}
+
+function _renderVehicles() {
+  var el = document.getElementById('bsVehicles');
+  if (!_bsVehicles.length) { el.innerHTML = '<div class="bs-empty">No vehicles found under your account.</div>'; return; }
+  el.innerHTML = _bsVehicles.map(function(v){
+    var sel = _bsSelectedVehicle === v.id;
+    var icon = (v.type||'').toLowerCase().includes('truck')
+      ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>'
+      : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1l2-4h10l2 4h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg>';
+    return '<div class="bs-card'+(sel?' selected':'')+'" onclick="bsSelectVehicle(\''+v.id+'\')">'
+      +'<div class="bs-card-icon" style="background:'+(sel?'rgba(232,0,28,0.1)':'#f0f4ff')+';color:'+(sel?'#E8001C':'#003087')+';">'+icon+'</div>'
+      +'<div style="flex:1;"><div class="bs-card-title" style="'+(sel?'color:#E8001C;':'')+'">'+_esc(v.plate||'—')+'</div><div class="bs-card-sub">'+_esc(v.desc||'')+'</div></div>'
+      +(sel?'<svg width="20" height="20" viewBox="0 0 24 24" fill="#E8001C" stroke="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>':'')
+      +'</div>';
+  }).join('');
+}
+
+function _renderServices() {
+  var el = document.getElementById('bsServices');
+  if (!_bsServices.length) { el.innerHTML = '<div class="bs-empty">No services available.</div>'; return; }
+  el.innerHTML = _bsServices.map(function(s){
+    var sel = !!_bsSelectedServices[s.id];
+    var cost = String(s.cost||'');
+    var uom = String(s.uom||'');
+    return '<div class="bs-card'+(sel?' selected':'')+'" onclick="bsToggleService(\''+s.id+'\')">'
+      +'<div class="bs-card-icon" style="background:'+(sel?'rgba(232,0,28,0.1)':'#f0f4ff')+';color:'+(sel?'#E8001C':'#003087')+'"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>'
+      +'<div style="flex:1;"><div class="bs-card-title" style="'+(sel?'color:#E8001C;':'')+'">'+_esc(s.name||'')+'</div>'
+      +(cost?'<div class="bs-card-sub">'+_esc(_fmtCost(cost))+' / '+_esc(uom)+'</div>':'')
+      +'</div>'
+      +'<div class="bs-check'+(sel?' checked':'')+'">'+( sel?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>':'')+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+window.bsSelectVehicle = function(id) {
+  _bsSelectedVehicle = id;
+  _renderVehicles();
+  _updateDateSuggestion();
+};
+
+var _bsSuggestedDate = '';
+function _updateDateSuggestion() {
+  var el = document.getElementById('bsDateSuggestion');
+  var txt = document.getElementById('bsDateSuggestionText');
+  if (!el || !txt) return;
+  if (!_bsSelectedVehicle) { el.style.display = 'none'; return; }
+
+  var vehicle = _bsVehicles.find(function(v){ return v.id === _bsSelectedVehicle; });
+  if (!vehicle) { el.style.display = 'none'; return; }
+
+  var lastSvc = vehicle.lastSvcDate || '';
+  var freq = parseInt(vehicle.svcFreq) || 0;
+  var now = new Date();
+  var suggested = null;
+  var reason = '';
+
+  if (lastSvc && freq > 0) {
+    var lastDate = new Date(lastSvc);
+    if (!isNaN(lastDate)) {
+      var nextPms = new Date(lastDate.getFullYear(), lastDate.getMonth() + freq, lastDate.getDate());
+      if (nextPms > now) {
+        suggested = new Date(nextPms.getTime() - 3*86400000);
+        if (suggested < now) suggested = new Date(now.getTime() + 86400000);
+        reason = 'Based on PMS schedule (due ' + nextPms.toISOString().split('T')[0] + ')';
+      } else {
+        suggested = new Date(now.getTime() + 86400000);
+        reason = 'PMS is overdue — book ASAP';
+      }
+    }
+  }
+
+  if (!suggested) {
+    suggested = new Date(now.getTime() + 2*86400000);
+    while (suggested.getDay() === 0 || suggested.getDay() === 6) suggested = new Date(suggested.getTime() + 86400000);
+    reason = 'Next available weekday';
+  }
+
+  _bsSuggestedDate = suggested.toISOString().split('T')[0];
+  txt.textContent = _fmtDatePretty(_bsSuggestedDate) + ' — ' + reason;
+  el.style.display = 'flex';
+}
+
+window.bsUseSuggestion = function() {
+  if (!_bsSuggestedDate) return;
+  _bsDate = _bsSuggestedDate;
+  var btn = document.getElementById('bsDateBtn');
+  btn.classList.add('has-value');
+  document.getElementById('bsDateText').textContent = _fmtDatePretty(_bsDate);
+};
+
+window.bsToggleService = function(id) {
+  if (_bsSelectedServices[id]) delete _bsSelectedServices[id];
+  else _bsSelectedServices[id] = true;
+  _renderServices();
+};
+
+window.bsPickDate = function() {
+  var input = document.getElementById('bsDateInput');
+  if (!input) return;
+  input.min = new Date().toISOString().split('T')[0];
+  input.max = new Date(Date.now()+90*86400000).toISOString().split('T')[0];
+  if (input.showPicker) { input.showPicker(); }
+  else { input.focus(); input.click(); }
+};
+
+window._onDatePicked = function(val) {
+  if (!val) return;
+  _bsDate = val;
+  var btn = document.getElementById('bsDateBtn');
+  btn.classList.add('has-value');
+  document.getElementById('bsDateText').textContent = _fmtDatePretty(_bsDate);
+};
+
+window.bsSubmit = async function() {
+  if (!_bsSelectedVehicle) { _toast('Please select a vehicle.','error'); return; }
+  var svcIds = Object.keys(_bsSelectedServices);
+  if (!svcIds.length) { _toast('Please select at least one service.','error'); return; }
+  if (!_bsDate) { _toast('Please select a preferred date.','error'); return; }
+
+  var btn = document.getElementById('bsSubmitBtn');
+  btn.disabled = true; btn.textContent = 'Booking...';
+
+  try {
+    var user = firebase.auth().currentUser;
+    var db = firebase.firestore();
+    var sess = JSON.parse(sessionStorage.getItem('cpUser')||'{}');
+    var customerName = sess.name || '';
+
+    var vehicle = _bsVehicles.find(function(v){return v.id===_bsSelectedVehicle;});
+    var plate = vehicle ? (vehicle.plate||'') : '';
+    var vehicleDesc = vehicle ? (vehicle.desc||'') : '';
+
+    var selectedNames = _bsServices
+      .filter(function(s){return _bsSelectedServices[s.id];})
+      .map(function(s){return s.name||'';})
+      .filter(Boolean);
+
+    await db.collection('service_bookings').add({
+      customerId: user.uid,
+      customerName: customerName,
+      vehicleId: _bsSelectedVehicle,
+      plate: plate,
+      vehicleDesc: vehicleDesc,
+      services: selectedNames,
+      preferredDate: _bsDate,
+      notes: (document.getElementById('bsNotes').value||'').trim(),
+      status: 'Pending',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Notify admin & staff
+    var msg = customerName + ' booked ' + selectedNames.join(', ') + ' for ' + plate + ' on ' + _bsDate + '.';
+    await db.collection('notifications').add({
+      title: '📅 New Service Booking', message: msg, type: 'info',
+      targetRole: 'admin', targetUid: '',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(), readBy: {}, isRead: false,
+    });
+    await db.collection('notifications').add({
+      title: '📅 New Service Booking', message: msg, type: 'info',
+      targetRole: 'staff', targetUid: '',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(), readBy: {}, isRead: false,
+    });
+
+    _toast('Service booked successfully!','success');
+    setTimeout(function(){ window.location.href = 'customer_dashboard.html'; }, 1500);
+  } catch(e) {
+    _toast('Error: '+e.message,'error');
+    btn.disabled = false; btn.textContent = 'Book Service';
+  }
+};
+
+function _toast(msg, type) {
+  var t = document.getElementById('cuToast');
+  if (!t) return;
+  t.textContent = msg;
+  t.className = 'cu-toast show' + (type==='success'?' success':'');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function(){ t.className = 'cu-toast'; }, 3500);
+}
+
+function _esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function _fmtCost(c) {
+  var raw = String(c||'').replace(/[₱,\s]/g,'').trim();
+  if (!raw) return '';
+  var num = parseFloat(raw);
+  if (isNaN(num)) return '₱' + raw;
+  return '₱' + num.toLocaleString('en-PH');
+}
+
+var _MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function _fmtDatePretty(dateStr) {
+  if (!dateStr) return '';
+  var d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d)) return dateStr;
+  return _MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+}
+</script>
+</body>
+</html>

@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'login.dart';
 import 'customer_pms_history.dart';
 import 'customer_smart_ai.dart';
+import 'customer_book_service.dart';
 import 'profile.dart';
 import 'notifications.dart';
 import 'customer_bottomnavbar.dart';
@@ -21,6 +22,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
   static const _bg = Color(0xFFF7F8FA);
   String _initials = '?';
   String? _photoUrl;
+  String _userName = '';
   IconData _fleetNavIcon = Icons.directions_car_outlined;
   bool _iconComputed = false; // Flag to prevent recomputing icon on every rebuild
 
@@ -45,7 +47,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
           ? '${parts[0][0]}${parts[1][0]}'.toUpperCase()
           : parts[0][0].toUpperCase();
     }
-    if (mounted) setState(() { _initials = ini; _photoUrl = photo; });
+    if (mounted) setState(() { _initials = ini; _photoUrl = photo; _userName = name; });
   }
 
   // nav items moved to CustomerBottomNavBar
@@ -55,6 +57,15 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
       backgroundColor: _bg,
       appBar: _buildTopBar(),
       body: _buildBody(),
+      floatingActionButton: _currentIndex == 0
+          ? FloatingActionButton.extended(
+              onPressed: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const CustomerBookService())),
+              backgroundColor: _red,
+              icon: const Icon(Icons.calendar_month_outlined, color: Colors.white, size: 20),
+              label: const Text('Book Service', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+            )
+          : null,
       bottomNavigationBar: CustomerBottomNavBar(
         currentIndex: _currentIndex,
         vehiclesIcon: _fleetNavIcon,
@@ -76,15 +87,23 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
       automaticallyImplyLeading: false,
       title: Row(
         children: [
-          Image.asset('assets/img/LOGO_CALTEX.png', width: 36, height: 36, fit: BoxFit.contain),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Image.asset('assets/img/CALTEX_LETTER.png', height: 18, fit: BoxFit.contain),
-              const Text('AutoPro', style: TextStyle(color: Colors.white70, fontSize: 11, letterSpacing: 2)),
-            ],
+          GestureDetector(
+            onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const UserProfile(role: UserRole.customer)))
+              .then((_) => _loadInitials()),
+            child: CircleAvatar(
+              radius: 18,
+              backgroundColor: Colors.white24,
+              backgroundImage: _photoUrl != null ? NetworkImage(_photoUrl!) : null,
+              child: _photoUrl == null
+                  ? Text(_initials, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold))
+                  : null,
+            ),
           ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(_userName.isNotEmpty ? _userName : 'My Vehicles',
+            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+            overflow: TextOverflow.ellipsis)),
         ],
       ),
       actions: [
@@ -95,20 +114,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AppNotifications(role: NotificationRole.customer))),
           ),
         ),
-        GestureDetector(
-          onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const UserProfile(role: UserRole.customer)))
-            .then((_) => _loadInitials()),
-          child: CircleAvatar(
-            radius: 16,
-            backgroundColor: Colors.white24,
-            backgroundImage: _photoUrl != null ? NetworkImage(_photoUrl!) : null,
-            child: _photoUrl == null
-                ? Text(_initials, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))
-                : null,
-          ),
-        ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
       ],
     );
   }

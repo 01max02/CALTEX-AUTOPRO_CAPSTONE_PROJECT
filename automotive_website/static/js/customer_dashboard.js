@@ -69,6 +69,8 @@
 
     const initials = _userName.split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0, 2) || 'CU';
     document.getElementById('cuAvatar').textContent = initials;
+    const headerNameEl = document.getElementById('cuHeaderName');
+    if (headerNameEl) headerNameEl.textContent = _userName || 'Customer';
     loadVehicles();
   }
 

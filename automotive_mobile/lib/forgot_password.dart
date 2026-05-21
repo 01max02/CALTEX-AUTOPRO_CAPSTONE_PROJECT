@@ -219,35 +219,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Widget _buildHeader() {
-    return Stack(children: [
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(20, 70, 20, 60),
-        color: _red,
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Image.asset('assets/img/LOGO_CALTEX.png', width: 72, height: 72, fit: BoxFit.contain),
-          const SizedBox(width: 16),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Image.asset('assets/img/CALTEX_LETTER.png', height: 44, fit: BoxFit.contain),
-            const SizedBox(height: 4),
-            const Text('AutoPro', style: TextStyle(
-                color: Colors.white70, fontSize: 15,
-                fontWeight: FontWeight.w700, letterSpacing: 4)),
-          ]),
-        ]),
-      ),
-      Positioned(
-        bottom: 0, left: 0, right: 0,
-        child: Container(
-          height: 40,
-          decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(32),
-                  topRight: Radius.circular(32))),
-        ),
-      ),
-    ]);
+    return const SizedBox(height: 40);
   }
 
   // ── Step 1 ────────────────────────────────────────────────────────────────

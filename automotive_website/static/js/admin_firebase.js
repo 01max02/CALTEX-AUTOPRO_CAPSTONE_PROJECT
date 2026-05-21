@@ -66,6 +66,19 @@
               ? (parts[0][0] + parts[1][0]).toUpperCase()
               : parts[0][0].toUpperCase();
           }
+          // Also update sidebar footer
+          const sidebarNameEl = document.getElementById('sidebarName');
+          if (sidebarNameEl) sidebarNameEl.textContent = name;
+          const sidebarAvatarEl = document.getElementById('sidebarAvatar');
+          if (sidebarAvatarEl) {
+            const parts2 = name.trim().split(' ');
+            sidebarAvatarEl.textContent = parts2.length >= 2
+              ? (parts2[0][0] + parts2[1][0]).toUpperCase()
+              : parts2[0][0].toUpperCase();
+          }
+          // Also update avatar menu name
+          const avatarMenuName = document.getElementById('adminAvatarName');
+          if (avatarMenuName) avatarMenuName.textContent = name;
         }
       }).catch(() => {});
     }

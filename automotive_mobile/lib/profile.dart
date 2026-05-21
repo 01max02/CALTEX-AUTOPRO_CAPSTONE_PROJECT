@@ -162,34 +162,24 @@ class _UserProfileState extends State<UserProfile> {
                   ),
                   child: Column(children: [
                     GestureDetector(
-                      onTap: _pickImage,
-                      child: Stack(alignment: Alignment.bottomRight, children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 3),
-                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 12)],
-                          ),
-                          child: CircleAvatar(
-                            radius: 44,
-                            backgroundColor: Colors.white24,
-                            backgroundImage: _avatarImage != null
-                                ? FileImage(_avatarImage!) as ImageProvider
-                                : _photoUrl != null
-                                    ? NetworkImage(_photoUrl!)
-                                    : null,
-                            child: (_avatarImage == null && _photoUrl == null)
-                                ? Text(_initials, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold))
-                                : null,
-                          ),
+                      onTap: null,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 12)],
                         ),
-                        Container(
-                          width: 28, height: 28,
-                          decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle,
-                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 4)]),
-                          child: const Icon(Icons.camera_alt, size: 15, color: _red),
+                        child: CircleAvatar(
+                          radius: 44,
+                          backgroundColor: Colors.white24,
+                          backgroundImage: _photoUrl != null
+                              ? NetworkImage(_photoUrl!)
+                              : null,
+                          child: _photoUrl == null
+                              ? Text(_initials, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold))
+                              : null,
                         ),
-                      ]),
+                      ),
                     ),
                     const SizedBox(height: 14),
                     Text(_nameCtrl.text,
