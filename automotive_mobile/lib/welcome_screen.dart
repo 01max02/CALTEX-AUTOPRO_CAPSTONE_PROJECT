@@ -46,7 +46,7 @@ class WelcomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                'In partnership with Caltex Philippines',
+                'Authorized Caltex Service Partner',
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.75),
                   fontSize: 13,

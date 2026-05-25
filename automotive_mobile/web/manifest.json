@@ -1,11 +1,11 @@
 {
-    "name": "automotive_mobile",
-    "short_name": "automotive_mobile",
+    "name": "JA Noble",
+    "short_name": "JA Noble",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "JA Noble - Authorized Caltex Service Partner",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

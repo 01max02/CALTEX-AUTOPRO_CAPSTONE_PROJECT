@@ -1,0 +1,332 @@
+<!-- ── Smart Reports AI Floating Widget ── -->
+<!-- Include this file in admin pages that need the AI chatbot -->
+<!-- Requires: window.assets, window.inventory, window.serviceTransactions from admin_firebase.js -->
+
+<!-- Floating toggle button -->
+<button id="ragAiToggleBtn" onclick="ragAiToggle()"
+  title="Smart Reports AI"
+  style="position:fixed;bottom:2rem;right:2rem;z-index:1200;
+         width:56px;height:56px;border-radius:50%;border:none;cursor:pointer;
+         background:linear-gradient(135deg,#E8001C,#c0001a);
+         box-shadow:0 4px 18px rgba(232,0,28,0.4);
+         display:flex;align-items:center;justify-content:center;
+         transition:transform 0.2s,box-shadow 0.2s;"
+  onmouseover="this.style.transform='scale(1.1)';this.style.boxShadow='0 6px 24px rgba(232,0,28,0.5)'"
+  onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 4px 18px rgba(232,0,28,0.4)'">
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+       fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    <circle cx="9" cy="10" r="1" fill="#fff" stroke="none"/>
+    <circle cx="12" cy="10" r="1" fill="#fff" stroke="none"/>
+    <circle cx="15" cy="10" r="1" fill="#fff" stroke="none"/>
+  </svg>
+</button>
+
+<!-- Floating AI chat panel -->
+<div id="ragAiPanel"
+  style="display:none;position:fixed;bottom:5.5rem;right:2rem;z-index:1199;
+         width:380px;height:560px;background:#fff;border-radius:18px;
+         box-shadow:0 8px 40px rgba(0,0,0,0.18);
+         border:1px solid #e2e8f0;overflow:hidden;
+         display:none;flex-direction:column;
+         animation:ragAiSlideIn 0.22s ease;">
+
+  <!-- Panel header -->
+  <div style="background:linear-gradient(135deg,#E8001C,#c0001a);padding:14px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+    <div style="width:34px;height:34px;background:rgba(255,255,255,0.15);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;">🤖</div>
+    <div style="flex:1;">
+      <div style="color:#fff;font-size:13px;font-weight:700;">Smart Reports AI</div>
+      <div style="color:rgba(255,255,255,0.7);font-size:11px;display:flex;align-items:center;gap:4px;">
+        <span id="ragAiDot" style="width:6px;height:6px;background:#d69e2e;border-radius:50%;display:inline-block;"></span>
+        <span id="ragAiStatus">Loading...</span>
+      </div>
+    </div>
+    <button onclick="ragAiClear()" style="background:rgba(255,255,255,0.15);border:none;color:white;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;cursor:pointer;font-family:inherit;">Clear</button>
+    <button onclick="ragAiToggle()" style="background:rgba(255,255,255,0.15);border:none;color:white;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">×</button>
+  </div>
+
+  <!-- Messages area -->
+  <div id="ragAiChat" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:#F7F8FA;"></div>
+
+  <!-- Quick chips -->
+  <div id="ragAiChips" style="display:flex;flex-wrap:wrap;gap:5px;padding:8px 12px;background:white;border-top:1px solid #f0f4f8;max-height:70px;overflow-y:auto;">
+    <button class="rag-chip" onclick="ragAiSend('Show fleet summary')">📊 Fleet</button>
+    <button class="rag-chip" onclick="ragAiSend('Which vehicles have PMS overdue?')">⚠️ Overdue</button>
+    <button class="rag-chip" onclick="ragAiSend('What items are low in stock?')">📦 Low stock</button>
+    <button class="rag-chip" onclick="ragAiSend('Total repair cost this month')">💰 Cost</button>
+    <button class="rag-chip" onclick="ragAiSend('How many services are pending?')">⏳ Pending</button>
+    <button class="rag-chip" onclick="ragAiSend('What are the fast moving inventory items?')">📈 Fast moving</button>
+  </div>
+
+  <!-- Input bar -->
+  <div style="display:flex;gap:8px;align-items:flex-end;padding:10px 12px;background:white;border-top:1px solid #e2e8f0;flex-shrink:0;">
+    <textarea id="ragAiInput" placeholder="Ask about fleet, inventory, maintenance..."
+      rows="1" style="flex:1;border:1.5px solid #e2e8f0;border-radius:20px;padding:8px 14px;font-size:12px;font-family:inherit;color:#1a202c;background:#F7F8FA;outline:none;resize:none;max-height:80px;overflow-y:auto;line-height:1.4;"
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ragAiSend();}"
+      oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,80)+'px'"
+      onfocus="this.style.borderColor='#E8001C';this.style.background='white'"
+      onblur="this.style.borderColor='#e2e8f0';this.style.background='#F7F8FA'"></textarea>
+    <button onclick="ragAiSend()" style="width:36px;height:36px;background:linear-gradient(135deg,#E8001C,#c0001a);border:none;border-radius:50%;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(232,0,28,0.3);">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(45deg)"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+
+<style>
+@keyframes ragAiSlideIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+.rag-chip { padding:4px 10px;background:#f7f8fa;border:1.5px solid #e2e8f0;border-radius:16px;font-size:11px;font-weight:500;color:#4a5568;cursor:pointer;transition:all .15s;white-space:nowrap;font-family:inherit; }
+.rag-chip:hover { background:#E8001C;color:white;border-color:#E8001C; }
+#ragAiChat .rag-row { display:flex;gap:8px;align-items:flex-end; }
+#ragAiChat .rag-row.user { flex-direction:row-reverse; }
+#ragAiChat .rag-av { width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0; }
+#ragAiChat .rag-av.ai { background:linear-gradient(135deg,#E8001C,#c0001a);color:white; }
+#ragAiChat .rag-av.usr { background:linear-gradient(135deg,#E8001C,#C41E3A);color:white;font-size:10px;font-weight:700; }
+#ragAiChat .rag-bub { max-width:80%;padding:10px 13px;border-radius:14px;font-size:12px;line-height:1.6; }
+#ragAiChat .rag-bub.ai { background:white;color:#1a202c;border-radius:4px 14px 14px 14px;box-shadow:0 1px 6px rgba(0,0,0,0.06); }
+#ragAiChat .rag-bub.usr { background:linear-gradient(135deg,#E8001C,#C41E3A);color:white;border-radius:14px 4px 14px 14px;box-shadow:0 2px 6px rgba(232,0,28,0.2); }
+#ragAiChat .rag-bub table { width:100%;border-collapse:collapse;margin-top:6px;font-size:11px; }
+#ragAiChat .rag-bub table th { background:#f7f8fa;padding:4px 6px;text-align:left;font-weight:700;color:#4a5568;border-bottom:1.5px solid #e2e8f0;font-size:10px; }
+#ragAiChat .rag-bub table td { padding:4px 6px;border-bottom:1px solid #f0f4f8;color:#1a202c; }
+#ragAiChat .rag-bub .sr-tag { display:inline-block;padding:1px 6px;border-radius:12px;font-size:10px;font-weight:700;margin:1px 1px; }
+.rag-typing { display:flex;gap:4px;align-items:center;padding:8px 12px; }
+.rag-typing span { width:6px;height:6px;background:#a0aec0;border-radius:50%;animation:ragBounce .9s ease-in-out infinite; }
+.rag-typing span:nth-child(2) { animation-delay:.15s; }
+.rag-typing span:nth-child(3) { animation-delay:.3s; }
+@keyframes ragBounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-5px)} }
+</style>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  Smart Reports AI — Floating Widget
+// ════════════════════════════════════════════════════════════
+(function() {
+var _ragInitials = 'AD';
+var _ragReady = false;
+
+window.ragAiToggle = function() {
+  var panel = document.getElementById('ragAiPanel');
+  if (!panel) return;
+  var isOpen = panel.style.display === 'flex';
+  panel.style.display = isOpen ? 'none' : 'flex';
+};
+
+// Get admin initials
+if (typeof firebase !== 'undefined') {
+  firebase.auth().onAuthStateChanged(function(user) {
+    if (!user) return;
+    firebase.firestore().collection('users').doc(user.uid).get().then(function(doc) {
+      if (!doc.exists) return;
+      var name = doc.data().name || '';
+      var parts = name.trim().split(' ').filter(Boolean);
+      _ragInitials = parts.length >= 2 ? (parts[0][0]+parts[1][0]).toUpperCase() : (parts[0]?parts[0][0].toUpperCase():'AD');
+    });
+  });
+}
+
+// Watch for data readiness
+function _ragWatch() {
+  var attempts = 0;
+  var iv = setInterval(function() {
+    attempts++;
+    var v = (window.assets||[]).length, i = (window.inventory||[]).length, s = (window.serviceTransactions||[]).length;
+    if (v > 0 || i > 0 || s > 0 || attempts >= 15) {
+      clearInterval(iv);
+      _ragReady = true;
+      var dot = document.getElementById('ragAiDot');
+      var txt = document.getElementById('ragAiStatus');
+      if (dot) dot.style.background = '#38a169';
+      if (txt) { txt.style.color = '#38a169'; txt.textContent = 'Online · Live data'; }
+    }
+  }, 600);
+}
+setTimeout(_ragWatch, 1000);
+setTimeout(_ragShowWelcome, 1100);
+
+function _ragEsc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function _ragAppend(role, html) {
+  var chat = document.getElementById('ragAiChat');
+  var row = document.createElement('div');
+  row.className = 'rag-row' + (role==='user'?' user':'');
+  var av = role==='user' ? '<div class="rag-av usr">'+_ragInitials+'</div>' : '<div class="rag-av ai">🤖</div>';
+  var bub = '<div class="rag-bub '+role+'">'+html+'</div>';
+  row.innerHTML = role==='user' ? bub+av : av+bub;
+  chat.appendChild(row);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function _ragTyping() {
+  var chat = document.getElementById('ragAiChat');
+  var row = document.createElement('div');
+  row.className='rag-row'; row.id='ragTyping';
+  row.innerHTML='<div class="rag-av ai">🤖</div><div class="rag-bub ai"><div class="rag-typing"><span></span><span></span><span></span></div></div>';
+  chat.appendChild(row); chat.scrollTop=chat.scrollHeight;
+}
+function _ragRemoveTyping() { var el=document.getElementById('ragTyping'); if(el)el.remove(); }
+
+window.ragAiSend = function(preset) {
+  var input = document.getElementById('ragAiInput');
+  var text = (preset||input.value).trim();
+  if (!text) return;
+  if (!_ragReady) { _ragAppend('ai','⏳ <strong>Still loading data…</strong> Please wait.'); return; }
+  document.getElementById('ragAiChips').style.display='none';
+  _ragAppend('user', _ragEsc(text));
+  input.value=''; input.style.height='auto';
+  _ragTyping();
+
+  // Try RAG AI API backend first (user_type: admin), fallback to local JS engine
+  var RAG_API_URL = window.RAG_API_URL || 'http://localhost:8000';
+  fetch(RAG_API_URL + '/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: text, user_type: 'admin', session_id: 'admin-widget-' + Date.now() })
+  })
+  .then(function(res) { if (!res.ok) throw new Error('API error'); return res.json(); })
+  .then(function(data) {
+    _ragRemoveTyping();
+    if (data.answer) {
+      // Format the answer nicely
+      var answer = data.answer.replace(/\n/g, '<br>').replace(/^- /gm, '• ');
+      _ragAppend('ai', answer);
+    } else {
+      _ragAppend('ai', '⚠️ No answer received from AI.');
+    }
+  })
+  .catch(function(err) {
+    // Fallback to local JS query engine if API is not available
+    _ragRemoveTyping();
+    var result = _ragProcess(text);
+    _ragAppend('ai', result.html);
+  });
+};
+
+window.ragAiClear = function() {
+  document.getElementById('ragAiChat').innerHTML='';
+  document.getElementById('ragAiChips').style.display='flex';
+  _ragShowWelcome();
+};
+
+function _ragShowWelcome() {
+  var chat = document.getElementById('ragAiChat');
+  if (!chat) return;
+  var div = document.createElement('div');
+  div.className='rag-row';
+  div.innerHTML='<div class="rag-av ai">🤖</div>'
+    +'<div class="rag-bub ai" style="max-width:85%;">'
+    +'<div style="font-size:13px;font-weight:700;color:#1a202c;margin-bottom:3px;">Hello! I\'m your Smart Reports AI 👋</div>'
+    +'<div style="font-size:11px;color:#718096;line-height:1.5;">Ask me about fleet, inventory, maintenance costs, and more. I pull <strong>live data</strong> from Firestore.</div>'
+    +'</div>';
+  chat.appendChild(div);
+}
+
+// ════════════════════════════════════════════════════════════
+//  Query Engine (same logic as admin_smart_reports.html)
+// ════════════════════════════════════════════════════════════
+function _ragProcess(query) {
+  var q = query.toLowerCase().trim();
+  var assets=window.assets||[], inventory=window.inventory||[], services=window.serviceTransactions||[], issuances=window.issuances||[], users=window.users||[];
+  var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function fmtP(n){return '₱'+(parseFloat(n)||0).toLocaleString('en-PH',{minimumFractionDigits:2});}
+  function tag(t,c,b){return '<span class="sr-tag" style="background:'+b+';color:'+c+';">'+_ragEsc(t)+'</span>';}
+  function isOverdue(a){var s=(a.status||'').toLowerCase();return s==='overdue'||s.includes('overdue');}
+  function isMaint(a){var s=(a.status||'').toLowerCase();return s==='maintenance'||s.includes('maintenance');}
+  function isDueSoon(a){var s=(a.status||'').toLowerCase();return s==='due-soon'||s.includes('due');}
+  function isActive(a){var s=(a.status||'').toLowerCase();return s==='active'||s==='on track';}
+  function isLowStock(i){return (parseInt(i.stock)||0)<=(parseInt(i.minLevel)||0);}
+  function statusTag(raw){
+    var s=(raw||'').toLowerCase(),label=raw||'—';
+    if(s==='overdue'||s.includes('overdue'))label='Overdue';
+    else if(s==='maintenance'||s.includes('maintenance'))label='Maintenance';
+    else if(s==='due-soon'||s.includes('due'))label='Due Soon';
+    else if(s==='active'||s==='on track')label='Active';
+    else if(s==='pending')label='Pending';
+    else if(s==='ongoing')label='Ongoing';
+    else if(s==='completed')label='Completed';
+    else if(s==='low')label='Low';
+    else if(s==='ok')label='OK';
+    var map={'Overdue':['#E8001C','rgba(232,0,28,0.1)'],'Maintenance':['#d69e2e','rgba(214,158,46,0.1)'],'Due Soon':['#d97706','rgba(217,119,6,0.1)'],'Active':['#38a169','rgba(56,161,105,0.1)'],'Pending':['#718096','rgba(113,128,150,0.1)'],'Ongoing':['#d69e2e','rgba(214,158,46,0.1)'],'Completed':['#003087','rgba(0,48,135,0.1)'],'Low':['#E8001C','rgba(232,0,28,0.1)'],'OK':['#38a169','rgba(56,161,105,0.1)']};
+    var c=map[label]||['#718096','rgba(113,128,150,0.1)'];
+    return tag(label,c[0],c[1]);
+  }
+  function tbl(h,r){if(!r.length)return '<em style="color:#718096;font-size:11px;">No records found.</em>';return '<table><thead><tr>'+h.map(function(x){return '<th>'+_ragEsc(x)+'</th>';}).join('')+'</tr></thead><tbody>'+r.map(function(row){return '<tr>'+row.map(function(c){return '<td>'+c+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table>';}
+  function ret(html){return {html:html};}
+
+  // Fleet summary
+  if(q.includes('fleet summary')||q.includes('summary')||q.includes('overview')){
+    var tot=assets.length,ov=assets.filter(isOverdue).length,mt=assets.filter(isMaint).length,ds=assets.filter(isDueSoon).length,ac=assets.filter(isActive).length,ls=inventory.filter(isLowStock).length;
+    return ret('<strong>📊 Fleet Summary</strong><br>• Vehicles: <strong>'+tot+'</strong> (Active: '+ac+', Maintenance: '+mt+')<br>• PMS Overdue: <strong>'+ov+'</strong>, Due Soon: <strong>'+ds+'</strong><br>• Low Stock Items: <strong>'+ls+'</strong><br>• Services: <strong>'+services.length+'</strong>');
+  }
+  // All vehicles
+  if((q.includes('all')&&q.includes('vehicle'))||q.includes('show vehicle')||q.includes('list vehicle')){
+    if(!assets.length)return ret('🚗 No vehicles found.');
+    var rows=assets.slice(0,15).map(function(a){return [_ragEsc(a.plateNumber||'—'),_ragEsc(a.assetDescription||'—'),statusTag(a.status)];});
+    return ret('<strong>🚗 Vehicles ('+assets.length+')</strong>'+tbl(['Plate','Description','Status'],rows));
+  }
+  // Under maintenance
+  if(q.includes('under maintenance')||(q.includes('maintenance')&&!q.includes('cost'))){
+    var list=assets.filter(isMaint);
+    if(!list.length)return ret('✅ No vehicles under maintenance.');
+    var rows=list.map(function(a){return [_ragEsc(a.plateNumber||'—'),_ragEsc(a.assetDescription||'—'),_ragEsc(a.owner||'—')];});
+    return ret('<strong>🔧 Under Maintenance ('+list.length+')</strong>'+tbl(['Plate','Description','Owner'],rows));
+  }
+  // PMS overdue
+  if(q.includes('overdue')){
+    var list=assets.filter(isOverdue);
+    if(!list.length)return ret('✅ No PMS overdue vehicles.');
+    var rows=list.map(function(a){return [_ragEsc(a.plateNumber||'—'),_ragEsc(a.assetDescription||'—'),_ragEsc(a.owner||'—')];});
+    return ret('<strong>⚠️ PMS Overdue ('+list.length+')</strong>'+tbl(['Plate','Description','Owner'],rows));
+  }
+  // Due soon
+  if(q.includes('due this week')||q.includes('due soon')||(q.includes('pms')&&q.includes('due'))){
+    var list=assets.filter(isDueSoon);
+    if(!list.length)return ret('✅ No PMS due soon.');
+    var rows=list.map(function(a){return [_ragEsc(a.plateNumber||'—'),_ragEsc(a.assetDescription||'—'),statusTag(a.status)];});
+    return ret('<strong>📅 PMS Due Soon ('+list.length+')</strong>'+tbl(['Plate','Description','Status'],rows));
+  }
+  // Low stock
+  if(q.includes('low')&&q.includes('stock')){
+    var list=inventory.filter(isLowStock);
+    if(!list.length)return ret('✅ All stock levels adequate.');
+    var rows=list.map(function(i){return [_ragEsc(i.itemName||'—'),String(i.stock||0)+'/'+String(i.minLevel||0),_ragEsc(i.unit||'')];});
+    return ret('<strong>📦 Low Stock ('+list.length+')</strong>'+tbl(['Item','Stock/Min','Unit'],rows));
+  }
+  // Inventory summary
+  if(q.includes('inventory')){
+    var tot=inventory.length,ls=inventory.filter(isLowStock).length,ok=tot-ls;
+    return ret('<strong>🗃️ Inventory</strong><br>• Total: <strong>'+tot+'</strong><br>• OK: <strong>'+ok+'</strong><br>• Low: <strong>'+ls+'</strong>');
+  }
+  // Cost
+  if(q.includes('cost')||q.includes('expense')){
+    var now=new Date();
+    var thisMonth=services.filter(function(s){var d=s.dateServiced||s.date||'';if(!d)return false;var dt=new Date(d);return !isNaN(dt)&&dt.getMonth()===now.getMonth()&&dt.getFullYear()===now.getFullYear();});
+    var mCost=thisMonth.reduce(function(s,t){return s+(parseFloat(t.totalCost||t.cost||0)||0);},0);
+    var aCost=services.reduce(function(s,t){return s+(parseFloat(t.totalCost||t.cost||0)||0);},0);
+    return ret('<strong>💰 Maintenance Cost</strong><br>• This month: <strong>'+fmtP(mCost)+'</strong> ('+thisMonth.length+' services)<br>• All time: <strong>'+fmtP(aCost)+'</strong>');
+  }
+  // Pending
+  if(q.includes('pending')){
+    var list=services.filter(function(s){return (s.status||'').toLowerCase()==='pending';});
+    if(!list.length)return ret('✅ No pending services.');
+    var rows=list.map(function(s){return [_ragEsc(s.plate||'—'),_ragEsc(s.mechanicName||s.mechanic||'—'),_ragEsc(s.dateServiced||s.date||'—')];});
+    return ret('<strong>⏳ Pending ('+list.length+')</strong>'+tbl(['Plate','Mechanic','Date'],rows));
+  }
+  // Fast moving
+  if(q.includes('fast')||q.includes('most used')){
+    var counts={};
+    issuances.forEach(function(i){var n=i.itemName||i.item||'';if(n)counts[n]=(counts[n]||0)+(parseFloat(i.quantity||i.qty)||0);});
+    var sorted=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];}).slice(0,8);
+    if(!sorted.length)return ret('No issuance data found.');
+    var rows=sorted.map(function(k){return [_ragEsc(k),String(counts[k])];});
+    return ret('<strong>📈 Fast Moving Items</strong>'+tbl(['Item','Total Issued'],rows));
+  }
+  // Users
+  if(q.includes('user')||q.includes('staff')){
+    var adm=users.filter(function(u){return u.role==='admin';}).length,stf=users.filter(function(u){return u.role==='staff';}).length,cus=users.filter(function(u){return u.role==='customer';}).length;
+    return ret('<strong>👥 Users ('+users.length+')</strong><br>• Admin: '+adm+'<br>• Staff: '+stf+'<br>• Customer: '+cus);
+  }
+  // Fallback
+  return ret('🤔 Try: <em>fleet summary, overdue, low stock, cost, pending, fast moving</em>');
+}
+
+})();
+</script>

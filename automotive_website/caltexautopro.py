@@ -472,6 +472,10 @@ def admin_service_bookings():
 def admin_receiving():
     return render_template('admin_receiving.html')
 
+@app.route('/admin_calendar.html')
+def admin_calendar():
+    return render_template('admin_calendar.html')
+
 @app.route('/print_layout.html')
 def print_layout():
     return render_template('print_layout.html')
