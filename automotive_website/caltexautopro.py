@@ -2,6 +2,7 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 import smtplib
 import os
+import json as _json
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import timedelta
@@ -544,11 +545,80 @@ def pms_history_details():
 
 @app.route('/customer_smart_ai.html')
 def customer_smart_ai():
-    return render_template('customer_smart_ai.html')
+    return render_template('customer_smart_ai_widget.html')
 
 @app.route('/customer_header.html')
 def customer_header():
     return render_template('customer_header.html')
+
+# ── RAG AI Engine (in-process) ────────────────────────────────────────────────
+# Imports the RAG engine directly — no separate server needed.
+# The rag_module.py is auto-generated from AI_ASSISTANT/rag_ai.py
+# Run: python build_rag_module.py (if rag_module.py doesn't exist)
+
+_rag_engine = None
+_rag_error = None
+
+try:
+    from rag_module import EnhancedRag
+    _rag_engine = EnhancedRag()
+    print('✅ RAG AI Engine initialized (in-process)')
+except Exception as _e:
+    _rag_error = str(_e)
+    print(f'⚠️  RAG AI Engine not loaded: {_e}')
+    print('   The AI chat will fall back to basic responses.')
+
+
+@app.route('/api/ai-chat', methods=['POST'])
+def ai_chat():
+    """AI chat endpoint — uses RAG engine directly (no separate server)."""
+    data = request.get_json(silent=True) or {}
+    message = data.get('message', '').strip()
+    session_id = data.get('session_id', '')
+    user_type = data.get('user_type', 'customer')
+
+    if not message:
+        return jsonify({'success': False, 'error': 'Empty message'}), 400
+
+    if _rag_engine is None:
+        return jsonify({
+            'success': False,
+            'error': f'RAG AI not available: {_rag_error}',
+            'answer': 'The AI service is not available right now. Please try the quick-help options.',
+            'offline': True,
+        }), 503
+
+    try:
+        result = _rag_engine.ask(
+            query=message,
+            session_id=session_id or 'default',
+            user_type=user_type,
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'answer': 'An error occurred while processing your question. Please try again.',
+        }), 500
+
+
+@app.route('/api/ai-health', methods=['GET'])
+def ai_health_check():
+    """Check if the RAG AI engine is loaded."""
+    if _rag_engine is not None:
+        return jsonify({'online': True, 'status': 'ok', 'mode': 'in-process'})
+    return jsonify({'online': False, 'error': _rag_error}), 503
+
+
+@app.route('/api/ai-session/<session_id>', methods=['DELETE'])
+def ai_clear_session(session_id):
+    """Clear conversation history for a session."""
+    if _rag_engine is None:
+        return jsonify({'success': False, 'error': 'RAG AI not available'}), 503
+    result = _rag_engine.clear_session(session_id)
+    return jsonify(result)
+
 
 # ── Run ──────────────────────────────────────────────────────
 if __name__ == '__main__':

@@ -298,7 +298,7 @@
     return el;
   }
 
-  window.send = function (preset) {
+  window.send = async function (preset) {
     const input = document.getElementById('aiInput');
     const text = (preset || input.value).trim();
     if (!text) return;
@@ -318,10 +318,33 @@
     }
 
     const typing = addTyping();
-    setTimeout(() => {
+
+    // Try RAG AI backend via Flask proxy first
+    try {
+      const resp = await fetch('/api/ai-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          session_id: cpUser.uid || cpUser.email || 'anonymous',
+          user_type: 'customer',
+        }),
+      });
+      const data = await resp.json();
+      typing.remove();
+      if (data.answer) {
+        addBubble(data.answer, 'bot');
+      } else if (data.offline) {
+        // RAG server offline — fall back to local processing
+        addBubble(processQuery(text), 'bot');
+      } else {
+        addBubble(processQuery(text), 'bot');
+      }
+    } catch (err) {
+      // Network error or Flask down — fall back to local processing
       typing.remove();
       addBubble(processQuery(text), 'bot');
-    }, 500);
+    }
   };
 
   window.clearChat = function () {

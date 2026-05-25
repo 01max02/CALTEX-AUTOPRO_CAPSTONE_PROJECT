@@ -123,7 +123,7 @@ if (typeof firebase !== 'undefined') {
   });
 }
 
-// Watch for data readiness
+// Watch for data readiness + check RAG AI health
 function _ragWatch() {
   var attempts = 0;
   var iv = setInterval(function() {
@@ -132,10 +132,23 @@ function _ragWatch() {
     if (v > 0 || i > 0 || s > 0 || attempts >= 15) {
       clearInterval(iv);
       _ragReady = true;
-      var dot = document.getElementById('ragAiDot');
-      var txt = document.getElementById('ragAiStatus');
-      if (dot) dot.style.background = '#38a169';
-      if (txt) { txt.style.color = '#38a169'; txt.textContent = 'Online · Live data'; }
+      // Check RAG AI engine health
+      fetch('/api/ai-health').then(function(r){return r.json();}).then(function(d){
+        var dot = document.getElementById('ragAiDot');
+        var txt = document.getElementById('ragAiStatus');
+        if (d.online) {
+          if (dot) dot.style.background = '#38a169';
+          if (txt) { txt.style.color = '#38a169'; txt.textContent = 'Online · RAG AI + Live data'; }
+        } else {
+          if (dot) dot.style.background = '#d69e2e';
+          if (txt) { txt.style.color = '#d69e2e'; txt.textContent = 'Online · Local mode (no AI)'; }
+        }
+      }).catch(function(){
+        var dot = document.getElementById('ragAiDot');
+        var txt = document.getElementById('ragAiStatus');
+        if (dot) dot.style.background = '#d69e2e';
+        if (txt) { txt.style.color = '#d69e2e'; txt.textContent = 'Online · Local mode'; }
+      });
     }
   }, 600);
 }
@@ -174,26 +187,29 @@ window.ragAiSend = function(preset) {
   input.value=''; input.style.height='auto';
   _ragTyping();
 
-  // Try RAG AI API backend first (user_type: admin), fallback to local JS engine
-  var RAG_API_URL = window.RAG_API_URL || 'http://localhost:8000';
-  fetch(RAG_API_URL + '/chat', {
+  // Call the Flask in-process RAG AI endpoint (user_type: admin)
+  fetch('/api/ai-chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: text, user_type: 'admin', session_id: 'admin-widget-' + Date.now() })
+    body: JSON.stringify({ message: text, user_type: 'admin', session_id: 'admin-widget-' + (firebase.auth().currentUser ? firebase.auth().currentUser.uid : Date.now()) })
   })
-  .then(function(res) { if (!res.ok) throw new Error('API error'); return res.json(); })
+  .then(function(res) { return res.json(); })
   .then(function(data) {
     _ragRemoveTyping();
     if (data.answer) {
       // Format the answer nicely
       var answer = data.answer.replace(/\n/g, '<br>').replace(/^- /gm, '• ');
       _ragAppend('ai', answer);
+    } else if (data.offline) {
+      // RAG engine not loaded — fall back to local JS engine
+      var result = _ragProcess(text);
+      _ragAppend('ai', result.html);
     } else {
       _ragAppend('ai', '⚠️ No answer received from AI.');
     }
   })
   .catch(function(err) {
-    // Fallback to local JS query engine if API is not available
+    // Network error or Flask down — fall back to local JS query engine
     _ragRemoveTyping();
     var result = _ragProcess(text);
     _ragAppend('ai', result.html);
