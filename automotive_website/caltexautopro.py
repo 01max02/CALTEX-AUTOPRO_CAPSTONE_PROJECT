@@ -16,8 +16,25 @@ from firebase_admin import credentials, auth as fb_auth
 
 _SERVICE_ACCOUNT_PATH = os.environ.get(
     'FIREBASE_SERVICE_ACCOUNT',
-    os.path.join(os.path.dirname(__file__), 'serviceAccountKey.json')
+    None
 )
+
+# Search multiple common locations for the service account key
+if not _SERVICE_ACCOUNT_PATH or not os.path.exists(_SERVICE_ACCOUNT_PATH):
+    _SEARCH_PATHS = [
+        os.path.join(os.path.dirname(__file__), 'serviceAccountKey.json'),
+        os.path.join(os.path.dirname(__file__), '..', 'serviceAccountKey.json'),
+        os.path.join(os.path.dirname(__file__), '..', 'AI_ASSISTANT', 'serviceAccountKey.json'),
+        os.path.join(os.path.dirname(__file__), 'firebase-credentials.json'),
+        os.path.join(os.path.dirname(__file__), '..', 'firebase-credentials.json'),
+        os.path.join(os.path.expanduser('~'), 'serviceAccountKey.json'),
+    ]
+    for _p in _SEARCH_PATHS:
+        if os.path.exists(_p):
+            _SERVICE_ACCOUNT_PATH = _p
+            break
+    else:
+        _SERVICE_ACCOUNT_PATH = os.path.join(os.path.dirname(__file__), 'serviceAccountKey.json')
 
 if not firebase_admin._apps:
     try:
@@ -559,10 +576,26 @@ def customer_header():
 _rag_engine = None
 _rag_error = None
 
+# Tell the RAG module to use the same Firebase credentials as caltexautopro.py
+if not os.environ.get('FIREBASE_CREDENTIALS_PATH'):
+    os.environ['FIREBASE_CREDENTIALS_PATH'] = _SERVICE_ACCOUNT_PATH
+
+# Groq LLM API key for conversational AI responses
+if not os.environ.get('GROQ_API_KEY'):
+    _groq_key_path = os.path.join(os.path.dirname(__file__), '.groq_key')
+    if os.path.exists(_groq_key_path):
+        os.environ['GROQ_API_KEY'] = open(_groq_key_path).read().strip()
+
 try:
     from rag_module import EnhancedRag
     _rag_engine = EnhancedRag()
-    print('✅ RAG AI Engine initialized (in-process)')
+    # Pre-warm the cache at startup so first query is fast
+    try:
+        _rag_engine.retriever.base_retriever._refresh_cache_if_needed()
+        _cached_count = len(_rag_engine.retriever.base_retriever._cached_records)
+        print(f'✅ RAG AI Engine initialized (in-process) — {_cached_count} records cached')
+    except Exception as _warm_err:
+        print(f'✅ RAG AI Engine initialized (cache warm failed: {_warm_err})')
 except Exception as _e:
     _rag_error = str(_e)
     print(f'⚠️  RAG AI Engine not loaded: {_e}')
@@ -572,6 +605,8 @@ except Exception as _e:
 @app.route('/api/ai-chat', methods=['POST'])
 def ai_chat():
     """AI chat endpoint — uses RAG engine directly (no separate server)."""
+    import threading
+
     data = request.get_json(silent=True) or {}
     message = data.get('message', '').strip()
     session_id = data.get('session_id', '')
@@ -588,19 +623,61 @@ def ai_chat():
             'offline': True,
         }), 503
 
-    try:
-        result = _rag_engine.ask(
-            query=message,
-            session_id=session_id or 'default',
-            user_type=user_type,
-        )
-        return jsonify(result)
-    except Exception as e:
+    # Run the RAG query with a timeout to prevent hanging
+    result_holder = [None]
+    error_holder = [None]
+
+    def _run_query():
+        try:
+            result_holder[0] = _rag_engine.ask(
+                query=message,
+                session_id=session_id or 'default',
+                user_type=user_type,
+            )
+        except Exception as e:
+            error_holder[0] = e
+
+    thread = threading.Thread(target=_run_query, daemon=True)
+    thread.start()
+    thread.join(timeout=45)  # 45 second timeout (first query fetches from Firestore)
+
+    if thread.is_alive():
+        # Query timed out — Firestore is slow or unreachable
         return jsonify({
             'success': False,
-            'error': str(e),
-            'answer': 'An error occurred while processing your question. Please try again.',
-        }), 500
+            'error': 'Query timed out — Firestore may be slow or unreachable',
+            'answer': 'The AI is taking too long to respond. This usually means the database connection is slow. Please try again.',
+            'offline': True,
+        }), 503
+
+    if error_holder[0]:
+        err_msg = str(error_holder[0])
+        if 'credentials' in err_msg.lower() or 'not found' in err_msg.lower():
+            answer = 'The AI service cannot connect to the database. Please ensure serviceAccountKey.json is in the automotive_website folder.'
+        else:
+            answer = 'An error occurred while processing your question. Please try again.'
+        return jsonify({
+            'success': False,
+            'error': err_msg,
+            'answer': answer,
+            'offline': True,
+        }), 503
+
+    result = result_holder[0]
+    if result is None:
+        return jsonify({
+            'success': False,
+            'error': 'No result returned',
+            'answer': 'The AI could not generate a response. Please try again.',
+            'offline': True,
+        }), 503
+
+    # Ensure we always return a success field and answer
+    if 'answer' not in result:
+        result['answer'] = 'No response generated.'
+    if 'success' not in result:
+        result['success'] = True
+    return jsonify(result)
 
 
 @app.route('/api/ai-health', methods=['GET'])
@@ -618,6 +695,229 @@ def ai_clear_session(session_id):
         return jsonify({'success': False, 'error': 'RAG AI not available'}), 503
     result = _rag_engine.clear_session(session_id)
     return jsonify(result)
+
+
+@app.route('/api/ai-report', methods=['POST'])
+def ai_generate_report():
+    """Generate PDF or Excel report from live Firestore data.
+    
+    Request body:
+        report_type: "inventory" | "issuance" | "transactions"
+        format: "pdf" | "excel" (default: "pdf")
+        start_date: ISO date string (optional, e.g. "2026-05-01")
+        end_date: ISO date string (optional, e.g. "2026-05-31")
+    
+    Returns: the file as a download
+    """
+    from flask import send_file
+    import io as _io
+    from datetime import datetime, timezone
+
+    if _rag_engine is None:
+        return jsonify({'success': False, 'error': 'RAG AI not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    report_type = data.get('report_type', '').strip().lower()
+    file_format = data.get('format', 'pdf').strip().lower()
+    raw_start = data.get('start_date', '').strip()
+    raw_end = data.get('end_date', '').strip()
+
+    if report_type not in ('inventory', 'issuance', 'transactions'):
+        return jsonify({
+            'success': False,
+            'error': 'Invalid report_type. Use: inventory, issuance, or transactions',
+        }), 400
+
+    if file_format not in ('pdf', 'excel', 'xlsx'):
+        return jsonify({
+            'success': False,
+            'error': 'Invalid format. Use: pdf or excel',
+        }), 400
+
+    # Parse optional date filters
+    start_date = None
+    end_date = None
+    period_label = 'All Time'
+    try:
+        if raw_start:
+            from dateutil import parser as dateutil_parser
+            start_date = dateutil_parser.parse(raw_start)
+            if start_date.tzinfo is None:
+                start_date = start_date.replace(tzinfo=timezone.utc)
+        if raw_end:
+            from dateutil import parser as dateutil_parser
+            end_date = dateutil_parser.parse(raw_end)
+            if end_date.tzinfo is None:
+                end_date = end_date.replace(tzinfo=timezone.utc)
+        if start_date and end_date:
+            period_label = f"{start_date.strftime('%b %d, %Y')} - {end_date.strftime('%b %d, %Y')}"
+        elif start_date:
+            period_label = f"From {start_date.strftime('%b %d, %Y')}"
+        elif end_date:
+            period_label = f"Until {end_date.strftime('%b %d, %Y')}"
+    except (ValueError, TypeError):
+        pass  # If date parsing fails, proceed without filtering
+
+    try:
+        from rag_module import ReportService, FirebaseSource
+        firebase_src = _rag_engine.firebase_source
+        report_svc = ReportService(firebase_source=firebase_src)
+
+        report_data = report_svc.build_report_data(
+            report_type=report_type,
+            limit_per_domain=200,
+            period_label=period_label,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        if file_format == 'pdf':
+            content = report_svc.generate_pdf(report_data)
+            mimetype = 'application/pdf'
+            filename = f'{report_type}_report.pdf'
+        else:
+            content = report_svc.generate_excel(report_data)
+            mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            filename = f'{report_type}_report.xlsx'
+
+        return send_file(
+            _io.BytesIO(content),
+            mimetype=mimetype,
+            as_attachment=True,
+            download_name=filename,
+        )
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'answer': f'Failed to generate report: {e}',
+        }), 500
+
+
+@app.route('/api/ai-report-list', methods=['GET'])
+def ai_report_list():
+    """List available report types."""
+    return jsonify({
+        'report_types': [
+            {'id': 'inventory', 'name': 'Inventory Report', 'description': 'All inventory/item master records'},
+            {'id': 'issuance', 'name': 'Issuance Report', 'description': 'Material issuance records'},
+            {'id': 'transactions', 'name': 'Transactions Report', 'description': 'Service transactions'},
+        ],
+        'formats': ['pdf', 'excel'],
+    })
+
+
+@app.route('/customer_my_bookings.html')
+def customer_my_bookings():
+    return render_template('customer_my_bookings.html')
+
+
+@app.route('/api/send-reschedule-email', methods=['POST'])
+def send_reschedule_email():
+    """Send email notification when a booking is rescheduled by admin."""
+    data      = request.get_json(silent=True) or {}
+    to_email  = data.get('to_email', '').strip()
+    to_name   = data.get('to_name', 'Customer').strip()
+    plate     = data.get('plate', '').strip()
+    old_date  = data.get('old_date', '').strip()
+    new_date  = data.get('new_date', '').strip()
+    services  = data.get('services', '').strip()
+
+    if not to_email:
+        return jsonify({'ok': False, 'error': 'Missing to_email'}), 400
+
+    print(f'📧 Sending reschedule email → {to_email} ({to_name})')
+
+    subject = 'Your Caltex AutoPro Booking Has Been Rescheduled'
+    html_body = f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:0;background:#f0f2f5;font-family:'Segoe UI',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:40px 0;">
+  <tr><td align="center">
+    <table width="520" cellpadding="0" cellspacing="0"
+           style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.10);">
+      <tr>
+        <td style="background:#E8001C;padding:30px 40px 0;text-align:center;">
+          <div style="font-size:13px;font-weight:700;letter-spacing:4px;color:rgba(255,255,255,.8);margin-bottom:6px;">CALTEX</div>
+          <div style="font-size:22px;font-weight:800;color:#fff;letter-spacing:2px;">AutoPro</div>
+          <div style="background:#fff;border-radius:24px 24px 0 0;height:22px;margin-top:20px;"></div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:8px 40px 40px;">
+          <h1 style="margin:0 0 8px;text-align:center;font-size:22px;font-weight:800;color:#1a202c;">Booking Rescheduled</h1>
+          <p style="margin:0 0 26px;text-align:center;font-size:13px;color:#718096;line-height:1.6;">
+            Hi <strong>{to_name}</strong>,<br/>
+            Your service booking has been rescheduled by the shop administrator.
+          </p>
+          <div style="background:#fffbeb;border:1px solid #f6e05e;border-radius:12px;padding:20px 24px;margin-bottom:26px;">
+            <table cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td style="padding:8px 0;font-size:12px;color:#718096;font-weight:700;text-transform:uppercase;width:130px;">Vehicle</td>
+                <td style="padding:8px 0;font-size:14px;font-weight:700;color:#1a202c;">{plate}</td>
+              </tr>
+              <tr style="border-top:1px solid #e2e8f0;">
+                <td style="padding:8px 0;font-size:12px;color:#718096;font-weight:700;text-transform:uppercase;">Services</td>
+                <td style="padding:8px 0;font-size:13px;color:#4a5568;">{services}</td>
+              </tr>
+              <tr style="border-top:1px solid #e2e8f0;">
+                <td style="padding:8px 0;font-size:12px;color:#718096;font-weight:700;text-transform:uppercase;">Previous Date</td>
+                <td style="padding:8px 0;font-size:13px;color:#e53e3e;font-weight:600;text-decoration:line-through;">{old_date}</td>
+              </tr>
+              <tr style="border-top:1px solid #e2e8f0;">
+                <td style="padding:8px 0;font-size:12px;color:#718096;font-weight:700;text-transform:uppercase;">New Date</td>
+                <td style="padding:8px 0;font-size:14px;color:#38a169;font-weight:700;">{new_date}</td>
+              </tr>
+            </table>
+          </div>
+          <p style="margin:0 0 10px;font-size:13px;color:#4a5568;text-align:center;line-height:1.6;">
+            If you have any concerns about this change, please contact us or visit the shop during business hours.
+          </p>
+          <div style="text-align:center;margin-top:20px;">
+            <span style="display:inline-block;background:#f7f8fa;border-radius:8px;padding:10px 20px;font-size:12px;color:#718096;">
+              Shop Hours: Mon-Sat 8:00 AM - 5:00 PM | Sunday: Closed
+            </span>
+          </div>
+          <hr style="border:none;border-top:1px solid #e2e8f0;margin:26px 0;"/>
+          <p style="margin:0;font-size:12px;color:#a0aec0;text-align:center;line-height:1.6;">
+            Need help? Contact us at <a href="mailto:caltexautopro2026@gmail.com" style="color:#E8001C;">caltexautopro2026@gmail.com</a>
+          </p>
+        </td>
+      </tr>
+      <tr>
+        <td style="background:#f7f8fa;padding:18px 40px;text-align:center;border-top:1px solid #e2e8f0;">
+          <p style="margin:0;font-size:11px;color:#a0aec0;line-height:1.6;">
+            &copy; 2025 Caltex AutoPro &middot; JA Noble Enterprise INC<br/>
+            This is an automated message &mdash; please do not reply.
+          </p>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>"""
+
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From']    = SMTP_FROM
+        msg['To']      = to_email
+        msg.attach(MIMEText(html_body, 'html'))
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SMTP_USER, to_email, msg.as_string())
+        print(f'✅ Reschedule email delivered → {to_email}')
+        return jsonify({'ok': True})
+    except smtplib.SMTPAuthenticationError:
+        print(f'❌ SMTP auth failed for reschedule email → {to_email}')
+        return jsonify({'ok': False, 'error': 'SMTP auth failed'}), 500
+    except Exception as e:
+        print(f'❌ Reschedule email error → {to_email}: {e}')
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 
 # ── Run ──────────────────────────────────────────────────────

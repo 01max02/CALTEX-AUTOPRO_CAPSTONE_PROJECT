@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Bookings</title>
+    <link rel="icon" type="image/png" href="../static/img/LOGO_CALTEX.png" />
+    <link rel="stylesheet" href="../static/css/customer_dashboard.css">
+    <style>
+        .mb-page { max-width:900px; margin:0 auto; padding:28px 40px 40px; }
+        .mb-header { margin-bottom:28px; }
+        .mb-header h2 { font-size:22px; font-weight:800; color:#1a202c; margin:0 0 4px; }
+        .mb-header p { font-size:13px; color:#718096; margin:0; }
+        .mb-card { background:white; border-radius:14px; border:1.5px solid #e2e8f0; padding:18px 20px; margin-bottom:14px; transition:all .15s; }
+        .mb-card:hover { box-shadow:0 4px 16px rgba(0,0,0,0.06); border-color:#cbd5e0; }
+        .mb-card-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+        .mb-plate { font-size:16px; font-weight:700; color:#1a202c; }
+        .mb-badge { font-size:11px; font-weight:700; padding:4px 12px; border-radius:20px; text-transform:uppercase; letter-spacing:0.3px; }
+        .mb-badge.approved { background:rgba(56,161,105,0.1); color:#38a169; }
+        .mb-badge.dismissed { background:rgba(113,128,150,0.1); color:#718096; }
+        .mb-services { font-size:13px; color:#4a5568; margin-bottom:8px; line-height:1.5; }
+        .mb-meta { display:flex; flex-wrap:wrap; gap:16px; font-size:12px; color:#718096; }
+        .mb-meta-item { display:flex; align-items:center; gap:5px; }
+        .mb-reschedule-note { margin-top:10px; padding:8px 12px; background:#fffbeb; border:1px solid #f6e05e; border-radius:8px; font-size:12px; color:#92400e; display:flex; align-items:center; gap:8px; }
+        .mb-empty { text-align:center; padding:60px 20px; color:#718096; }
+        .mb-empty svg { margin-bottom:16px; opacity:0.4; }
+        .mb-empty p { font-size:14px; margin:0 0 16px; }
+        .mb-empty a { color:#E8001C; font-weight:600; text-decoration:none; }
+        .mb-empty a:hover { text-decoration:underline; }
+
+        @media (max-width: 768px) {
+            .mb-page { padding:16px 16px 32px; }
+            .mb-card { padding:14px 16px; border-radius:12px; }
+            .mb-card-top { flex-direction:column; align-items:flex-start; gap:8px; }
+            .mb-meta { gap:10px; }
+        }
+    </style>
+</head>
+<body data-page="my-bookings">
+
+<div id="customerHeader"></div>
+
+<main class="cu-main">
+  <div class="mb-page">
+    <div class="mb-header">
+      <h2>My Bookings</h2>
+      <p>View your service booking history and status.</p>
+    </div>
+
+    <div id="mbList">
+      <div style="text-align:center;padding:40px;color:#718096;font-size:13px;">Loading bookings...</div>
+    </div>
+  </div>
+</main>
+
+<div id="cuToast"></div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+  firebase.initializeApp({
+    apiKey: "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
+    authDomain: "caltex-autopro-1e664.firebaseapp.com",
+    projectId: "caltex-autopro-1e664",
+    storageBucket: "caltex-autopro-1e664.firebasestorage.app",
+    messagingSenderId: "930140433367",
+    appId: "1:930140433367:web:cf67bfa388fa517422b992"
+  });
+</script>
+<script src="../static/js/customer_shared.js"></script>
+<script>
+// Load header
+fetch('customer_header.html').then(function(r){return r.text();}).then(function(html){
+  document.getElementById('customerHeader').innerHTML = html;
+  var sess = JSON.parse(sessionStorage.getItem('cpUser') || '{}');
+  if (sess.name) {
+    var parts = sess.name.trim().split(' ').filter(Boolean);
+    var ini = parts.length >= 2 ? (parts[0][0]+parts[1][0]).toUpperCase() : (parts[0]?parts[0][0].toUpperCase():'CU');
+    var av = document.getElementById('cuAvatar'); if(av) av.textContent = ini;
+    var hn = document.getElementById('cuHeaderName'); if(hn) hn.textContent = sess.name;
+    var mn = document.getElementById('cuAvatarName'); if(mn) mn.textContent = sess.name;
+  }
+});
+
+var _MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function _formatDate(dateStr) {
+  if (!dateStr) return '—';
+  var parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  var y = parseInt(parts[0]);
+  var m = parseInt(parts[1]) - 1;
+  var d = parseInt(parts[2]);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return dateStr;
+  return _MONTHS[m] + ' ' + d + ', ' + y;
+}
+
+function _esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+firebase.auth().onAuthStateChanged(function(user) {
+  if (!user) { window.location.href = 'login.html'; return; }
+
+  var db = firebase.firestore();
+  db.collection('service_bookings')
+    .where('customerId', '==', user.uid)
+    .get()
+    .then(function(snap) {
+      var list = document.getElementById('mbList');
+      if (snap.empty) {
+        list.innerHTML = '<div class="mb-empty">'
+          + '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'
+          + '<p>You have no bookings yet.</p>'
+          + '<a href="customer_book_service.html">Book a Service →</a>'
+          + '</div>';
+        return;
+      }
+
+      // Sort by createdAt descending (client-side to avoid index requirement)
+      var docs = snap.docs.sort(function(a, b) {
+        var aTime = a.data().createdAt ? a.data().createdAt.toMillis() : 0;
+        var bTime = b.data().createdAt ? b.data().createdAt.toMillis() : 0;
+        return bTime - aTime;
+      });
+
+      var html = '';
+      docs.forEach(function(doc) {
+        var d = doc.data();
+        if ((d.status || '').toLowerCase() === 'pending') return; // skip pending
+        var status = (d.status || 'Approved').toLowerCase();
+        var badgeClass = status === 'approved' ? 'approved' : 'dismissed';
+        var badgeLabel = status === 'dismissed' ? 'Cancelled' : 'Approved';
+        var services = (d.services || []).join(', ') || '—';
+        var rescheduleNote = '';
+
+        if (d.previousDate && d.previousDate !== d.preferredDate) {
+          rescheduleNote = '<div class="mb-reschedule-note">'
+            + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>'
+            + 'Rescheduled from <strong>' + _formatDate(d.previousDate) + '</strong> to <strong>' + _formatDate(d.preferredDate) + '</strong>'
+            + '</div>';
+        }
+
+        html += '<div class="mb-card">'
+          + '<div class="mb-card-top">'
+          + '<span class="mb-plate">' + _esc(d.plate || '—') + '</span>'
+          + '<span class="mb-badge ' + badgeClass + '">' + _esc(badgeLabel) + '</span>'
+          + '</div>'
+          + '<div class="mb-services">' + _esc(services) + '</div>'
+          + '<div class="mb-meta">'
+          + '<span class="mb-meta-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' + _formatDate(d.preferredDate) + '</span>'
+          + '<span class="mb-meta-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' + _esc(d.preferredTime || '—') + '</span>'
+          + '</div>'
+          + rescheduleNote
+          + '</div>';
+      });
+
+      list.innerHTML = html;
+    }).catch(function(err) {
+      document.getElementById('mbList').innerHTML = '<div style="text-align:center;padding:40px;color:#e53e3e;font-size:13px;">Error loading bookings: ' + err.message + '</div>';
+    });
+});
+</script>
+</body>
+</html>

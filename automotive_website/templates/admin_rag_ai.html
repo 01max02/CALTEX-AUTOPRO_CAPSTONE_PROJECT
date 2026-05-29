@@ -56,6 +56,8 @@
     <button class="rag-chip" onclick="ragAiSend('Total repair cost this month')">💰 Cost</button>
     <button class="rag-chip" onclick="ragAiSend('How many services are pending?')">⏳ Pending</button>
     <button class="rag-chip" onclick="ragAiSend('What are the fast moving inventory items?')">📈 Fast moving</button>
+    <button class="rag-chip" onclick="ragAiSend('Generate inventory report PDF')">📄 PDF Report</button>
+    <button class="rag-chip" onclick="ragAiSend('Generate issuance report excel')">📊 Excel Report</button>
   </div>
 
   <!-- Input bar -->
@@ -196,16 +198,29 @@ window.ragAiSend = function(preset) {
   .then(function(res) { return res.json(); })
   .then(function(data) {
     _ragRemoveTyping();
-    if (data.answer) {
+    if (data.offline || !data.success) {
+      // RAG engine not available — fall back to local JS engine
+      var result = _ragProcess(text);
+      _ragAppend('ai', result.html);
+    } else if (data.report_ready) {
+      // Report is ready — show message with download button
+      var answer = (data.answer || '').replace(/\n/g, '<br>');
+      var btnHtml = '<div style="margin-top:8px;display:flex;gap:6px;">'
+        + '<button onclick="ragDownloadReport(\'' + data.report_type + '\',\'' + data.report_format + '\')" '
+        + 'style="background:#E8001C;color:white;border:none;padding:6px 14px;border-radius:16px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">📥 Download ' + (data.report_format||'pdf').toUpperCase() + '</button>';
+      // Offer the other format too
+      var otherFmt = data.report_format === 'pdf' ? 'excel' : 'pdf';
+      btnHtml += '<button onclick="ragDownloadReport(\'' + data.report_type + '\',\'' + otherFmt + '\')" '
+        + 'style="background:#f7f8fa;color:#4a5568;border:1.5px solid #e2e8f0;padding:6px 14px;border-radius:16px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">📥 ' + otherFmt.toUpperCase() + '</button>';
+      btnHtml += '</div>';
+      _ragAppend('ai', answer + btnHtml);
+    } else if (data.answer) {
       // Format the answer nicely
       var answer = data.answer.replace(/\n/g, '<br>').replace(/^- /gm, '• ');
       _ragAppend('ai', answer);
-    } else if (data.offline) {
-      // RAG engine not loaded — fall back to local JS engine
+    } else {
       var result = _ragProcess(text);
       _ragAppend('ai', result.html);
-    } else {
-      _ragAppend('ai', '⚠️ No answer received from AI.');
     }
   })
   .catch(function(err) {
@@ -220,6 +235,33 @@ window.ragAiClear = function() {
   document.getElementById('ragAiChat').innerHTML='';
   document.getElementById('ragAiChips').style.display='flex';
   _ragShowWelcome();
+};
+
+window.ragDownloadReport = function(reportType, format) {
+  _ragAppend('ai', '⏳ Generating ' + format.toUpperCase() + ' report...');
+  fetch('/api/ai-report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ report_type: reportType, format: format })
+  })
+  .then(function(res) {
+    if (!res.ok) throw new Error('Report generation failed');
+    return res.blob();
+  })
+  .then(function(blob) {
+    var ext = format === 'pdf' ? '.pdf' : '.xlsx';
+    var filename = reportType + '_report' + ext;
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    _ragAppend('ai', '✅ <strong>' + filename + '</strong> downloaded successfully!');
+  })
+  .catch(function(err) {
+    _ragAppend('ai', '❌ Failed to generate report: ' + err.message);
+  });
 };
 
 function _ragShowWelcome() {

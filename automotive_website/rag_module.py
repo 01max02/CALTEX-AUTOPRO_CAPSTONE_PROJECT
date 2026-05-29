@@ -274,15 +274,18 @@ class DataNormalizer:
         """
         # Domain-specific primary name fields
         domain_name_fields: dict[str, list[str]] = {
-            "item_master": ["name"],
-            "inventory": ["name"],
+            "item_master": ["name", "desc"],
+            "inventory": ["name", "item"],
             "stock_inventory": ["name"],
-            "products": ["name"],
-            "services": ["service_name", "vehicle", "customer"],
-            "orders": ["order_id", "item", "customer"],
-            "customers": ["name"],
-            "issuance": ["item", "issued_to"],
+            "products": ["name", "product"],
+            "maintenance": ["plate", "desc", "id"],
+            "transactions": ["item", "desc"],
+            "service_bookings": ["customerName", "vehicleDesc", "plate"],
+            "vehicles": ["plate", "desc", "type"],
+            "issuance": ["itemName", "item", "plate"],
+            "users": ["name", "email"],
             "manual": ["title"],
+            "notifications": ["title", "message"],
         }
 
         # Try domain-specific fields first
@@ -293,7 +296,7 @@ class DataNormalizer:
                 return str(value).strip()
 
         # Generic fallback: try common name fields
-        generic_name_fields = ["name", "title", "item", "service_name", "product", "customer", "vehicle", "order_id"]
+        generic_name_fields = ["name", "itemName", "title", "item", "plate", "desc", "customerName", "vehicleDesc", "email"]
         for field in generic_name_fields:
             value = payload.get(field)
             if value and self._is_name_worthy(value):
@@ -683,27 +686,27 @@ class FirebaseSource:
             database_url=os.getenv("FIREBASE_DATABASE_URL"),
             firestore_collections={
                 "item_master": os.getenv("FIREBASE_COLLECTION_ITEM_MASTER", "item_master"),
-                "inventory": os.getenv("FIREBASE_COLLECTION_INVENTORY", "inventory"),
-                # Optional separate collection that holds stock quantities and reorder levels
                 "stock_inventory": os.getenv("FIREBASE_COLLECTION_STOCK", "stock_inventory"),
-                "issuance": os.getenv("FIREBASE_COLLECTION_ISSUANCE", "issuance"),
-                "products": os.getenv("FIREBASE_COLLECTION_PRODUCTS", "products"),
-                "customers": os.getenv("FIREBASE_COLLECTION_CUSTOMERS", "customers"),
-                "orders": os.getenv("FIREBASE_COLLECTION_ORDERS", "orders"),
-                "services": os.getenv("FIREBASE_COLLECTION_SERVICES", "services"),
-                "manual": os.getenv("FIREBASE_COLLECTION_MANUAL", "manual"),
+                "issuance": os.getenv("FIREBASE_COLLECTION_ISSUANCE", "issuances"),
+                "maintenance": os.getenv("FIREBASE_COLLECTION_MAINTENANCE", "maintenance"),
+                "transactions": os.getenv("FIREBASE_COLLECTION_TRANSACTIONS", "transactions"),
+                "service_bookings": os.getenv("FIREBASE_COLLECTION_SERVICE_BOOKINGS", "service_bookings"),
+                "vehicles": os.getenv("FIREBASE_COLLECTION_VEHICLES", "vehicles"),
+                "users": os.getenv("FIREBASE_COLLECTION_USERS", "users"),
+                "manual": os.getenv("FIREBASE_COLLECTION_MANUAL", "manuals"),
+                "notifications": os.getenv("FIREBASE_COLLECTION_NOTIFICATIONS", "notifications"),
             },
             realtime_paths={
                 "item_master": os.getenv("FIREBASE_PATH_ITEM_MASTER", "item_master"),
-                "inventory": os.getenv("FIREBASE_PATH_INVENTORY", "inventory"),
-                # Optional realtime path for stock records
                 "stock_inventory": os.getenv("FIREBASE_PATH_STOCK", "stock_inventory"),
-                "issuance": os.getenv("FIREBASE_PATH_ISSUANCE", "issuance"),
-                "products": os.getenv("FIREBASE_PATH_PRODUCTS", "products"),
-                "customers": os.getenv("FIREBASE_PATH_CUSTOMERS", "customers"),
-                "orders": os.getenv("FIREBASE_PATH_ORDERS", "orders"),
-                "services": os.getenv("FIREBASE_PATH_SERVICES", "services"),
-                "manual": os.getenv("FIREBASE_PATH_MANUAL", "manual"),
+                "issuance": os.getenv("FIREBASE_PATH_ISSUANCE", "issuances"),
+                "maintenance": os.getenv("FIREBASE_PATH_MAINTENANCE", "maintenance"),
+                "transactions": os.getenv("FIREBASE_PATH_TRANSACTIONS", "transactions"),
+                "service_bookings": os.getenv("FIREBASE_PATH_SERVICE_BOOKINGS", "service_bookings"),
+                "vehicles": os.getenv("FIREBASE_PATH_VEHICLES", "vehicles"),
+                "users": os.getenv("FIREBASE_PATH_USERS", "users"),
+                "manual": os.getenv("FIREBASE_PATH_MANUAL", "manuals"),
+                "notifications": os.getenv("FIREBASE_PATH_NOTIFICATIONS", "notifications"),
             },
         )
         self._initialized = False
@@ -765,28 +768,111 @@ class FirebaseSource:
         return await asyncio.to_thread(self.fetch_live_data, limit_per_domain)
 
     def _fetch_from_firestore(self, limit_per_domain: int) -> list[dict[str, Any]]:
-        from firebase_admin import firestore
+        """Fetch data from Firestore using REST API (avoids gRPC hanging on Python 3.14)."""
+        import urllib.request
+        import urllib.error
+        from google.oauth2 import service_account
+        from google.auth.transport.requests import Request as AuthRequest
 
-        client = firestore.client()
+        # Get credentials for REST API
+        cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH")
+        cred_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+
+        if cred_path and os.path.exists(cred_path):
+            sa_creds = service_account.Credentials.from_service_account_file(
+                cred_path, scopes=['https://www.googleapis.com/auth/datastore']
+            )
+        elif cred_json:
+            import json as _j
+            sa_creds = service_account.Credentials.from_service_account_info(
+                _j.loads(cred_json), scopes=['https://www.googleapis.com/auth/datastore']
+            )
+        else:
+            # Try to find the key in common locations
+            for candidate in [
+                os.path.join(os.getcwd(), 'serviceAccountKey.json'),
+                os.path.join(os.path.dirname(__file__), 'serviceAccountKey.json'),
+            ]:
+                if os.path.exists(candidate):
+                    sa_creds = service_account.Credentials.from_service_account_file(
+                        candidate, scopes=['https://www.googleapis.com/auth/datastore']
+                    )
+                    break
+            else:
+                self._last_error = "No Firebase credentials found for REST API"
+                return []
+
+        # Refresh token
+        sa_creds.refresh(AuthRequest())
+        token = sa_creds.token
+
+        # Determine project ID
+        project_id = getattr(sa_creds, 'project_id', None) or os.getenv('GCLOUD_PROJECT', 'caltex-autopro-1e664')
+        base_url = f"https://firestore.googleapis.com/v1/projects/{project_id}/databases/(default)/documents"
+
         records: list[dict[str, Any]] = []
 
         for domain, collection_name in self.config.firestore_collections.items():
             try:
-                stream = client.collection(collection_name).limit(limit_per_domain).stream()
-                for doc in stream:
-                    data = doc.to_dict() or {}
-                    records.append(
-                        {
-                            "domain": domain,
-                            "record_id": doc.id,
-                            "source": collection_name,
-                            "payload": data,
-                        }
-                    )
+                url = f"{base_url}/{collection_name}?pageSize={limit_per_domain}"
+                req = urllib.request.Request(url, headers={
+                    'Authorization': f'Bearer {token}',
+                    'Content-Type': 'application/json',
+                })
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    import json as _j
+                    data = _j.loads(resp.read().decode('utf-8'))
+
+                for doc in data.get('documents', []):
+                    doc_id = doc['name'].split('/')[-1]
+                    payload = self._parse_firestore_fields(doc.get('fields', {}))
+                    records.append({
+                        "domain": domain,
+                        "record_id": doc_id,
+                        "source": collection_name,
+                        "payload": payload,
+                    })
+            except urllib.error.HTTPError as exc:
+                self._last_error = f"Firestore REST '{collection_name}': HTTP {exc.code}"
             except Exception as exc:
-                self._last_error = f"Firestore collection '{collection_name}': {exc}"
+                self._last_error = f"Firestore REST '{collection_name}': {exc}"
 
         return records
+
+    @staticmethod
+    def _parse_firestore_fields(fields: dict) -> dict:
+        """Convert Firestore REST API field format to plain dict."""
+        result = {}
+        for key, value_obj in fields.items():
+            result[key] = FirebaseSource._parse_firestore_value(value_obj)
+        return result
+
+    @staticmethod
+    def _parse_firestore_value(value_obj: dict):
+        """Parse a single Firestore REST value object."""
+        if 'stringValue' in value_obj:
+            return value_obj['stringValue']
+        elif 'integerValue' in value_obj:
+            return int(value_obj['integerValue'])
+        elif 'doubleValue' in value_obj:
+            return float(value_obj['doubleValue'])
+        elif 'booleanValue' in value_obj:
+            return value_obj['booleanValue']
+        elif 'nullValue' in value_obj:
+            return None
+        elif 'timestampValue' in value_obj:
+            return value_obj['timestampValue']
+        elif 'arrayValue' in value_obj:
+            return [FirebaseSource._parse_firestore_value(v) for v in value_obj['arrayValue'].get('values', [])]
+        elif 'mapValue' in value_obj:
+            return FirebaseSource._parse_firestore_fields(value_obj['mapValue'].get('fields', {}))
+        elif 'referenceValue' in value_obj:
+            return value_obj['referenceValue']
+        elif 'geoPointValue' in value_obj:
+            return value_obj['geoPointValue']
+        else:
+            # Unknown type — return raw
+            return str(value_obj)
 
     def _fetch_from_realtime(self, limit_per_domain: int) -> list[dict[str, Any]]:
         from firebase_admin import db
@@ -852,7 +938,7 @@ class RetrievedChunk:
 
 
 class LiveFirebaseRetriever:
-    def __init__(self, firebase_source: FirebaseSource, cache_ttl_seconds: int = 15):
+    def __init__(self, firebase_source: FirebaseSource, cache_ttl_seconds: int = 300):
         self.firebase_source = firebase_source
         self.cache_ttl_seconds = cache_ttl_seconds
         self._normalizer = get_data_normalizer()
@@ -890,14 +976,14 @@ class LiveFirebaseRetriever:
             "manual": ("title", "topic", "section", "content", "steps", "description", "category", "instructions"),
         }
         self._domain_keywords: dict[str, tuple[str, ...]] = {
-            "item_master": ("item master", "item_master", "materials", "services", "service offerings", "stock list", "catalog", "inventory", "item"),
-            "inventory": ("stock", "inventory", "enough", "restock", "available", "quantity", "qty", "oil", "fluid", "part"),
-            "products": ("product", "price", "sku", "catalog", "item"),
-            "customers": ("customer", "client", "owner", "contact"),
-            "orders": ("order", "purchase", "delivery", "invoice"),
-            "services": ("service", "maintenance", "pms", "repair", "appointment", "schedule"),
-            "issuance": ("issuance", "issued", "released"),
-            "stock_inventory": ("stock", "stock inventory", "available stock", "availability", "remaining", "quantity", "qty", "reorder", "level"),
+            "item_master": ("item master", "item_master", "materials", "material", "service offerings", "stock list", "catalog", "inventory", "item", "items", "product", "products"),
+            "stock_inventory": ("stock", "stock inventory", "available stock", "availability", "remaining", "quantity", "qty", "reorder", "level", "restock", "enough", "oil", "fluid", "part"),
+            "issuance": ("issuance", "issuances", "issued", "released", "release"),
+            "maintenance": ("maintenance", "repair", "pms", "service history", "work order", "repair history"),
+            "transactions": ("transaction", "transactions", "service", "services", "appointment", "schedule"),
+            "service_bookings": ("booking", "book", "appointment", "schedule", "booked"),
+            "vehicles": ("vehicle", "car", "plate", "fleet", "truck", "van"),
+            "users": ("user", "customer", "client", "owner", "contact", "staff", "admin"),
             "manual": ("how to", "how do i", "manual", "guide", "help", "tutorial", "instructions", "usage", "user guide", "app", "navigate", "where", "button", "feature", "screen", "page", "menu", "setting"),
         }
 
@@ -977,7 +1063,7 @@ class LiveFirebaseRetriever:
         if (now - self._last_refresh) < self.cache_ttl_seconds and self._cached_records:
             return
 
-        raw_records = self.firebase_source.fetch_live_data(limit_per_domain=250)
+        raw_records = self.firebase_source.fetch_live_data(limit_per_domain=100)
         # Normalize field names for consistent schema across NoSQL documents
         normalized_records = self._normalizer.normalize_records(raw_records)
         self._cached_records = self._chunk_records(normalized_records)
@@ -1141,8 +1227,14 @@ class LiveFirebaseRetriever:
         text_tokens = self._tokenize(text_lower)
         overlap = len(query_tokens.intersection(text_tokens))
         exact_bonus = 0.3 if query.lower() in text_lower else 0.0
-        domain_bonus = 0.15 if any(d in query.lower() for d in ["inventory", "customer", "order", "service", "product"]) else 0.0
-        return overlap + exact_bonus + domain_bonus
+        # Broader domain keyword matching
+        domain_keywords = ["inventory", "customer", "order", "service", "product", "item", 
+                          "material", "stock", "vehicle", "maintenance", "issuance"]
+        domain_bonus = 0.15 if any(d in query.lower() for d in domain_keywords) else 0.0
+        # "List all" queries should match everything in the domain
+        list_keywords = {"list", "show", "all", "display", "get", "what", "how many"}
+        list_bonus = 0.1 if query_tokens.intersection(list_keywords) else 0.0
+        return overlap + exact_bonus + domain_bonus + list_bonus
 
     def _retrieve_lexical_fallback(
         self,
@@ -1186,6 +1278,31 @@ class LiveFirebaseRetriever:
                     },
                 )
             )
+
+        # FALLBACK: If lexical search returned nothing but we have candidates,
+        # return top candidates with a minimum score (common for "list all" queries
+        # where query words don't appear in the data itself)
+        if not results and candidate_indices:
+            for idx in candidate_indices[:top_k]:
+                record = self._cached_records[idx]
+                results.append(
+                    RetrievedChunk(
+                        domain=record["domain"],
+                        record_id=record["record_id"],
+                        source=record["source"],
+                        text=self._cached_texts[idx],
+                        payload=record["payload"],
+                        score=0.1,
+                        retrieval_type="fallback",
+                        metadata={
+                            "source_collection": record["source"],
+                            "document_id": record["record_id"],
+                            "retrieval_score": 0.1,
+                            "retrieval_type": "fallback",
+                        },
+                    )
+                )
+
         return results
 
     def _chunk_records(self, raw_records: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1739,6 +1856,42 @@ COLLECTION_POLICIES: dict[str, CollectionPolicy] = {
         allowed_roles=frozenset({UserRole.CUSTOMER, UserRole.STAFF, UserRole.ADMIN}),
         sensitivity_level=SensitivityLevel.PUBLIC,
         description="User manual and app usage guides — public for all users",
+    ),
+    "vehicles": CollectionPolicy(
+        collection="vehicles",
+        allowed_roles=frozenset({UserRole.CUSTOMER, UserRole.STAFF, UserRole.ADMIN}),
+        sensitivity_level=SensitivityLevel.PUBLIC,
+        description="Vehicle records — customers see own vehicles",
+    ),
+    "maintenance": CollectionPolicy(
+        collection="maintenance",
+        allowed_roles=frozenset({UserRole.STAFF, UserRole.ADMIN}),
+        sensitivity_level=SensitivityLevel.INTERNAL,
+        description="Maintenance/service records",
+    ),
+    "transactions": CollectionPolicy(
+        collection="transactions",
+        allowed_roles=frozenset({UserRole.STAFF, UserRole.ADMIN}),
+        sensitivity_level=SensitivityLevel.INTERNAL,
+        description="Stock transactions (IN/OUT)",
+    ),
+    "service_bookings": CollectionPolicy(
+        collection="service_bookings",
+        allowed_roles=frozenset({UserRole.CUSTOMER, UserRole.STAFF, UserRole.ADMIN}),
+        sensitivity_level=SensitivityLevel.PUBLIC,
+        description="Service booking appointments",
+    ),
+    "users": CollectionPolicy(
+        collection="users",
+        allowed_roles=frozenset({UserRole.ADMIN}),
+        sensitivity_level=SensitivityLevel.CONFIDENTIAL,
+        description="User accounts — admin only",
+    ),
+    "notifications": CollectionPolicy(
+        collection="notifications",
+        allowed_roles=frozenset({UserRole.CUSTOMER, UserRole.STAFF, UserRole.ADMIN}),
+        sensitivity_level=SensitivityLevel.PUBLIC,
+        description="System notifications",
     ),
 }
 
@@ -2597,6 +2750,20 @@ class NLPQueryParser:
                     "export",
                     "download report",
                     "create report",
+                    "for the month of",
+                    "for the week of",
+                    "for this month",
+                    "for last month",
+                    "for this week",
+                    "for last week",
+                    "for today",
+                    "for yesterday",
+                    "materials for",
+                    "inventory for",
+                    "issuance for",
+                    "services for",
+                    "transactions for",
+                    "stock for",
                 ],
                 0.93,
             ),
@@ -3248,16 +3415,16 @@ class GroundingResult:
 MIN_EVIDENCE_CHUNKS: int = 1
 
 # Minimum average retrieval score to consider evidence sufficient
-MIN_AVERAGE_SCORE: float = 0.15
+MIN_AVERAGE_SCORE: float = 0.0
 
 # Minimum top-chunk score to consider evidence relevant
-MIN_TOP_SCORE: float = 0.20
+MIN_TOP_SCORE: float = 0.0
 
 # Minimum retrieval confidence from the reranker
-MIN_RETRIEVAL_CONFIDENCE: float = 0.20
+MIN_RETRIEVAL_CONFIDENCE: float = 0.0
 
 # Below this confidence, always ask for clarification
-CLARIFICATION_THRESHOLD: float = 0.30
+CLARIFICATION_THRESHOLD: float = 0.10
 
 
 # ---------------------------------------------------------------------------
@@ -3503,15 +3670,15 @@ class GroundingGuard:
 # Module-level singleton
 # ---------------------------------------------------------------------------
 
-_default_guard: GroundingGuard | None = None
+_default_grounding_guard: GroundingGuard | None = None
 
 
 def get_grounding_guard() -> GroundingGuard:
     """Return the module-level GroundingGuard singleton."""
-    global _default_guard
-    if _default_guard is None:
-        _default_guard = GroundingGuard()
-    return _default_guard
+    global _default_grounding_guard
+    if _default_grounding_guard is None:
+        _default_grounding_guard = GroundingGuard()
+    return _default_grounding_guard
 
 
 # ============================================================================
@@ -3865,15 +4032,15 @@ def build_blocked_response(result: InjectionDetectionResult) -> str:
 # Module-level singleton
 # ---------------------------------------------------------------------------
 
-_default_guard: PromptGuard | None = None
+_default_prompt_guard: PromptGuard | None = None
 
 
 def get_prompt_guard() -> PromptGuard:
     """Return the module-level PromptGuard singleton."""
-    global _default_guard
-    if _default_guard is None:
-        _default_guard = PromptGuard(strict_mode=True)
-    return _default_guard
+    global _default_prompt_guard
+    if _default_prompt_guard is None:
+        _default_prompt_guard = PromptGuard(strict_mode=True)
+    return _default_prompt_guard
 
 
 # ============================================================================
@@ -5490,19 +5657,10 @@ Please answer the user's question naturally using the retrieved data. If the dat
         user_type: str,
         intent: QueryIntent,
     ) -> list[RetrievedChunk]:
-        """Filter chunks for data quality and security."""
+        """Filter chunks for data quality, security, and relevance."""
         filtered: list[RetrievedChunk] = []
         
         for chunk in chunks:
-            # Validate data completeness
-            validation = self.data_validator.validate_record(
-                chunk.payload, chunk.domain, is_admin=(user_type == "admin")
-            )
-            
-            # Skip incomplete records with low confidence
-            if not validation.is_complete and validation.confidence < 0.5:
-                continue
-            
             # Filter sensitive fields
             filtered_payload = self.data_validator.filter_sensitive_fields(
                 chunk.payload, is_admin=(user_type == "admin")
@@ -5516,15 +5674,19 @@ Please answer the user's question naturally using the retrieved data. If the dat
             chunk.payload = filtered_payload
             filtered.append(chunk)
         
-        # Prefer complete, high-confidence results
-        filtered.sort(
-            key=lambda c: self.data_validator.validate_record(
-                c.payload, c.domain, is_admin=(user_type == "admin")
-            ).confidence,
-            reverse=True
-        )
+        # Prioritize actual data records over manual/guide content
+        # Manual content should only appear if no other data is available
+        data_chunks = [c for c in filtered if c.domain not in ('manual', 'notifications')]
+        manual_chunks = [c for c in filtered if c.domain in ('manual', 'notifications')]
         
-        return filtered[:8]  # Return top 8
+        if data_chunks:
+            # If we have real data, prefer it over manual content
+            result = data_chunks[:8]
+        else:
+            # Only show manual content if no real data found
+            result = manual_chunks[:5]
+        
+        return result
 
     def _build_conversational_context(
         self,
@@ -5615,79 +5777,60 @@ Please answer the user's question naturally using the retrieved data. If the dat
             return self._template_general(chunks)
 
     def _template_material_list(self, chunks: list[RetrievedChunk]) -> str:
-        """Template response for material list queries."""
+        """Conversational response for material/inventory list queries."""
         lines: list[str] = []
-        for chunk in chunks[:8]:
+        for chunk in chunks[:10]:
             payload = chunk.payload
             payload_lower = {str(k).lower(): v for k, v in payload.items()}
             name = self._resolve_display_name(payload, chunk.domain, chunk.source)
 
-            # Flexible field extraction for NoSQL variability
-            qty = (
-                payload_lower.get("qty")
-                or payload_lower.get("quantity")
-                or payload_lower.get("stock")
-                or payload_lower.get("remaining_stock")
-                or payload_lower.get("current_stock")
-                or payload_lower.get("count")
-            )
-            uom = (
-                payload_lower.get("uom")
-                or payload_lower.get("unit")
-                or payload_lower.get("unit_of_measure")
-                or ""
-            )
-            status = (
-                payload_lower.get("status")
-                or payload_lower.get("state")
-                or payload_lower.get("condition")
-                or ""
-            )
-            category = (
-                payload_lower.get("category")
-                or payload_lower.get("group")
-                or payload_lower.get("type")
-                or ""
-            )
+            qty = (payload_lower.get("stock") or payload_lower.get("qty") 
+                   or payload_lower.get("quantity") or "")
+            uom = (payload_lower.get("uom") or payload_lower.get("unit") or "")
+            category = (payload_lower.get("group") or payload_lower.get("category") 
+                       or payload_lower.get("type") or "")
+            cost = (payload_lower.get("cost") or payload_lower.get("price") or "")
 
-            detail_bits: list[str] = []
-            if qty and str(qty).lower() not in ("none", "null", "n/a", ""):
-                detail_bits.append(f"Qty: {qty}")
-            if uom and str(uom).lower() not in ("none", "null", "n/a", ""):
-                detail_bits.append(f"UOM: {uom}")
+            details = []
             if category and str(category).lower() not in ("none", "null", "n/a", ""):
-                detail_bits.append(f"Category: {category}")
-            if status and str(status).lower() not in ("none", "null", "n/a", ""):
-                detail_bits.append(f"Status: {status}")
+                details.append(str(category))
+            if qty and str(qty).lower() not in ("none", "null", "n/a", "", "0"):
+                suffix = f" {uom}" if uom else ""
+                details.append(f"Stock: {qty}{suffix}")
+            if cost and str(cost).lower() not in ("none", "null", "n/a", "", "0"):
+                details.append(f"₱{cost}" if not str(cost).startswith("₱") else str(cost))
 
-            # If we have no detail bits at all, show key payload fields instead
-            if not detail_bits:
-                for key, value in list(payload.items())[:3]:
-                    if value and str(value).strip() and str(value).lower() not in ("none", "null", "n/a", "unknown", "-"):
-                        detail_bits.append(f"{key.replace('_', ' ').title()}: {value}")
-
-            if detail_bits:
-                lines.append(f"- {name} | {' | '.join(detail_bits)}")
-            else:
-                lines.append(f"- {name}")
+            detail_str = f" — {', '.join(details)}" if details else ""
+            lines.append(f"  • {name}{detail_str}")
 
         if not lines:
-            return "No materials found in the system."
+            return "I don't see any materials in the system right now. The inventory might be empty or still being set up."
         
-        return "Here are the matching items I found:\n\n" + "\n".join(lines)
+        # Detect what domain the data is from for a better intro
+        domains = set(c.domain for c in chunks[:10])
+        if "vehicles" in domains:
+            intro = f"🚗 Here are the vehicles I found ({len(lines)}):"
+        elif "issuance" in domains:
+            intro = f"📋 Here are the issuance records ({len(lines)}):"
+        elif "maintenance" in domains:
+            intro = f"🔧 Here are the maintenance records ({len(lines)}):"
+        else:
+            intro = f"📦 Here's what we have in inventory ({len(lines)} items):"
+        
+        return intro + "\n\n" + "\n".join(lines) + "\n\nNeed details on a specific item? Just ask!"
 
     def _template_stock_check(self, chunks: list[RetrievedChunk]) -> str:
-        """Template response for stock availability queries."""
+        """Conversational response for stock availability queries."""
         available = []
-        unavailable = []
+        low_stock = []
         
         for chunk in chunks:
             payload = chunk.payload
             payload_lower = {str(k).lower(): v for k, v in payload.items()}
             qty_raw = (
-                payload_lower.get("qty")
+                payload_lower.get("stock")
+                or payload_lower.get("qty")
                 or payload_lower.get("quantity")
-                or payload_lower.get("stock")
                 or payload_lower.get("remaining_stock")
                 or payload_lower.get("current_stock")
                 or payload_lower.get("count")
@@ -5697,32 +5840,38 @@ Please answer the user's question naturally using the retrieved data. If the dat
                 payload_lower.get("uom")
                 or payload_lower.get("unit")
                 or payload_lower.get("unit_of_measure")
+                or "units"
             )
+            min_level = payload_lower.get("min") or payload_lower.get("minlevel") or payload_lower.get("reorder_level") or 0
+            status = payload_lower.get("status") or ""
 
-            # Try to parse qty as number
             try:
                 qty_num = int(float(str(qty_raw))) if qty_raw else 0
             except (ValueError, TypeError):
                 qty_num = 0
 
-            if qty_raw and qty_num > 0:
-                suffix = f" {uom}" if uom else ""
-                available.append(f"• {name}: {qty_raw}{suffix} in stock")
-            elif qty_raw is not None:
-                unavailable.append(f"• {name}: Currently unavailable")
-            else:
-                # No qty field at all — just show the record
-                available.append(f"• {name}")
+            try:
+                min_num = int(float(str(min_level))) if min_level else 0
+            except (ValueError, TypeError):
+                min_num = 0
+
+            if qty_num > 0:
+                status_icon = "🟢" if qty_num > min_num else "🟡"
+                if qty_num <= min_num and min_num > 0:
+                    low_stock.append(f"  ⚠️ {name}: {qty_num} {uom} (below minimum of {min_num})")
+                else:
+                    available.append(f"  {status_icon} {name}: {qty_num} {uom}")
         
-        response = ""
+        if not available and not low_stock:
+            return "I couldn't find stock level information for that. Try asking 'what items are in stock?' or about a specific item."
+
+        parts = []
+        if low_stock:
+            parts.append(f"⚠️ **Low Stock Alert** ({len(low_stock)} items need attention):\n" + "\n".join(low_stock))
         if available:
-            response += "**Available items:**\n" + "\n".join(available)
-        if unavailable:
-            if response:
-                response += "\n\n"
-            response += "**Unavailable:**\n" + "\n".join(unavailable)
+            parts.append(f"📦 **Current Stock Levels** ({len(available)} items):\n" + "\n".join(available))
         
-        return response or "No stock information available."
+        return "\n\n".join(parts)
 
     def _template_vehicle_history(self, chunks: list[RetrievedChunk]) -> str:
         """Template response for vehicle history queries."""
@@ -5739,41 +5888,50 @@ Please answer the user's question naturally using the retrieved data. If the dat
         return "Vehicle service history:\n\n" + "\n".join(records)
 
     def _template_general(self, chunks: list[RetrievedChunk]) -> str:
-        """Generic template response — handles NoSQL schema variability."""
-        results: list[str] = []
-        for chunk in chunks[:8]:
-            payload = chunk.payload
-            name = self._resolve_display_name(payload, chunk.domain, chunk.source)
+        """Generate a natural conversational response from retrieved data."""
+        # Separate actual data records from manual/guide content
+        data_chunks = [c for c in chunks if c.domain not in ('manual', 'notifications')]
+        if not data_chunks:
+            data_chunks = chunks[:5]
 
-            # Build detail from the most informative fields
-            detail_parts: list[str] = []
-            payload_lower = {str(k).lower(): v for k, v in payload.items()}
+        # Group by domain for a natural summary
+        domain_groups: dict[str, list] = {}
+        for chunk in data_chunks[:10]:
+            domain_groups.setdefault(chunk.domain, []).append(chunk)
 
-            # Skip the field we already used as the name
-            shown_fields = 0
-            for key, value in payload.items():
-                if shown_fields >= 3:
-                    break
-                val_str = str(value).strip() if value is not None else ""
-                if not val_str or val_str.lower() in ("none", "null", "n/a", "unknown", "-", "true", "false"):
-                    continue
-                # Skip if this value is already the display name
-                if val_str == name:
-                    continue
-                # Format the field nicely
-                display_key = key.replace("_", " ").title()
-                detail_parts.append(f"{display_key}: {val_str}")
-                shown_fields += 1
+        parts: list[str] = []
+        for domain, domain_chunks in domain_groups.items():
+            domain_label = domain.replace("_", " ").title()
+            items: list[str] = []
+            for chunk in domain_chunks[:5]:
+                payload = chunk.payload
+                name = self._resolve_display_name(payload, chunk.domain, chunk.source)
+                # Get 2-3 key details
+                details = []
+                skip_keys = {'name', 'title', 'id', 'record_id', 'domain', 'source'}
+                for key, value in list(payload.items())[:6]:
+                    if key.lower() in skip_keys:
+                        continue
+                    val_str = str(value).strip() if value else ""
+                    if not val_str or val_str.lower() in ("none", "null", "n/a", "unknown", "-"):
+                        continue
+                    if val_str == name:
+                        continue
+                    details.append(f"{key.replace('_', ' ').title()}: {val_str[:50]}")
+                    if len(details) >= 3:
+                        break
+                detail_str = f" ({', '.join(details)})" if details else ""
+                items.append(f"  • {name}{detail_str}")
 
-            if detail_parts:
-                results.append(f"• {name} — {' | '.join(detail_parts)}")
-            else:
-                results.append(f"• {name}")
+            if items:
+                parts.append(f"📋 **{domain_label}** ({len(domain_chunks)} records):\n" + "\n".join(items))
 
-        if not results:
-            return "No matching records found."
+        if not parts:
+            return "I couldn't find specific records matching your query. Could you try rephrasing?"
 
-        return "Here's what I found:\n\n" + "\n".join(results)
+        count = sum(len(v) for v in domain_groups.values())
+        intro = f"I found {count} matching records from your database:\n\n"
+        return intro + "\n\n".join(parts)
 
     def _resolve_display_name(
         self,
@@ -5795,27 +5953,22 @@ Please answer the user's question naturally using the retrieved data. If the dat
         parsed_query: ParsedQuery,
         user_type: str,
     ) -> str:
-        """Generate helpful response when no data is found."""
-        intent_name = parsed_query.intent.value.replace("_", " ")
-        
+        """Generate helpful conversational response when no data is found."""
         suggestions = {
-            QueryIntent.INVENTORY_CHECK: "Try searching for a specific product name or category.",
-            QueryIntent.MATERIAL_LIST: "Try asking for the materials or services offered in item_master.",
-            QueryIntent.STOCK_AVAILABILITY: "Try asking about stock_inventory or a specific item name.",
-            QueryIntent.PRICE_INQUIRY: "I can help you with other product information.",
-            QueryIntent.VEHICLE_HISTORY: "Please provide the vehicle's plate number.",
-            QueryIntent.SERVICE_SCHEDULE: "Would you like to book a new appointment?",
-            QueryIntent.MAINTENANCE_INFO: "Check if the service record exists or search by vehicle plate.",
-            QueryIntent.GENERAL_INQUIRY: "Can you provide more details about what you're looking for?",
+            QueryIntent.INVENTORY_CHECK: "I don't see that specific item in the inventory right now. Try asking about a specific product name, or say 'show all items' to see everything we have.",
+            QueryIntent.MATERIAL_LIST: "I couldn't find materials matching that. Try 'list all materials' or ask about a specific category like 'filters' or 'lubricants'.",
+            QueryIntent.STOCK_AVAILABILITY: "I don't have stock info for that item. Try 'what's in stock?' or ask about a specific item like 'engine oil stock level'.",
+            QueryIntent.PRICE_INQUIRY: "I couldn't find pricing for that. Try asking about a specific item name.",
+            QueryIntent.VEHICLE_HISTORY: "I need a plate number to look up vehicle history. Try something like 'history for ABC-1234'.",
+            QueryIntent.SERVICE_SCHEDULE: "No schedules found. Would you like to check upcoming bookings or a specific vehicle?",
+            QueryIntent.MAINTENANCE_INFO: "No maintenance records found for that. Try specifying a plate number or date range.",
+            QueryIntent.CUSTOMER_RECORD: "I couldn't find that customer record. Try searching by name or email.",
+            QueryIntent.GENERAL_INQUIRY: "I'm not sure what you're looking for. I can help with inventory, vehicles, maintenance, issuances, and more. What would you like to know?",
         }
         
-        base_msg = f"I couldn't find information about {intent_name}. "
-        suggestion = suggestions.get(
-            parsed_query.intent,
-            "Please provide more specific details."
+        return suggestions.get(parsed_query.intent, 
+            "I'm not sure I found what you need. Try asking about inventory, vehicles, maintenance, stock levels, or issuances — I have access to all that data!"
         )
-        
-        return base_msg + suggestion
 
     def _post_process_response(self, response: str, context: str) -> str:
         """Clean up and validate LLM response."""
@@ -5877,16 +6030,71 @@ class ReportService:
         report_type: str,
         limit_per_domain: int = 250,
         period_label: str = "Current Month",
+        start_date: "datetime | None" = None,
+        end_date: "datetime | None" = None,
     ) -> ReportData:
         normalized = self._normalize_report_type(report_type)
         records = self.firebase_source.fetch_live_data(limit_per_domain=limit_per_domain)
-        rows = [
-            self._flatten_record(record)
-            for record in records
-            if record.get("domain") == normalized
-        ]
+        # Map report type to actual domain names in Firestore
+        domain_map = {
+            "inventory": ["item_master", "stock_inventory"],
+            "issuance": ["issuance"],
+            "transactions": ["transactions", "maintenance", "service_bookings"],
+        }
+        allowed_domains = domain_map.get(normalized, [normalized])
+        filtered_records = [r for r in records if r.get("domain") in allowed_domains]
+
+        # Apply date filtering if start_date or end_date provided
+        if start_date or end_date:
+            filtered_records = self._filter_by_date(filtered_records, start_date, end_date)
+
+        rows = [self._flatten_record(record) for record in filtered_records]
         title = self._domain_titles.get(normalized, f"{normalized.title()} Report")
         return ReportData(report_type=normalized, title=title, rows=rows, period_label=period_label)
+
+    def _filter_by_date(
+        self,
+        records: list[dict[str, Any]],
+        start_date: "datetime | None",
+        end_date: "datetime | None",
+    ) -> list[dict[str, Any]]:
+        """Filter records by checking common date fields in the payload."""
+        from dateutil import parser as dateutil_parser
+
+        date_fields = ["createdAt", "date", "dateServiced", "schedule_date", "timestamp", "created_at", "updated_at"]
+        result = []
+        for record in records:
+            payload = record.get("payload", {})
+            record_date = None
+            for field in date_fields:
+                raw = payload.get(field)
+                if not raw:
+                    continue
+                try:
+                    if isinstance(raw, (int, float)):
+                        # Unix timestamp (seconds or milliseconds)
+                        ts = raw if raw < 1e12 else raw / 1000.0
+                        record_date = datetime.fromtimestamp(ts, tz=timezone.utc)
+                    else:
+                        parsed = dateutil_parser.parse(str(raw), fuzzy=True)
+                        if parsed.tzinfo is None:
+                            parsed = parsed.replace(tzinfo=timezone.utc)
+                        record_date = parsed
+                    break
+                except (ValueError, TypeError, OverflowError):
+                    continue
+
+            # If no date found on record, include it (don't exclude undated records)
+            if record_date is None:
+                result.append(record)
+                continue
+
+            if start_date and record_date < start_date:
+                continue
+            if end_date and record_date > end_date:
+                continue
+            result.append(record)
+        return result
 
     def generate_excel(self, report: ReportData) -> bytes:
         from openpyxl import Workbook
@@ -6210,7 +6418,7 @@ class ReportService:
         }.get(report_type, report_type.title())
 
     def _build_date_label(self) -> str:
-        return datetime.now(timezone.utc).strftime("%B %-d, %Y at %I:%M %p")
+        return datetime.now(timezone.utc).strftime("%B %d, %Y at %I:%M %p")
 
     def _logo_path(self) -> Path:
         return Path(__file__).parent / "images" / "LOGO_CALTEX.png"
@@ -6379,6 +6587,102 @@ class EnhancedRag:
         self.responder = ConversationalResponder()
         self.nlp_parser = NLPQueryParser()
 
+    def _parse_report_period(self, query_lower: str) -> tuple:
+        """Parse date/period from a report query string.
+        
+        Returns (start_date, end_date, period_label) tuple.
+        """
+        import re
+        from datetime import timedelta
+
+        now = datetime.now(timezone.utc)
+        start_date = None
+        end_date = None
+        period_label = "All Time"
+
+        # Check for "today"
+        if "today" in query_lower:
+            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+            period_label = f"Today ({now.strftime('%b %d, %Y')})"
+            return start_date, end_date, period_label
+
+        # Check for "yesterday"
+        if "yesterday" in query_lower:
+            yesterday = now - timedelta(days=1)
+            start_date = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
+            period_label = f"Yesterday ({yesterday.strftime('%b %d, %Y')})"
+            return start_date, end_date, period_label
+
+        # Check for "this week"
+        if "this week" in query_lower:
+            start_of_week = now - timedelta(days=now.weekday())
+            start_date = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = now
+            period_label = f"This Week ({start_date.strftime('%b %d')} - {end_date.strftime('%b %d, %Y')})"
+            return start_date, end_date, period_label
+
+        # Check for "last week"
+        if "last week" in query_lower:
+            start_of_this_week = now - timedelta(days=now.weekday())
+            end_date = (start_of_this_week - timedelta(seconds=1)).replace(hour=23, minute=59, second=59, microsecond=999999)
+            start_date = (start_of_this_week - timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
+            period_label = f"Last Week ({start_date.strftime('%b %d')} - {end_date.strftime('%b %d, %Y')})"
+            return start_date, end_date, period_label
+
+        # Check for "this month"
+        if "this month" in query_lower:
+            start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            end_date = now
+            period_label = f"This Month ({now.strftime('%B %Y')})"
+            return start_date, end_date, period_label
+
+        # Check for "last month"
+        if "last month" in query_lower:
+            first_of_this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            end_date = first_of_this_month - timedelta(seconds=1)
+            start_date = end_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            period_label = f"Last Month ({start_date.strftime('%B %Y')})"
+            return start_date, end_date, period_label
+
+        # Check for specific month + year pattern like "may 2026", "january 2025"
+        month_names = {
+            "january": 1, "february": 2, "march": 3, "april": 4,
+            "may": 5, "june": 6, "july": 7, "august": 8,
+            "september": 9, "october": 10, "november": 11, "december": 12,
+            "jan": 1, "feb": 2, "mar": 3, "apr": 4,
+            "jun": 6, "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+        }
+        month_pattern = re.search(
+            r'\b(' + '|'.join(month_names.keys()) + r')\s+(\d{4})\b', query_lower
+        )
+        if month_pattern:
+            month_num = month_names[month_pattern.group(1)]
+            year = int(month_pattern.group(2))
+            start_date = datetime(year, month_num, 1, tzinfo=timezone.utc)
+            # End of month
+            if month_num == 12:
+                end_date = datetime(year + 1, 1, 1, tzinfo=timezone.utc) - timedelta(seconds=1)
+            else:
+                end_date = datetime(year, month_num + 1, 1, tzinfo=timezone.utc) - timedelta(seconds=1)
+            period_label = f"{start_date.strftime('%B %Y')}"
+            return start_date, end_date, period_label
+
+        # Check for just a month name (assume current year)
+        for mname, mnum in month_names.items():
+            if re.search(r'\b' + mname + r'\b', query_lower) and not month_pattern:
+                year = now.year
+                start_date = datetime(year, mnum, 1, tzinfo=timezone.utc)
+                if mnum == 12:
+                    end_date = datetime(year + 1, 1, 1, tzinfo=timezone.utc) - timedelta(seconds=1)
+                else:
+                    end_date = datetime(year, mnum + 1, 1, tzinfo=timezone.utc) - timedelta(seconds=1)
+                period_label = f"{start_date.strftime('%B %Y')}"
+                return start_date, end_date, period_label
+
+        return start_date, end_date, period_label
+
     def ask(
         self,
         query: str,
@@ -6495,73 +6799,82 @@ class EnhancedRag:
             }
 
         if retrieval_state.clarification_required or retrieval_state.confidence < 0.25:
-            answer = retrieval_state.clarification_prompt or "Please provide a little more detail so I can retrieve the right records."
-            self.metrics.record_query(
-                user_role=user_type,
-                retrieval_confidence=retrieval_state.confidence,
-                clarification=True,
-                intent=parsed_query.intent.value,
-            )
-            self.memory.add_turn(session_id=session_id, role="user", message=query)
-            self.memory.add_turn(session_id=session_id, role="assistant", message=answer)
-            return {
-                "answer": answer,
-                "session_id": session_id,
-                "success": True,
-                "metadata": {
-                    "intent": parsed_query.intent.value,
-                    "confidence": round(parsed_query.confidence, 2),
-                    "retrieval_confidence": round(retrieval_state.confidence, 2),
-                    "retrieval_strategy": retrieval_state.retrieval_type,
-                    "clarification_required": True,
-                    "is_historical": parsed_query.is_historical,
-                    "retrieved_count": len(chunks),
-                },
-            }
+            # If we have chunks but low confidence (common in lexical-only mode without embeddings),
+            # skip clarification and proceed with what we have
+            if len(chunks) > 0 and retrieval_state.confidence > 0.0:
+                pass  # proceed to grounding check and response generation
+            elif parsed_query.intent in {QueryIntent.VEHICLE_HISTORY, QueryIntent.REPORT_GENERATION}:
+                pass  # reports/history should always proceed — they generate their own data
+            else:
+                answer = retrieval_state.clarification_prompt or "Please provide a little more detail so I can retrieve the right records."
+                self.metrics.record_query(
+                    user_role=user_type,
+                    retrieval_confidence=retrieval_state.confidence,
+                    clarification=True,
+                    intent=parsed_query.intent.value,
+                )
+                self.memory.add_turn(session_id=session_id, role="user", message=query)
+                self.memory.add_turn(session_id=session_id, role="assistant", message=answer)
+                return {
+                    "answer": answer,
+                    "session_id": session_id,
+                    "success": True,
+                    "metadata": {
+                        "intent": parsed_query.intent.value,
+                        "confidence": round(parsed_query.confidence, 2),
+                        "retrieval_confidence": round(retrieval_state.confidence, 2),
+                        "retrieval_strategy": retrieval_state.retrieval_type,
+                        "clarification_required": True,
+                        "is_historical": parsed_query.is_historical,
+                        "retrieved_count": len(chunks),
+                    },
+                }
 
         # -------------------------------------------------------------------
         # GROUNDING ENFORCEMENT — verify evidence sufficiency BEFORE LLM call
+        # Skip for report/history intents — they generate their own data
         # -------------------------------------------------------------------
-        grounding_result = self.grounding_guard.check_sufficiency(
-            chunks=chunks,
-            retrieval_confidence=retrieval_state.confidence,
-            domain=route.domain,
-            access_denied=False,
-        )
-
-        if not grounding_result.can_generate:
-            self.security_logger.log_grounding_failure(
-                user_role=user_type,
-                session_id=session_id,
-                decision=grounding_result.decision.value,
-                evidence_count=grounding_result.evidence_count,
-                confidence=grounding_result.confidence,
-                query_length=len(query),
-            )
-            self.metrics.record_query(
-                user_role=user_type,
+        if parsed_query.intent not in {QueryIntent.VEHICLE_HISTORY, QueryIntent.REPORT_GENERATION}:
+            grounding_result = self.grounding_guard.check_sufficiency(
+                chunks=chunks,
                 retrieval_confidence=retrieval_state.confidence,
-                grounding_blocked=True,
-                intent=parsed_query.intent.value,
+                domain=route.domain,
+                access_denied=False,
             )
-            answer = grounding_result.fallback_message
-            self.memory.add_turn(session_id=session_id, role="user", message=query)
-            self.memory.add_turn(session_id=session_id, role="assistant", message=answer)
-            return {
-                "answer": answer,
-                "session_id": session_id,
-                "success": True,
-                "metadata": {
-                    "intent": parsed_query.intent.value,
-                    "confidence": round(parsed_query.confidence, 2),
-                    "retrieval_confidence": round(retrieval_state.confidence, 2),
-                    "retrieval_strategy": retrieval_state.retrieval_type,
-                    "grounding_blocked": True,
-                    "grounding_decision": grounding_result.decision.value,
-                    "is_historical": parsed_query.is_historical,
-                    "retrieved_count": len(chunks),
-                },
-            }
+
+            if not grounding_result.can_generate:
+                self.security_logger.log_grounding_failure(
+                    user_role=user_type,
+                    session_id=session_id,
+                    decision=grounding_result.decision.value,
+                    evidence_count=grounding_result.evidence_count,
+                    confidence=grounding_result.confidence,
+                    query_length=len(query),
+                )
+                self.metrics.record_query(
+                    user_role=user_type,
+                    retrieval_confidence=retrieval_state.confidence,
+                    grounding_blocked=True,
+                    intent=parsed_query.intent.value,
+                )
+                answer = grounding_result.fallback_message
+                self.memory.add_turn(session_id=session_id, role="user", message=query)
+                self.memory.add_turn(session_id=session_id, role="assistant", message=answer)
+                return {
+                    "answer": answer,
+                    "session_id": session_id,
+                    "success": True,
+                    "metadata": {
+                        "intent": parsed_query.intent.value,
+                        "confidence": round(parsed_query.confidence, 2),
+                        "retrieval_confidence": round(retrieval_state.confidence, 2),
+                        "retrieval_strategy": retrieval_state.retrieval_type,
+                        "grounding_blocked": True,
+                        "grounding_decision": grounding_result.decision.value,
+                        "is_historical": parsed_query.is_historical,
+                        "retrieved_count": len(chunks),
+                    },
+                }
 
         # If user asked for reports or vehicle history, delegate to ReportService
         if parsed_query.intent in {QueryIntent.VEHICLE_HISTORY, QueryIntent.REPORT_GENERATION}:
@@ -6586,6 +6899,77 @@ class EnhancedRag:
                     self.report_service = ReportService(firebase_source=self.firebase_source)
                     report_service = self.report_service
 
+                # Detect if user wants a file download (PDF/Excel)
+                query_lower = query.lower()
+                wants_pdf = 'pdf' in query_lower or ('generate' in query_lower and 'report' in query_lower and 'excel' not in query_lower)
+                wants_excel = 'excel' in query_lower or 'xlsx' in query_lower or 'spreadsheet' in query_lower
+                # If intent is REPORT_GENERATION, always offer file download (default to PDF)
+                wants_file = wants_pdf or wants_excel or (parsed_query.intent == QueryIntent.REPORT_GENERATION)
+                if not wants_pdf and not wants_excel:
+                    wants_pdf = True  # default to PDF
+
+                # Determine report type from query
+                report_type = None
+                if 'issuance' in query_lower or 'issued' in query_lower:
+                    report_type = 'issuance'
+                elif 'inventory' in query_lower or 'stock' in query_lower or 'material' in query_lower:
+                    report_type = 'inventory'
+                elif 'transaction' in query_lower or 'service' in query_lower or 'maintenance' in query_lower:
+                    report_type = 'transactions'
+                elif 'all report' in query_lower or 'full report' in query_lower:
+                    report_type = 'inventory'
+                else:
+                    # Default: if intent is report generation but no specific type, use inventory
+                    report_type = 'inventory'
+
+                # Parse date/period from query
+                report_start_date, report_end_date, period_label = self._parse_report_period(query_lower)
+
+                # If user wants a file and we can determine the type, generate it
+                if wants_file and report_type:
+                    report_data = report_service.build_report_data(
+                        report_type=report_type,
+                        limit_per_domain=200,
+                        period_label=period_label,
+                        start_date=report_start_date,
+                        end_date=report_end_date,
+                    )
+                    file_format = 'excel' if wants_excel else 'pdf'
+                    answer = (
+                        f"✅ Your {report_type} report is ready for download!\n"
+                        f"Format: {file_format.upper()}\n"
+                        f"Period: {period_label}\n"
+                        f"Records: {len(report_data.rows)}"
+                    )
+                    total_latency = (time.time() - request_start) * 1000.0
+                    self.metrics.record_query(
+                        user_role=user_type,
+                        total_latency_ms=total_latency,
+                        retrieval_confidence=retrieval_state.confidence,
+                        intent=parsed_query.intent.value,
+                        llm_called=False,
+                    )
+                    self.memory.add_turn(session_id=session_id, role="user", message=query)
+                    self.memory.add_turn(session_id=session_id, role="assistant", message=answer)
+                    return {
+                        "answer": answer,
+                        "session_id": session_id,
+                        "success": True,
+                        "report_ready": True,
+                        "report_type": report_type,
+                        "report_format": file_format,
+                        "report_rows": len(report_data.rows),
+                        "metadata": {
+                            "intent": parsed_query.intent.value,
+                            "confidence": round(parsed_query.confidence, 2),
+                            "retrieval_confidence": round(retrieval_state.confidence, 2),
+                            "retrieval_strategy": retrieval_state.retrieval_type,
+                            "is_historical": parsed_query.is_historical,
+                            "retrieved_count": len(chunks),
+                        },
+                    }
+
+                # Otherwise, return a text summary
                 agg = report_service.summarize_service_history(
                     query=query,
                     start_date=start_date,

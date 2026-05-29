@@ -332,11 +332,11 @@
       });
       const data = await resp.json();
       typing.remove();
-      if (data.answer) {
-        addBubble(data.answer, 'bot');
-      } else if (data.offline) {
-        // RAG server offline — fall back to local processing
+      if (data.offline || !data.success) {
+        // RAG engine not available — fall back to local processing
         addBubble(processQuery(text), 'bot');
+      } else if (data.answer) {
+        addBubble(data.answer, 'bot');
       } else {
         addBubble(processQuery(text), 'bot');
       }

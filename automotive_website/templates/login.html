@@ -69,6 +69,29 @@
 <!-- Toast -->
 <div id="toast"></div>
 
+<!-- Firebase SDK (must load FIRST before login logic) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
+    authDomain: "caltex-autopro-1e664.firebaseapp.com",
+    projectId: "caltex-autopro-1e664",
+    storageBucket: "caltex-autopro-1e664.firebasestorage.app",
+    messagingSenderId: "930140433367",
+    appId: "1:930140433367:web:cf67bfa388fa517422b992"
+  };
+  firebase.initializeApp(firebaseConfig);
+
+  firebase.auth().onAuthStateChanged((user) => {
+    if (user) {
+      console.log('Auth state: User logged in', user.uid);
+    } else {
+      console.log('Auth state: No user');
+    }
+  });
+</script>
 
 <script>
   // ── Helpers ──
@@ -280,33 +303,6 @@
 
   // ── Forgot Password Modal ──
   // Redirects to forgot_password.html (handled via href link)
-</script>
-
-<!-- Firebase SDK (must load FIRST before google_signin.js) -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
-    authDomain: "caltex-autopro-1e664.firebaseapp.com",
-    projectId: "caltex-autopro-1e664",
-    storageBucket: "caltex-autopro-1e664.firebasestorage.app",
-    messagingSenderId: "930140433367",
-    appId: "1:930140433367:web:cf67bfa388fa517422b992"
-  };
-  firebase.initializeApp(firebaseConfig);
-
-  // Prevent auth state from redirecting on login page
-  firebase.auth().onAuthStateChanged((user) => {
-    if (user) {
-      console.log('Auth state: User logged in', user.uid);
-      // Don't auto sign out - let user stay logged in
-      // Only sign out if explicitly needed
-    } else {
-      console.log('Auth state: No user');
-    }
-  });
 </script>
 
 <!-- Google Sign-In Module (loads AFTER Firebase) -->

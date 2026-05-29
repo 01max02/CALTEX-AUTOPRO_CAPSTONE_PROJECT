@@ -26,55 +26,24 @@
         </div>
 
         <div class="admin-content">
-            <!-- Stat chips -->
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
-                <div class="stat-card">
-                    <div class="stat-icon" style="background:rgba(214,158,46,0.1);color:#d69e2e;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    </div>
-                    <div class="stat-number" id="statPending" style="color:#d69e2e;">0</div>
-                    <div class="stat-label">Pending</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon green">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                    </div>
-                    <div class="stat-number" id="statApproved">0</div>
-                    <div class="stat-label">Approved</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" style="background:rgba(113,128,150,0.1);color:#718096;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    </div>
-                    <div class="stat-number" id="statDismissed" style="color:#718096;">0</div>
-                    <div class="stat-label">Dismissed</div>
-                </div>
-            </div>
-
             <!-- Tabs -->
             <div style="display:flex;gap:0;border-bottom:2px solid #e2e8f0;margin-bottom:1.25rem;">
-                <button class="sb-tab active" data-filter="Pending" onclick="sbSwitchTab(this,'Pending')" style="padding:0.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:0.88rem;font-weight:700;color:#d69e2e;border-bottom:2px solid #d69e2e;margin-bottom:-2px;transition:all 0.2s;display:flex;align-items:center;gap:0.4rem;">
-                    Pending <span id="tabBadgePending" style="background:#d69e2e;color:white;font-size:0.7rem;font-weight:800;padding:1px 7px;border-radius:10px;">0</span>
-                </button>
-                <button class="sb-tab" data-filter="Approved" onclick="sbSwitchTab(this,'Approved')" style="padding:0.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:0.88rem;font-weight:700;color:#718096;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s;">
+                <button class="sb-tab active" data-filter="Approved" onclick="sbSwitchTab(this,'Approved')" style="padding:0.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:0.88rem;font-weight:700;color:#38a169;border-bottom:2px solid #38a169;margin-bottom:-2px;transition:all 0.2s;">
                     Approved
                 </button>
                 <button class="sb-tab" data-filter="Dismissed" onclick="sbSwitchTab(this,'Dismissed')" style="padding:0.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:0.88rem;font-weight:700;color:#718096;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s;">
-                    Dismissed
-                </button>
-                <button class="sb-tab" data-filter="all" onclick="sbSwitchTab(this,'all')" style="padding:0.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:0.88rem;font-weight:700;color:#718096;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s;">
-                    All
+                    Cancelled
                 </button>
             </div>
 
             <!-- Table -->
             <div class="data-table">
-                <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:1fr 1.5fr 1.5fr 1fr 1fr 1fr 140px;">
+                <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:1fr 1.5fr 1.5fr 1fr 0.8fr 1fr 140px;">
                     <div>Plate</div>
                     <div>Customer</div>
                     <div>Services</div>
                     <div>Preferred Date</div>
-                    <div>Requested</div>
+                    <div>Time</div>
                     <div>Status</div>
                     <div>Actions</div>
                 </div>
@@ -88,7 +57,55 @@
 </div>
 
 <div id="toast"></div>
-<style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+
+<!-- Reschedule Modal -->
+<div id="rescheduleModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:18px;width:360px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.2);overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#003087,#001d52);padding:18px 20px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="color:white;font-size:15px;font-weight:700;">Reschedule Booking</div>
+      <button onclick="closeRescheduleModal()" style="background:rgba(255,255,255,0.15);border:none;color:white;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;">×</button>
+    </div>
+    <div style="padding:20px;">
+      <div style="font-size:12px;color:#718096;margin-bottom:4px;">Vehicle</div>
+      <div id="rsPlate" style="font-size:16px;font-weight:700;color:#1a202c;margin-bottom:16px;"></div>
+      <div style="font-size:12px;color:#718096;margin-bottom:8px;">Select new date</div>
+      <div id="rsCalendar" style="margin-bottom:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <button onclick="rsCalNav(-1)" style="width:30px;height:30px;border-radius:8px;border:1.5px solid #e2e8f0;background:white;cursor:pointer;font-size:16px;color:#4a5568;">‹</button>
+          <span id="rsCalMonth" style="font-size:14px;font-weight:700;color:#1a202c;"></span>
+          <button onclick="rsCalNav(1)" style="width:30px;height:30px;border-radius:8px;border:1.5px solid #e2e8f0;background:white;cursor:pointer;font-size:16px;color:#4a5568;">›</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center;margin-bottom:6px;">
+          <span style="font-size:10px;font-weight:700;color:#a0aec0;">SU</span>
+          <span style="font-size:10px;font-weight:700;color:#a0aec0;">MO</span>
+          <span style="font-size:10px;font-weight:700;color:#a0aec0;">TU</span>
+          <span style="font-size:10px;font-weight:700;color:#a0aec0;">WE</span>
+          <span style="font-size:10px;font-weight:700;color:#a0aec0;">TH</span>
+          <span style="font-size:10px;font-weight:700;color:#a0aec0;">FR</span>
+          <span style="font-size:10px;font-weight:700;color:#a0aec0;">SA</span>
+        </div>
+        <div id="rsCalGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;"></div>
+      </div>
+      <div id="rsSelectedInfo" style="display:none;padding:10px;background:#f0fdf4;border:1.5px solid #38a169;border-radius:10px;margin-bottom:16px;text-align:center;">
+        <span style="font-size:13px;font-weight:700;color:#38a169;" id="rsSelectedText"></span>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="closeRescheduleModal()" style="flex:1;padding:12px;border:1.5px solid #e2e8f0;border-radius:10px;background:white;font-size:13px;font-weight:600;cursor:pointer;color:#718096;">Cancel</button>
+        <button id="rsConfirmBtn" onclick="confirmReschedule()" disabled style="flex:1;padding:12px;border:none;border-radius:10px;background:#003087;font-size:13px;font-weight:700;cursor:pointer;color:white;opacity:0.5;">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+#rsCalGrid .rs-day { width:100%;aspect-ratio:1;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:all .12s;background:#f0fdf4;color:#1a202c; }
+#rsCalGrid .rs-day:hover { background:#dcfce7;transform:scale(1.08); }
+#rsCalGrid .rs-day.selected { background:#003087;color:white;transform:scale(1.1);box-shadow:0 3px 10px rgba(0,48,135,0.3); }
+#rsCalGrid .rs-day.past { background:#f1f5f9;color:#cbd5e0;cursor:not-allowed; }
+#rsCalGrid .rs-day.sunday { background:#fef2f2;color:#fca5a5;cursor:not-allowed; }
+#rsCalGrid .rs-day.empty { background:transparent;cursor:default; }
+</style>
 
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -140,7 +157,7 @@
     return _MONTHS[m] + ' ' + d + ', ' + y;
   }
 
-  var _currentFilter = 'Pending';
+  var _currentFilter = 'Approved';
 
   window.sbSwitchTab = function(btn, filter) {
     _currentFilter = filter;
@@ -162,7 +179,7 @@
     if (!body) return;
 
     var docs = filter === 'all'
-      ? _allDocs
+      ? _allDocs.filter(function(d) { return d.status !== 'Pending'; })
       : _allDocs.filter(function(d) { return d.status === filter; });
 
     if (docs.length === 0) {
@@ -176,18 +193,21 @@
       var sc = isPending ? '#d69e2e' : isApproved ? '#38a169' : '#718096';
       var sb = isPending ? 'rgba(214,158,46,0.1)' : isApproved ? 'rgba(56,161,105,0.1)' : 'rgba(113,128,150,0.1)';
       var svcList = (r.services || []).join(', ') || '—';
-      return '<div class="table-row" style="grid-template-columns:1fr 1.5fr 1.5fr 1fr 1fr 1fr 140px;align-items:center;">'
+      return '<div class="table-row" style="grid-template-columns:1fr 1.5fr 1.5fr 1fr 0.8fr 1fr 140px;align-items:center;">'
         + '<div style="font-weight:700;color:#1a202c;">' + (r.plate || '—') + '</div>'
         + '<div style="color:#4a5568;font-size:13px;">' + (r.customerName || '—') + '</div>'
         + '<div style="color:#718096;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + svcList + '">' + svcList + '</div>'
         + '<div style="font-weight:600;color:#003087;">' + _formatDate(r.preferredDate) + '</div>'
-        + '<div style="color:#718096;font-size:12px;">' + _timeAgo(r.createdAt) + '</div>'
-        + '<div><span style="background:' + sb + ';color:' + sc + ';font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">' + (r.status || 'Pending') + '</span></div>'
+        + '<div style="font-size:12px;color:#4a5568;">' + (r.preferredTime || '—') + '</div>'
+        + '<div><span style="background:' + sb + ';color:' + sc + ';font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">' + (r.status || 'Approved') + '</span></div>'
         + '<div style="display:flex;gap:6px;">'
         + (isPending
           ? '<button onclick="approveBooking(\'' + r.id + '\',\'' + (r.plate||'') + '\')" style="padding:5px 12px;background:#38a169;border:none;border-radius:7px;color:white;font-size:12px;font-weight:600;cursor:pointer;">Approve</button>'
             + '<button onclick="dismissBooking(\'' + r.id + '\')" style="padding:5px 12px;background:#e53e3e;border:none;border-radius:7px;color:white;font-size:12px;font-weight:600;cursor:pointer;">Dismiss</button>'
-          : '<span style="font-size:12px;color:#a0aec0;">—</span>')
+          : isApproved
+            ? '<button onclick="rescheduleBooking(\'' + r.id + '\',\'' + (r.plate||'') + '\',\'' + (r.preferredDate||'') + '\',\'' + (r.customerId||'') + '\',\'' + (r.customerName||'') + '\')" style="padding:5px 12px;background:#003087;border:none;border-radius:7px;color:white;font-size:12px;font-weight:600;cursor:pointer;">Reschedule</button>'
+              + '<button onclick="dismissBooking(\'' + r.id + '\')" style="padding:5px 12px;background:#e53e3e;border:none;border-radius:7px;color:white;font-size:12px;font-weight:600;cursor:pointer;">Cancel</button>'
+            : '<span style="font-size:12px;color:#a0aec0;">—</span>')
         + '</div>'
         + '</div>';
     }).join('');
@@ -207,15 +227,140 @@
       .catch(function(err) { showToast('Error: ' + err.message, 'error'); });
   };
 
+  window.rescheduleBooking = function(docId, plate, currentDate, customerId, customerName) {
+    window._rsDocId = docId;
+    window._rsPlate = plate;
+    window._rsCurrentDate = currentDate;
+    window._rsCustomerId = customerId || '';
+    window._rsCustomerName = customerName || '';
+    window._rsSelectedDate = '';
+    var now = new Date();
+    window._rsYear = now.getFullYear();
+    window._rsMonth = now.getMonth();
+    document.getElementById('rsPlate').textContent = plate;
+    document.getElementById('rsSelectedInfo').style.display = 'none';
+    document.getElementById('rsConfirmBtn').disabled = true;
+    document.getElementById('rsConfirmBtn').style.opacity = '0.5';
+    rsRenderCal();
+    document.getElementById('rescheduleModal').style.display = 'flex';
+  };
+
+  window.closeRescheduleModal = function() {
+    document.getElementById('rescheduleModal').style.display = 'none';
+  };
+
+  window.rsCalNav = function(dir) {
+    window._rsMonth += dir;
+    if (window._rsMonth > 11) { window._rsMonth = 0; window._rsYear++; }
+    if (window._rsMonth < 0) { window._rsMonth = 11; window._rsYear--; }
+    rsRenderCal();
+  };
+
+  function rsRenderCal() {
+    var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    document.getElementById('rsCalMonth').textContent = MONTHS[window._rsMonth] + ' ' + window._rsYear;
+    var firstDay = new Date(window._rsYear, window._rsMonth, 1).getDay();
+    var daysInMonth = new Date(window._rsYear, window._rsMonth + 1, 0).getDate();
+    var today = new Date(); today.setHours(0,0,0,0);
+    var cells = '';
+    for (var i = 0; i < firstDay; i++) cells += '<button class="rs-day empty"></button>';
+    for (var d = 1; d <= daysInMonth; d++) {
+      var dt = new Date(window._rsYear, window._rsMonth, d);
+      var dateStr = dt.toISOString().split('T')[0];
+      var isPast = dt < today;
+      var isSun = dt.getDay() === 0;
+      var isSel = dateStr === window._rsSelectedDate;
+      var cls = 'rs-day';
+      if (isSel) cls += ' selected';
+      else if (isPast) cls += ' past';
+      else if (isSun) cls += ' sunday';
+      var click = (!isPast && !isSun) ? ' onclick="rsPickDate(\'' + dateStr + '\')"' : '';
+      cells += '<button class="' + cls + '"' + click + '>' + d + '</button>';
+    }
+    document.getElementById('rsCalGrid').innerHTML = cells;
+  }
+
+  window.rsPickDate = function(dateStr) {
+    window._rsSelectedDate = dateStr;
+    rsRenderCal();
+    var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var dt = new Date(dateStr + 'T00:00:00');
+    document.getElementById('rsSelectedText').textContent = '📅 ' + MONTHS[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear();
+    document.getElementById('rsSelectedInfo').style.display = 'block';
+    document.getElementById('rsConfirmBtn').disabled = false;
+    document.getElementById('rsConfirmBtn').style.opacity = '1';
+  };
+
+  window.confirmReschedule = function() {
+    if (!window._rsSelectedDate || !window._rsDocId) return;
+    var oldDate = window._rsCurrentDate || '';
+    var newDate = window._rsSelectedDate;
+    var plate = window._rsPlate || '';
+    var customerId = window._rsCustomerId || '';
+    var customerName = window._rsCustomerName || '';
+
+    db.collection('service_bookings').doc(window._rsDocId).update({
+      preferredDate: newDate,
+      previousDate: oldDate,
+      rescheduledBy: 'admin',
+      rescheduledAt: firebase.firestore.FieldValue.serverTimestamp(),
+    })
+    .then(function() {
+      closeRescheduleModal();
+      showToast('Booking rescheduled to ' + newDate, 'success');
+
+      // Create in-app notification for the customer
+      if (customerId) {
+        db.collection('notifications').add({
+          title: '📅 Booking Rescheduled',
+          message: 'Your booking for ' + plate + ' has been rescheduled from ' + _formatDate(oldDate) + ' to ' + _formatDate(newDate) + '.',
+          type: 'warning',
+          targetRole: 'customer',
+          targetUid: customerId,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          readBy: {},
+          isRead: false,
+        });
+      }
+
+      // Get the booking doc to find services and customer email for email notification
+      db.collection('service_bookings').doc(window._rsDocId).get().then(function(doc) {
+        if (!doc.exists) return;
+        var bookingData = doc.data();
+        var services = (bookingData.services || []).join(', ');
+
+        // Look up customer email
+        if (customerId) {
+          db.collection('users').doc(customerId).get().then(function(userDoc) {
+            if (!userDoc.exists) return;
+            var userData = userDoc.data();
+            var email = userData.email || '';
+            if (!email) return;
+
+            // Send reschedule email notification
+            fetch('/api/send-reschedule-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                to_email: email,
+                to_name: customerName || userData.name || '',
+                plate: plate,
+                old_date: oldDate,
+                new_date: newDate,
+                services: services
+              })
+            }).catch(function(err) { console.error('Reschedule email error:', err); });
+          });
+        }
+      });
+    })
+    .catch(function(err) { showToast('Error: ' + err.message, 'error'); });
+  };
+
   function _updateStats() {
-    var s = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; };
-    var pending = _allDocs.filter(function(r) { return r.status === 'Pending'; }).length;
-    s('statPending', pending);
-    s('statApproved',  _allDocs.filter(function(r) { return r.status === 'Approved'; }).length);
-    s('statDismissed', _allDocs.filter(function(r) { return r.status === 'Dismissed'; }).length);
-    // Update tab badge
+    // Stats removed — using tabs only
     var badge = document.getElementById('tabBadgePending');
-    if (badge) { badge.textContent = pending; badge.style.display = pending > 0 ? 'inline-block' : 'none'; }
+    if (badge) badge.style.display = 'none';
   }
 
   // Real-time listener on service_bookings

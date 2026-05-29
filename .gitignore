@@ -1,0 +1,13 @@
+# Secrets
+.groq_key
+serviceAccountKey.json
+*.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Build artifacts
+rag_module.py
+generated_reports/
