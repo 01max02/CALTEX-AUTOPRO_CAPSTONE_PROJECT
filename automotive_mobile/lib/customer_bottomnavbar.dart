@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'customer_smart_ai.dart';
 
 /// Reusable bottom navigation bar for the Customer Dashboard.
 /// Indices:
 ///   0 → My Vehicles
-///   1 → Smart Reports AI (navigates to CustomerSmartAI screen)
+///   1 → My Bookings (navigates to CustomerMyBookings screen)
 ///   2 → PMS Log
 class CustomerBottomNavBar extends StatelessWidget {
   final int currentIndex;
@@ -42,7 +41,7 @@ class CustomerBottomNavBar extends StatelessWidget {
                 _tab(index: 2, icon: Icons.history,   label: 'PMS History'),
               ]),
 
-              // ── Center raised Smart Reports button ──
+              // ── Center raised Bookings button ──
               Positioned(
                 top: -20, left: 0, right: 0,
                 child: Center(
@@ -61,8 +60,8 @@ class CustomerBottomNavBar extends StatelessWidget {
                       child: const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.smart_toy, color: Colors.white, size: 20),
-                          Text('AI', style: TextStyle(
+                          Icon(Icons.calendar_month, color: Colors.white, size: 20),
+                          Text('Book', style: TextStyle(
                             color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
                         ],
                       ),

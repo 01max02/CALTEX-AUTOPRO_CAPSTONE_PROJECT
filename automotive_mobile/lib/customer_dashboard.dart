@@ -5,6 +5,7 @@ import 'login.dart';
 import 'customer_pms_history.dart';
 import 'customer_smart_ai.dart';
 import 'customer_book_service.dart';
+import 'customer_mybookings.dart';
 import 'profile.dart';
 import 'notifications.dart';
 import 'customer_bottomnavbar.dart';
@@ -58,12 +59,11 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
       appBar: _buildTopBar(),
       body: _buildBody(),
       floatingActionButton: _currentIndex == 0
-          ? FloatingActionButton.extended(
+          ? FloatingActionButton(
               onPressed: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const CustomerBookService())),
+                MaterialPageRoute(builder: (_) => const CustomerSmartAI())),
               backgroundColor: _red,
-              icon: const Icon(Icons.calendar_month_outlined, color: Colors.white, size: 20),
-              label: const Text('Book Service', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+              child: const Icon(Icons.smart_toy_outlined, color: Colors.white, size: 24),
             )
           : null,
       bottomNavigationBar: CustomerBottomNavBar(
@@ -71,7 +71,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
         vehiclesIcon: _fleetNavIcon,
         onTap: (i) {
           if (i == 1) {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerSmartAI()));
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerMyBookings()));
           } else {
             setState(() => _currentIndex = i);
           }

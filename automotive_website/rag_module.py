@@ -1665,7 +1665,7 @@ import time
 from typing import Any
 
 
-@dataclass(slots=True)
+@dataclass
 class RetrievalMetricSnapshot:
     total_queries: int = 0
     structured_queries: int = 0
@@ -2910,7 +2910,7 @@ class RetrievalStrategy(str, Enum):
     CLARIFY = "clarify"
 
 
-@dataclass(slots=True)
+@dataclass
 class QueryRoute:
     parsed_query: ParsedQuery
     domain: str
@@ -3078,7 +3078,7 @@ from typing import Any
 
 
 
-@dataclass(slots=True)
+@dataclass
 class HybridRetrievalResult:
     chunks: list[RetrievedChunk]
     route: QueryRoute

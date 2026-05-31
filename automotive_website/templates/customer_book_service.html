@@ -371,7 +371,7 @@ function _updateDateSuggestion() {
       if (nextPms > now) {
         suggested = new Date(nextPms.getTime() - 3*86400000);
         if (suggested < now) suggested = new Date(now.getTime() + 86400000);
-        reason = 'Based on PMS schedule (due ' + nextPms.toISOString().split('T')[0] + ')';
+        reason = 'Based on PMS schedule (due ' + _toLocalDateStr(nextPms) + ')';
       } else {
         suggested = new Date(now.getTime() + 86400000);
         reason = 'PMS is overdue — book ASAP';
@@ -385,7 +385,7 @@ function _updateDateSuggestion() {
     reason = 'Next available weekday';
   }
 
-  _bsSuggestedDate = suggested.toISOString().split('T')[0];
+  _bsSuggestedDate = _toLocalDateStr(suggested);
   txt.textContent = _fmtDatePretty(_bsSuggestedDate) + ' — ' + reason;
   el.style.display = 'flex';
 }
@@ -468,7 +468,10 @@ function bsRenderCalendar() {
 
   for (var d = 1; d <= daysInMonth; d++) {
     var dateObj = new Date(_bsCalYear, _bsCalMonth, d);
-    var dateStr = dateObj.toISOString().split('T')[0];
+    var yyyy = dateObj.getFullYear();
+    var mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    var dd = String(dateObj.getDate()).padStart(2, '0');
+    var dateStr = yyyy + '-' + mm + '-' + dd;
     var dayOfWeek = dateObj.getDay();
     var isPast = dateObj < today;
     var isSunday = dayOfWeek === 0;
@@ -737,6 +740,14 @@ function _fmtCost(c) {
 }
 
 var _MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function _toLocalDateStr(d) {
+  var yyyy = d.getFullYear();
+  var mm = String(d.getMonth() + 1).padStart(2, '0');
+  var dd = String(d.getDate()).padStart(2, '0');
+  return yyyy + '-' + mm + '-' + dd;
+}
+
 function _fmtDatePretty(dateStr) {
   if (!dateStr) return '';
   var d = new Date(dateStr + 'T00:00:00');
