@@ -10,7 +10,6 @@ const PAGE_URLS = {
     'dss':                      'admin_dss.html',
     'dss-pms':                  'admin_dss.html#dss-pms',
     'users':                    'admin_users.html',
-    'calendar-view':            'admin_calendar.html',
     'domains':                  'admin_domain_management.html',
 };
 

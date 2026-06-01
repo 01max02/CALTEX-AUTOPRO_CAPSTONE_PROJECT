@@ -85,6 +85,12 @@
           <span style="font-size:10px;font-weight:700;color:#a0aec0;">SA</span>
         </div>
         <div id="rsCalGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;"></div>
+        <div style="display:flex;gap:12px;margin-top:10px;padding-top:8px;border-top:1px solid #f0f4f8;justify-content:center;flex-wrap:wrap;">
+          <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#718096;"><span style="width:8px;height:8px;background:#38a169;border-radius:50%;display:inline-block;"></span>Available</span>
+          <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#718096;"><span style="width:8px;height:8px;background:#d97706;border-radius:50%;border:1.5px solid #d97706;display:inline-block;"></span>Full</span>
+          <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#718096;"><span style="width:8px;height:8px;background:#e2e8f0;border-radius:50%;display:inline-block;"></span>Closed</span>
+          <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#718096;"><span style="width:8px;height:8px;background:#003087;border-radius:50%;display:inline-block;"></span>Current</span>
+        </div>
       </div>
       <div id="rsSelectedInfo" style="display:none;padding:10px;background:#f0fdf4;border:1.5px solid #38a169;border-radius:10px;margin-bottom:16px;text-align:center;">
         <span style="font-size:13px;font-weight:700;color:#38a169;" id="rsSelectedText"></span>
@@ -102,9 +108,15 @@
 #rsCalGrid .rs-day { width:100%;aspect-ratio:1;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:all .12s;background:#f0fdf4;color:#1a202c; }
 #rsCalGrid .rs-day:hover { background:#dcfce7;transform:scale(1.08); }
 #rsCalGrid .rs-day.selected { background:#003087;color:white;transform:scale(1.1);box-shadow:0 3px 10px rgba(0,48,135,0.3); }
+#rsCalGrid .rs-day.current { background:#ebf8ff;color:#003087;border:2px solid #003087;font-weight:800; }
 #rsCalGrid .rs-day.past { background:#f1f5f9;color:#cbd5e0;cursor:not-allowed; }
+#rsCalGrid .rs-day.past:hover { transform:none; }
 #rsCalGrid .rs-day.sunday { background:#fef2f2;color:#fca5a5;cursor:not-allowed; }
+#rsCalGrid .rs-day.sunday:hover { transform:none; }
+#rsCalGrid .rs-day.full { background:#fef3c7;color:#92400e;cursor:not-allowed; }
+#rsCalGrid .rs-day.full:hover { transform:none; }
 #rsCalGrid .rs-day.empty { background:transparent;cursor:default; }
+#rsCalGrid .rs-day.empty:hover { transform:none; }
 </style>
 
 <!-- Firebase SDK -->
@@ -234,14 +246,28 @@
     window._rsCustomerId = customerId || '';
     window._rsCustomerName = customerName || '';
     window._rsSelectedDate = '';
+    window._rsBookedDates = {};
     var now = new Date();
     window._rsYear = now.getFullYear();
     window._rsMonth = now.getMonth();
-    document.getElementById('rsPlate').textContent = plate;
+    document.getElementById('rsPlate').textContent = plate + (currentDate ? ' — Current: ' + _formatDate(currentDate) : '');
     document.getElementById('rsSelectedInfo').style.display = 'none';
     document.getElementById('rsConfirmBtn').disabled = true;
     document.getElementById('rsConfirmBtn').style.opacity = '0.5';
-    rsRenderCal();
+
+    // Load booked dates for availability
+    db.collection('service_bookings')
+      .where('status', 'in', ['Approved', 'Pending'])
+      .get().then(function(snap) {
+        var counts = {};
+        snap.docs.forEach(function(d) {
+          var date = d.data().preferredDate;
+          if (date) counts[date] = (counts[date] || 0) + 1;
+        });
+        window._rsBookedDates = counts;
+        rsRenderCal();
+      }).catch(function() { rsRenderCal(); });
+
     document.getElementById('rescheduleModal').style.display = 'flex';
   };
 
@@ -256,26 +282,38 @@
     rsRenderCal();
   };
 
+  var _rsMaxPerDay = 5;
+
   function rsRenderCal() {
     var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     document.getElementById('rsCalMonth').textContent = MONTHS[window._rsMonth] + ' ' + window._rsYear;
     var firstDay = new Date(window._rsYear, window._rsMonth, 1).getDay();
     var daysInMonth = new Date(window._rsYear, window._rsMonth + 1, 0).getDate();
     var today = new Date(); today.setHours(0,0,0,0);
+    var bookedDates = window._rsBookedDates || {};
     var cells = '';
     for (var i = 0; i < firstDay; i++) cells += '<button class="rs-day empty"></button>';
     for (var d = 1; d <= daysInMonth; d++) {
       var dt = new Date(window._rsYear, window._rsMonth, d);
-      var dateStr = dt.toISOString().split('T')[0];
+      var yyyy = dt.getFullYear();
+      var mm = String(dt.getMonth() + 1).padStart(2, '0');
+      var dd = String(dt.getDate()).padStart(2, '0');
+      var dateStr = yyyy + '-' + mm + '-' + dd;
       var isPast = dt < today;
       var isSun = dt.getDay() === 0;
       var isSel = dateStr === window._rsSelectedDate;
+      var isCurrent = dateStr === window._rsCurrentDate;
+      var bookings = bookedDates[dateStr] || 0;
+      var isFull = bookings >= _rsMaxPerDay;
       var cls = 'rs-day';
       if (isSel) cls += ' selected';
-      else if (isPast) cls += ' past';
-      else if (isSun) cls += ' sunday';
-      var click = (!isPast && !isSun) ? ' onclick="rsPickDate(\'' + dateStr + '\')"' : '';
-      cells += '<button class="' + cls + '"' + click + '>' + d + '</button>';
+      else if (isCurrent && !isPast) cls += ' current';
+      else if (isPast || isSun) cls += ' past';
+      else if (isFull) cls += ' full';
+      var clickable = !isPast && !isSun && !isFull;
+      var click = clickable ? ' onclick="rsPickDate(\'' + dateStr + '\')"' : '';
+      var slotText = (!isPast && !isSun && !isFull && bookings > 0) ? ' title="' + bookings + '/' + _rsMaxPerDay + ' booked"' : '';
+      cells += '<button class="' + cls + '"' + click + slotText + '>' + d + '</button>';
     }
     document.getElementById('rsCalGrid').innerHTML = cells;
   }
@@ -283,9 +321,12 @@
   window.rsPickDate = function(dateStr) {
     window._rsSelectedDate = dateStr;
     rsRenderCal();
+    var parts = dateStr.split('-');
     var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    var dt = new Date(dateStr + 'T00:00:00');
-    document.getElementById('rsSelectedText').textContent = '📅 ' + MONTHS[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear();
+    var m = parseInt(parts[1]) - 1;
+    var d = parseInt(parts[2]);
+    var y = parseInt(parts[0]);
+    document.getElementById('rsSelectedText').textContent = '📅 New Date: ' + MONTHS[m] + ' ' + d + ', ' + y;
     document.getElementById('rsSelectedInfo').style.display = 'block';
     document.getElementById('rsConfirmBtn').disabled = false;
     document.getElementById('rsConfirmBtn').style.opacity = '1';

@@ -146,16 +146,9 @@
     </div>
 
     <!-- FAB toggle button -->
-    <button id="aiFab" onclick="toggleSmartAI()" style="width:52px;height:52px;background:#E8001C;border:none;border-radius:50%;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(232,0,28,0.4);transition:transform .2s,box-shadow .2s;" onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'">
-        <svg id="aiFabIcon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <!-- smart_toy / robot face -->
-            <rect x="3" y="8" width="18" height="12" rx="3"/>
-            <path d="M9 13h.01M15 13h.01"/>
-            <path d="M9 17h6"/>
-            <path d="M12 8V5"/>
-            <circle cx="12" cy="4" r="1"/>
-            <path d="M3 14H1.5a1 1 0 0 1 0-2H3"/>
-            <path d="M21 14h1.5a1 1 0 0 0 0-2H21"/>
+    <button id="aiFab" onclick="toggleSmartAI()" style="width:56px;height:56px;background:linear-gradient(135deg,#E8001C,#c0001a);border:none;border-radius:50%;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 18px rgba(232,0,28,0.4);transition:transform .2s,box-shadow .2s;" onmouseover="this.style.transform='scale(1.1)';this.style.boxShadow='0 6px 24px rgba(232,0,28,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 4px 18px rgba(232,0,28,0.4)'">
+        <svg id="aiFabIcon" xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="white" stroke="none">
+            <path d="M20 6h-1V3c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v14l4-4h9c.55 0 1-.45 1-1V6h2v9H7v2c0 .55.45 1 1 1h10l4 4V7c0-.55-.45-1-1-1z"/>
         </svg>
     </button>
 </div>
@@ -219,9 +212,18 @@ window.closeSmartAI = function() {
 };
 
 function _updateFabIcon() {
-    document.getElementById('aiFabIcon').innerHTML = _aiPanelOpen
-        ? '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'
-        : '<rect x="3" y="8" width="18" height="12" rx="3"/><path d="M9 13h.01M15 13h.01"/><path d="M9 17h6"/><path d="M12 8V5"/><circle cx="12" cy="4" r="1"/><path d="M3 14H1.5a1 1 0 0 1 0-2H3"/><path d="M21 14h1.5a1 1 0 0 0 0-2H21"/>';
+    var svg = document.getElementById('aiFabIcon');
+    if (_aiPanelOpen) {
+        svg.setAttribute('fill', 'white');
+        svg.setAttribute('stroke', 'none');
+        svg.removeAttribute('stroke-width');
+        svg.innerHTML = '<path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>';
+    } else {
+        svg.setAttribute('fill', 'white');
+        svg.setAttribute('stroke', 'none');
+        svg.removeAttribute('stroke-width');
+        svg.innerHTML = '<path d="M20 6h-1V3c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v14l4-4h9c.55 0 1-.45 1-1V6h2v9H7v2c0 .55.45 1 1 1h10l4 4V7c0-.55-.45-1-1-1z"/>';
+    }
 }
 
 async function _aiLoadData() {

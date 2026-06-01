@@ -474,10 +474,6 @@ def admin_users():
 def admin_dss():
     return render_template('admin_dss.html')
 
-@app.route('/admin_smart_reports.html')
-def admin_smart_reports():
-    return render_template('admin_smart_reports.html')
-
 @app.route('/admin_domain_management.html')
 def admin_domains():
     return render_template('admin_domain_management.html')
@@ -489,10 +485,6 @@ def admin_service_bookings():
 @app.route('/admin_receiving.html')
 def admin_receiving():
     return render_template('admin_receiving.html')
-
-@app.route('/admin_calendar.html')
-def admin_calendar():
-    return render_template('admin_calendar.html')
 
 @app.route('/print_layout.html')
 def print_layout():

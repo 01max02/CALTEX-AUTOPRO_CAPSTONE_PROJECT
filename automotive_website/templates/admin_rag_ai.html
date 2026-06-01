@@ -13,19 +13,15 @@
          transition:transform 0.2s,box-shadow 0.2s;"
   onmouseover="this.style.transform='scale(1.1)';this.style.boxShadow='0 6px 24px rgba(232,0,28,0.5)'"
   onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 4px 18px rgba(232,0,28,0.4)'">
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
-       fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-    <circle cx="9" cy="10" r="1" fill="#fff" stroke="none"/>
-    <circle cx="12" cy="10" r="1" fill="#fff" stroke="none"/>
-    <circle cx="15" cy="10" r="1" fill="#fff" stroke="none"/>
+  <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="white" stroke="none">
+    <path d="M20 6h-1V3c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v14l4-4h9c.55 0 1-.45 1-1V6h2v9H7v2c0 .55.45 1 1 1h10l4 4V7c0-.55-.45-1-1-1z"/>
   </svg>
 </button>
 
 <!-- Floating AI chat panel -->
 <div id="ragAiPanel"
-  style="display:none;position:fixed;bottom:5.5rem;right:2rem;z-index:1199;
-         width:380px;height:560px;background:#fff;border-radius:18px;
+  style="display:none;position:fixed;bottom:6rem;right:2rem;z-index:1201;
+         width:380px;height:560px;max-height:calc(100vh - 8rem);background:#fff;border-radius:18px;
          box-shadow:0 8px 40px rgba(0,0,0,0.18);
          border:1px solid #e2e8f0;overflow:hidden;
          display:none;flex-direction:column;
@@ -36,10 +32,6 @@
     <div style="width:34px;height:34px;background:rgba(255,255,255,0.15);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;">🤖</div>
     <div style="flex:1;">
       <div style="color:#fff;font-size:13px;font-weight:700;">Smart Reports AI</div>
-      <div style="color:rgba(255,255,255,0.7);font-size:11px;display:flex;align-items:center;gap:4px;">
-        <span id="ragAiDot" style="width:6px;height:6px;background:#d69e2e;border-radius:50%;display:inline-block;"></span>
-        <span id="ragAiStatus">Loading...</span>
-      </div>
     </div>
     <button onclick="ragAiClear()" style="background:rgba(255,255,255,0.15);border:none;color:white;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;cursor:pointer;font-family:inherit;">Clear</button>
     <button onclick="ragAiToggle()" style="background:rgba(255,255,255,0.15);border:none;color:white;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">×</button>
@@ -110,6 +102,20 @@ window.ragAiToggle = function() {
   if (!panel) return;
   var isOpen = panel.style.display === 'flex';
   panel.style.display = isOpen ? 'none' : 'flex';
+  // Update FAB icon: X when open, chat bubbles when closed
+  var btn = document.getElementById('ragAiToggleBtn');
+  if (btn) {
+    var svg = btn.querySelector('svg');
+    if (svg) {
+      if (!isOpen) {
+        // Now opening — show X
+        svg.innerHTML = '<path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>';
+      } else {
+        // Now closing — show chat icon
+        svg.innerHTML = '<path d="M20 6h-1V3c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v14l4-4h9c.55 0 1-.45 1-1V6h2v9H7v2c0 .55.45 1 1 1h10l4 4V7c0-.55-.45-1-1-1z"/>';
+      }
+    }
+  }
 };
 
 // Get admin initials
@@ -272,7 +278,7 @@ function _ragShowWelcome() {
   div.innerHTML='<div class="rag-av ai">🤖</div>'
     +'<div class="rag-bub ai" style="max-width:85%;">'
     +'<div style="font-size:13px;font-weight:700;color:#1a202c;margin-bottom:3px;">Hello! I\'m your Smart Reports AI 👋</div>'
-    +'<div style="font-size:11px;color:#718096;line-height:1.5;">Ask me about fleet, inventory, maintenance costs, and more. I pull <strong>live data</strong> from Firestore.</div>'
+    +'<div style="font-size:11px;color:#718096;line-height:1.5;">Ask me about fleet, inventory, maintenance costs, and more.</div>'
     +'</div>';
   chat.appendChild(div);
 }

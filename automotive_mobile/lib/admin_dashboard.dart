@@ -11,7 +11,7 @@ import 'profile.dart';
 import 'admin_users.dart';
 import 'admin_dss.dart';
 import 'notifications.dart';
-import 'admin_smart_reports.dart';
+import 'admin_rag_ai.dart';
 import 'admin_domain_management.dart';
 import 'barcode_scanner_screen.dart';
 
@@ -65,6 +65,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
       backgroundColor: _bg,
       appBar: _buildTopBar(),
       body: _buildBody(),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const AdminSmartReports())),
+        backgroundColor: _red,
+        shape: const CircleBorder(),
+        elevation: 6,
+        child: const Icon(Icons.question_answer_rounded, color: Colors.white, size: 24),
+      ),
       bottomNavigationBar: _buildBottomNav(),
     );
   }
@@ -573,22 +581,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 final lineMaxY = ([...stockInByMonth, ...stockOutByMonth, 1.0]
                   .reduce((a, b) => a > b ? a : b)) + 2;
 
-                // ── Chart 4: Top 10 Most Used Parts (this month) ──
+                // ── Chart 4: Top 10 Most Used Parts (All Time) ──
                 final allIssuances = issSnap.data?.docs
                     .map((d) => d.data() as Map<String, dynamic>).toList() ?? [];
                 final Map<String, double> partUsage = {};
                 for (final iss in allIssuances) {
+                  // Skip services — only count materials
                   if ((iss['itemType'] as String? ?? '').toLowerCase() == 'service') continue;
-                  final dateStr = iss['date'] as String? ?? '';
-                  if (dateStr.isEmpty) continue;
-                  final parts = dateStr.split(' ');
-                  if (parts.length < 3) continue;
-                  final m = months.indexOf(parts[0]);
-                  final y = int.tryParse(parts[2]) ?? -1;
-                  if (m != now.month - 1 || y != now.year) continue;
-                  final name = (iss['itemName'] ?? iss['item'] ?? '—') as String;
+                  final name = (iss['itemName'] ?? iss['item'] ?? '') as String;
+                  if (name.isEmpty || name == '—') continue;
                   final qty = parseQty(iss['quantity'] ?? iss['qty'] ?? 0);
-                  partUsage[name] = (partUsage[name] ?? 0) + qty;
+                  if (qty > 0) partUsage[name] = (partUsage[name] ?? 0) + qty;
                 }
                 final sortedParts = (partUsage.entries.toList()
                   ..sort((a, b) => b.value.compareTo(a.value)))
@@ -1065,7 +1068,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           const SizedBox(width: 10),
                           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             const Text('Top 10 Most Used Parts', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1a202c))),
-                            Text('${months[now.month - 1]} ${now.year} · Materials only', style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
+                            Text('All time · Materials only', style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
                           ])),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
@@ -1081,7 +1084,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               ? const Padding(
                                   padding: EdgeInsets.symmetric(vertical: 24),
                                   child: Center(child: Text(
-                                    'No material issuances recorded this month.',
+                                    'No material issuances recorded yet.',
                                     style: TextStyle(color: Color(0xFF718096), fontSize: 13))),
                                 )
                               : SizedBox(
@@ -2496,13 +2499,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
         'sub': 'Manage system users',
         'color': Colors.teal,
         'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminUsers())),
-      },
-      {
-        'icon': Icons.smart_toy_outlined,
-        'label': 'Smart Reports',
-        'sub': 'AI-powered reports',
-        'color': Colors.purple,
-        'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminSmartReports())),
       },
       {
         'icon': Icons.apps_outlined,

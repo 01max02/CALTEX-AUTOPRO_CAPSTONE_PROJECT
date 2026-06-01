@@ -63,7 +63,9 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
               onPressed: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const CustomerSmartAI())),
               backgroundColor: _red,
-              child: const Icon(Icons.smart_toy_outlined, color: Colors.white, size: 24),
+              shape: const CircleBorder(),
+              elevation: 6,
+              child: const Icon(Icons.question_answer_rounded, color: Colors.white, size: 26),
             )
           : null,
       bottomNavigationBar: CustomerBottomNavBar(
@@ -272,6 +274,11 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
         : status == 'Due Soon'                        ? Colors.orange
         : status == 'Under Maintenance'               ? Colors.orange
         : Colors.green; // On Track + Scheduled → Active
+    final statusBg = status == 'Overdue'              ? const Color(0xFFFFF5F5)
+        : status == 'Due This Week'                   ? const Color(0xFFFFFBEB)
+        : status == 'Due Soon'                        ? const Color(0xFFFFF8E1)
+        : status == 'Under Maintenance'               ? const Color(0xFFFFF8E1)
+        : const Color(0xFFF0FFF4);
     final statusLabel = status == 'Overdue'           ? 'Overdue'
         : status == 'Due This Week'                   ? 'Due This Week'
         : status == 'Due Soon'                        ? 'Due Soon'
@@ -284,49 +291,74 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 3))],
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFe2e8f0), width: 1),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // ── Header: icon + plate/desc + status badge ──
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(children: [
               Container(
-                width: 52, height: 52,
-                decoration: BoxDecoration(color: _red.withOpacity(0.08), borderRadius: BorderRadius.circular(14)),
-                child: _vehicleIcon(v['type'] ?? '', size: 26),
+                width: 46, height: 46,
+                decoration: BoxDecoration(color: _red.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
+                child: _vehicleIcon(v['type'] ?? '', size: 24),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(v['plate']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1a202c))),
+                Text(v['plate']!, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF1a202c))),
                 const SizedBox(height: 2),
                 Text(v['desc']!, style: const TextStyle(fontSize: 12, color: Color(0xFF718096))),
               ])),
-              const Icon(Icons.chevron_right, color: Color(0xFFcbd5e0), size: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusBg,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(statusLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: statusColor)),
+              ),
             ]),
           ),
+
+          // ── Body: meta row (odometer + last service) ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            child: Row(children: [
+              _metaItem(Icons.speed_outlined, v['odo']!.isNotEmpty ? v['odo']! : '—'),
+              const SizedBox(width: 20),
+              _metaItem(Icons.calendar_today_outlined, v['lastSvcDate']!.isNotEmpty ? v['lastSvcDate']! : '—'),
+            ]),
+          ),
+
+          // ── Footer: "View details" + chevron ──
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF7F8FA),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
-              border: Border(top: BorderSide(color: Colors.grey.shade100)),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(14)),
+              border: Border(top: BorderSide(color: Color(0xFFF0F4F8))),
             ),
-            child: Row(children: [
-              _infoChip(Icons.speed_outlined, v['odo']!.isNotEmpty ? v['odo']! : '—'),
-              _stripDivider(),
-              _infoChip(Icons.calendar_today_outlined, v['lastSvcDate']!.isNotEmpty ? v['lastSvcDate']! : '—'),
-              _stripDivider(),
-              Row(children: [
-                Container(width: 6, height: 6, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
-                const SizedBox(width: 4),
-                Text(statusLabel, style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w600)),
-              ]),
-            ]),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('View details', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFE8001C))),
+                Icon(Icons.chevron_right, size: 16, color: Color(0xFFE8001C)),
+              ],
+            ),
           ),
         ]),
       ),
     );
+  }
+
+  Widget _metaItem(IconData icon, String text) {
+    return Row(children: [
+      Icon(icon, size: 13, color: const Color(0xFF718096)),
+      const SizedBox(width: 5),
+      Text(text, style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+    ]);
   }
 
   Widget _stripDivider() => Container(
