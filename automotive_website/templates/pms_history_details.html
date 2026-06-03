@@ -196,9 +196,6 @@
       const vehicleInfoHtml = `
         <div style="background:white;border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-            <div style="width:48px;height:48px;background:rgba(232,0,28,0.08);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;" id="phdHeaderIcon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E8001C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-            </div>
             <div style="flex:1;">
               <div style="font-size:16px;font-weight:700;color:#1a202c;" id="phdPlate">—</div>
               <div style="font-size:12px;color:#718096;margin-top:2px;" id="phdDesc">—</div>
@@ -214,7 +211,6 @@
       // Set vehicle info
       document.getElementById('phdPlate').textContent = plate;
       document.getElementById('phdDesc').textContent = desc || '—';
-      document.getElementById('phdHeaderIcon').innerHTML = vehicleIconSvg(type, 24);
 
       // Load maintenance records for this plate
       const snap = await db.collection('maintenance')
@@ -365,9 +361,18 @@
     }
   });
 </script>
+<script src="../static/js/customer_shared.js"></script>
 <script>
   fetch('customer_header.html').then(r => r.text()).then(html => {
     document.getElementById('customerHeader').innerHTML = html;
+    var sess = JSON.parse(sessionStorage.getItem('cpUser') || '{}');
+    if (sess.name) {
+      var parts = sess.name.trim().split(' ').filter(Boolean);
+      var ini = parts.length >= 2 ? (parts[0][0]+parts[1][0]).toUpperCase() : (parts[0]?parts[0][0].toUpperCase():'CU');
+      var av = document.getElementById('cuAvatar'); if(av) av.textContent = ini;
+      var hn = document.getElementById('cuHeaderName'); if(hn) hn.textContent = sess.name;
+      var mn = document.getElementById('cuAvatarName'); if(mn) mn.textContent = sess.name;
+    }
   });
 </script>
 </body>

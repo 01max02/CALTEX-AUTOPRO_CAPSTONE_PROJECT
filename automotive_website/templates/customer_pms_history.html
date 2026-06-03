@@ -127,71 +127,142 @@
 
 <div id="cuToast"></div>
 
-<!-- ── Smart AI Floating Widget (shared across customer pages) ── -->
-<script>
-// Inject the AI widget from customer_dashboard.html pattern
-(function() {
-    var fab = document.createElement('div');
-    fab.id = 'aiWidget';
-    fab.style.cssText = 'display:none;position:fixed;bottom:24px;right:24px;z-index:9000;display:flex;flex-direction:column;align-items:flex-end;gap:12px;';
-    fab.innerHTML = `
-    <div id="aiPanel" style="display:none;width:360px;max-width:calc(100vw - 32px);height:520px;max-height:calc(100vh - 120px);background:#fff;border-radius:20px;box-shadow:0 12px 40px rgba(0,0,0,0.18),0 2px 8px rgba(0,0,0,0.08);border:1px solid #e2e8f0;flex-direction:column;overflow:hidden;">
+<!-- ── Smart AI Floating Widget ─────────────────────────── -->
+<div id="aiWidget" style="display:none;position:fixed;bottom:24px;right:24px;z-index:9000;display:flex;flex-direction:column;align-items:flex-end;gap:12px;">
+
+    <!-- Chat panel — hidden by default, opens on FAB click -->
+    <div id="aiPanel" style="display:none;width:360px;max-width:calc(100vw - 32px);height:520px;max-height:calc(100vh - 120px);background:#fff;border-radius:20px;box-shadow:0 12px 40px rgba(0,0,0,0.18),0 2px 8px rgba(0,0,0,0.08);border:1px solid #e2e8f0;flex-direction:column;overflow:hidden;animation:aiPanelIn .22s cubic-bezier(0.4,0,0.2,1);">
+
+        <!-- Panel header -->
         <div style="background:#E8001C;padding:14px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;">
             <div style="width:36px;height:36px;background:rgba(255,255,255,0.2);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="1"/><circle cx="12" cy="16" r="1"/><path d="M9 12h6M8 6h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M6 10h-.5a1.5 1.5 0 0 0 0 3H6M18 10h.5a1.5 1.5 0 0 1 0 3H18"/></svg>
             </div>
-            <div style="flex:1;"><div style="color:#fff;font-size:13px;font-weight:700;">Smart Reports AI</div><div style="color:rgba(255,255,255,0.75);font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;background:#4ade80;border-radius:50%;display:inline-block;"></span>Online</div></div>
+            <div style="flex:1;">
+                <div style="color:#fff;font-size:13px;font-weight:700;">Smart Reports AI</div>
+                <div style="color:rgba(255,255,255,0.75);font-size:11px;display:flex;align-items:center;gap:4px;">
+                    <span style="width:6px;height:6px;background:#4ade80;border-radius:50%;display:inline-block;"></span>Online
+                </div>
+            </div>
             <button id="aiClearBtn" onclick="aiClear()" style="display:none;background:rgba(255,255,255,0.15);border:none;color:white;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;cursor:pointer;font-family:inherit;">Clear</button>
             <button onclick="closeSmartAI()" style="background:rgba(255,255,255,0.15);border:none;color:white;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">×</button>
         </div>
+
+        <!-- Messages -->
         <div id="aiMessages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;background:#F7F8FA;">
             <div id="aiWelcome" style="text-align:center;padding:16px 8px 8px;">
-                <div style="width:52px;height:52px;background:rgba(0,48,135,0.08);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;color:#003087;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="1"/><circle cx="12" cy="16" r="1"/><path d="M9 12h6M8 6h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M6 10h-.5a1.5 1.5 0 0 0 0 3H6M18 10h.5a1.5 1.5 0 0 1 0 3H18"/></svg></div>
+                <div style="width:52px;height:52px;background:rgba(0,48,135,0.08);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;color:#003087;">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="1"/><circle cx="12" cy="16" r="1"/><path d="M9 12h6M8 6h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M6 10h-.5a1.5 1.5 0 0 0 0 3H6M18 10h.5a1.5 1.5 0 0 1 0 3H18"/></svg>
+                </div>
                 <div style="font-size:14px;font-weight:700;color:#1a202c;margin-bottom:4px;">Smart Reports AI</div>
                 <div id="aiWelcomeSub" style="font-size:12px;color:#718096;line-height:1.6;">Ask me anything about your vehicles — PMS status, maintenance history, and more.</div>
             </div>
         </div>
+
+        <!-- Quick chips -->
         <div id="aiChips" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;background:#F7F8FA;border-top:1px solid #f0f4f8;flex-shrink:0;">
-            <button onclick="aiSend('List all my vehicles')" style="background:white;border:1.5px solid #e2e8f0;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:500;color:#4a5568;cursor:pointer;font-family:inherit;">🚗 My fleet</button>
-            <button onclick="aiSend('Give me a fleet summary')" style="background:white;border:1.5px solid #e2e8f0;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:500;color:#4a5568;cursor:pointer;font-family:inherit;">📊 Summary</button>
-            <button onclick="aiSend('Which vehicles have PMS overdue?')" style="background:white;border:1.5px solid #e2e8f0;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:500;color:#4a5568;cursor:pointer;font-family:inherit;">⚠️ Overdue</button>
-            <button onclick="aiSend('Show my service history')" style="background:white;border:1.5px solid #e2e8f0;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:500;color:#4a5568;cursor:pointer;font-family:inherit;">📋 History</button>
+            <button onclick="aiSend('List all my vehicles')" style="background:white;border:1.5px solid #e2e8f0;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:500;color:#4a5568;cursor:pointer;font-family:inherit;transition:all .15s;" onmouseover="this.style.background='#1a202c';this.style.color='white'" onmouseout="this.style.background='white';this.style.color='#4a5568'">🚗 My fleet</button>
+            <button onclick="aiSend('Give me a fleet summary')" style="background:white;border:1.5px solid #e2e8f0;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:500;color:#4a5568;cursor:pointer;font-family:inherit;transition:all .15s;" onmouseover="this.style.background='#1a202c';this.style.color='white'" onmouseout="this.style.background='white';this.style.color='#4a5568'">📊 Summary</button>
+            <button onclick="aiSend('Which vehicles are under maintenance?')" style="background:white;border:1.5px solid #e2e8f0;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:500;color:#4a5568;cursor:pointer;font-family:inherit;transition:all .15s;" onmouseover="this.style.background='#1a202c';this.style.color='white'" onmouseout="this.style.background='white';this.style.color='#4a5568'">🔧 Maintenance</button>
+            <button onclick="aiSend('Which vehicles have PMS overdue?')" style="background:white;border:1.5px solid #e2e8f0;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:500;color:#4a5568;cursor:pointer;font-family:inherit;transition:all .15s;" onmouseover="this.style.background='#1a202c';this.style.color='white'" onmouseout="this.style.background='white';this.style.color='#4a5568'">⚠️ Overdue</button>
+            <button onclick="aiSend('Show my service history')" style="background:white;border:1.5px solid #e2e8f0;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:500;color:#4a5568;cursor:pointer;font-family:inherit;transition:all .15s;" onmouseover="this.style.background='#1a202c';this.style.color='white'" onmouseout="this.style.background='white';this.style.color='#4a5568'">📋 History</button>
         </div>
+
+        <!-- Input -->
         <div style="background:white;border-top:1px solid #e2e8f0;padding:10px 12px;display:flex;gap:8px;align-items:flex-end;flex-shrink:0;">
-            <textarea id="aiInput" placeholder="Ask about your vehicles..." rows="1" style="flex:1;border:1.5px solid #e2e8f0;border-radius:20px;padding:9px 14px;font-size:13px;font-family:inherit;color:#1a202c;background:#F7F8FA;outline:none;resize:none;max-height:80px;overflow-y:auto;transition:border-color .2s;line-height:1.4;" onfocus="this.style.borderColor='#E8001C';this.style.background='white'" onblur="this.style.borderColor='#e2e8f0';this.style.background='#F7F8FA'" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,80)+'px'" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend();}"></textarea>
-            <button onclick="aiSend()" style="width:38px;height:38px;background:#E8001C;border:none;border-radius:50%;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 3px 10px rgba(232,0,28,0.3);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(45deg)"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+            <textarea id="aiInput" placeholder="Ask about your vehicles..." rows="1"
+                style="flex:1;border:1.5px solid #e2e8f0;border-radius:20px;padding:9px 14px;font-size:13px;font-family:inherit;color:#1a202c;background:#F7F8FA;outline:none;resize:none;max-height:80px;overflow-y:auto;transition:border-color .2s;line-height:1.4;"
+                onfocus="this.style.borderColor='#E8001C';this.style.background='white'"
+                onblur="this.style.borderColor='#e2e8f0';this.style.background='#F7F8FA'"
+                oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,80)+'px'"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend();}"></textarea>
+            <button onclick="aiSend()" style="width:38px;height:38px;background:#E8001C;border:none;border-radius:50%;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 3px 10px rgba(232,0,28,0.3);transition:transform .2s;" onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(45deg)"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
         </div>
     </div>
-    <button id="aiFab" onclick="toggleSmartAI()" style="width:52px;height:52px;background:#E8001C;border:none;border-radius:50%;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(232,0,28,0.4);">
-        <svg id="aiFabIcon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="12" rx="3"/><path d="M9 13h.01M15 13h.01"/><path d="M9 17h6"/><path d="M12 8V5"/><circle cx="12" cy="4" r="1"/><path d="M3 14H1.5a1 1 0 0 1 0-2H3"/><path d="M21 14h1.5a1 1 0 0 0 0-2H21"/></svg>
-    </button>`;
-    document.body.appendChild(fab);
 
-    var style = document.createElement('style');
-    style.textContent = '@keyframes aiBounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}.ai-bubble-user{max-width:80%;padding:9px 13px;border-radius:16px 16px 4px 16px;background:#E8001C;color:white;font-size:12px;line-height:1.6;align-self:flex-end;white-space:pre-wrap;box-shadow:0 2px 6px rgba(232,0,28,0.2)}.ai-bubble-bot{max-width:80%;padding:9px 13px;border-radius:16px 16px 16px 4px;background:white;color:#1a202c;font-size:12px;line-height:1.6;align-self:flex-start;white-space:pre-wrap;box-shadow:0 2px 6px rgba(0,0,0,0.06)}.ai-typing-dots{background:white;border-radius:16px 16px 16px 4px;padding:10px 14px;align-self:flex-start;display:flex;gap:4px;align-items:center;box-shadow:0 2px 6px rgba(0,0,0,0.06)}.ai-typing-dots span{width:6px;height:6px;background:#a0aec0;border-radius:50%;animation:aiBounce .9s ease-in-out infinite}.ai-typing-dots span:nth-child(2){animation-delay:.15s}.ai-typing-dots span:nth-child(3){animation-delay:.3s}';
-    document.head.appendChild(style);
-})();
-</script>
+    <!-- FAB toggle button -->
+    <button id="aiFab" onclick="toggleSmartAI()" style="width:56px;height:56px;background:linear-gradient(135deg,#E8001C,#c0001a);border:none;border-radius:50%;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 18px rgba(232,0,28,0.4);transition:transform .2s,box-shadow .2s;" onmouseover="this.style.transform='scale(1.1)';this.style.boxShadow='0 6px 24px rgba(232,0,28,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 4px 18px rgba(232,0,28,0.4)'">
+        <svg id="aiFabIcon" xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="white" stroke="none">
+            <path d="M20 6h-1V3c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v14l4-4h9c.55 0 1-.45 1-1V6h2v9H7v2c0 .55.45 1 1 1h10l4 4V7c0-.55-.45-1-1-1z"/>
+        </svg>
+    </button>
+</div>
+
+<style>
+@keyframes aiPanelIn {
+    from { opacity:0; transform:translateY(16px) scale(0.97); }
+    to   { opacity:1; transform:translateY(0) scale(1); }
+}
+.ai-bubble-user {
+    max-width:80%; padding:9px 13px; border-radius:16px 16px 4px 16px;
+    background:#E8001C; color:white; font-size:12px; line-height:1.6;
+    align-self:flex-end; white-space:pre-wrap;
+    box-shadow:0 2px 6px rgba(232,0,28,0.2);
+}
+.ai-bubble-bot {
+    max-width:80%; padding:9px 13px; border-radius:16px 16px 16px 4px;
+    background:white; color:#1a202c; font-size:12px; line-height:1.6;
+    align-self:flex-start; white-space:pre-wrap;
+    box-shadow:0 2px 6px rgba(0,0,0,0.06);
+}
+.ai-typing-dots {
+    background:white; border-radius:16px 16px 16px 4px;
+    padding:10px 14px; align-self:flex-start;
+    display:flex; gap:4px; align-items:center;
+    box-shadow:0 2px 6px rgba(0,0,0,0.06);
+}
+.ai-typing-dots span {
+    width:6px; height:6px; background:#a0aec0; border-radius:50%;
+    animation:aiBounce .9s ease-in-out infinite;
+}
+.ai-typing-dots span:nth-child(2) { animation-delay:.15s; }
+.ai-typing-dots span:nth-child(3) { animation-delay:.3s; }
+@keyframes aiBounce {
+    0%,80%,100% { transform:translateY(0); }
+    40% { transform:translateY(-5px); }
+}
+</style>
+
 <script>
-var _aiVehicles = [], _aiMaintenance = [], _aiLoaded = false, _aiPanelOpen = false;
+// ── Smart AI Widget ──────────────────────────────────────────
+var _aiVehicles = [], _aiMaintenance = [], _aiLoaded = false;
+var _aiPanelOpen = false;
 
 window.openSmartAI = function() {
     document.getElementById('aiPanel').style.display = 'flex';
-    document.getElementById('aiWidget').style.display = 'flex';
-    _aiPanelOpen = true; _updateFabIcon();
+    _aiPanelOpen = true;
+    _updateFabIcon();
     if (!_aiLoaded) _aiLoadData();
     setTimeout(function() { document.getElementById('aiInput').focus(); }, 100);
 };
-window.toggleSmartAI = function() { _aiPanelOpen ? closeSmartAI() : openSmartAI(); };
+
+window.toggleSmartAI = function() {
+    if (_aiPanelOpen) closeSmartAI(); else openSmartAI();
+};
+
 window.closeSmartAI = function() {
     document.getElementById('aiPanel').style.display = 'none';
-    _aiPanelOpen = false; _updateFabIcon();
+    _aiPanelOpen = false;
+    _updateFabIcon();
 };
+
 function _updateFabIcon() {
-    document.getElementById('aiFabIcon').innerHTML = _aiPanelOpen
-        ? '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'
-        : '<rect x="3" y="8" width="18" height="12" rx="3"/><path d="M9 13h.01M15 13h.01"/><path d="M9 17h6"/><path d="M12 8V5"/><circle cx="12" cy="4" r="1"/><path d="M3 14H1.5a1 1 0 0 1 0-2H3"/><path d="M21 14h1.5a1 1 0 0 0 0-2H21"/>';
+    var svg = document.getElementById('aiFabIcon');
+    if (_aiPanelOpen) {
+        svg.setAttribute('fill', 'white');
+        svg.setAttribute('stroke', 'none');
+        svg.removeAttribute('stroke-width');
+        svg.innerHTML = '<path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>';
+    } else {
+        svg.setAttribute('fill', 'white');
+        svg.setAttribute('stroke', 'none');
+        svg.removeAttribute('stroke-width');
+        svg.innerHTML = '<path d="M20 6h-1V3c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v14l4-4h9c.55 0 1-.45 1-1V6h2v9H7v2c0 .55.45 1 1 1h10l4 4V7c0-.55-.45-1-1-1z"/>';
+    }
 }
+
 async function _aiLoadData() {
     try {
         var user = firebase.auth().currentUser;
@@ -199,30 +270,133 @@ async function _aiLoadData() {
         var stored = sessionStorage.getItem('cpUser');
         var cpUser = stored ? JSON.parse(stored) : {};
         var userName = cpUser.name || '';
-        if (!userName) { var uDoc = await firebase.firestore().collection('users').doc(user.uid).get(); if (uDoc.exists) userName = uDoc.data().name || ''; }
+        if (!userName) {
+            var uDoc = await firebase.firestore().collection('users').doc(user.uid).get();
+            if (uDoc.exists) userName = uDoc.data().name || '';
+        }
         var vSnap = await firebase.firestore().collection('vehicles').get();
-        _aiVehicles = vSnap.docs.map(function(d){return Object.assign({id:d.id},d.data());}).filter(function(v){return (v.owner||'').toLowerCase()===userName.toLowerCase();});
-        document.getElementById('aiWelcomeSub').textContent = _aiVehicles.length ? 'Ask me anything about your '+_aiVehicles.length+' vehicle'+(_aiVehicles.length!==1?'s':'')+' — PMS status, maintenance history, and more.' : 'No vehicles found under your account.';
-        if (_aiVehicles.length) { var plates=_aiVehicles.map(function(v){return v.plate;}).filter(Boolean).slice(0,10); var mSnap=await firebase.firestore().collection('maintenance').where('plate','in',plates).get(); _aiMaintenance=mSnap.docs.map(function(d){return Object.assign({id:d.id},d.data());}); }
+        _aiVehicles = vSnap.docs
+            .map(function(d) { return Object.assign({id: d.id}, d.data()); })
+            .filter(function(v) { return (v.owner || '').toLowerCase() === userName.toLowerCase(); });
+
+        document.getElementById('aiWelcomeSub').textContent = _aiVehicles.length
+            ? 'Ask me anything about your ' + _aiVehicles.length + ' vehicle' + (_aiVehicles.length !== 1 ? 's' : '') + ' — PMS status, maintenance history, and more.'
+            : 'No vehicles found under your account.';
+
+        if (_aiVehicles.length) {
+            var plates = _aiVehicles.map(function(v) { return v.plate; }).filter(Boolean).slice(0, 10);
+            var mSnap = await firebase.firestore().collection('maintenance').where('plate', 'in', plates).get();
+            _aiMaintenance = mSnap.docs.map(function(d) { return Object.assign({id: d.id}, d.data()); });
+        }
         _aiLoaded = true;
-    } catch(e) { console.error('AI load error:',e); }
+    } catch(e) {
+        console.error('Smart AI load error:', e);
+    }
 }
+
 function _aiProcess(q) {
-    var ql=q.toLowerCase();
+    var ql = q.toLowerCase();
     if (!_aiVehicles.length) return 'No vehicles are registered under your name yet.';
-    if (ql.includes('maintenance')||ql.includes('serviced')) { var l=_aiVehicles.filter(function(v){return (v.status||'').toLowerCase().includes('maintenance');}); return l.length?'Under maintenance:\n'+l.map(function(v){return '• '+v.plate+' — '+v.desc;}).join('\n'):'None of your vehicles are currently under maintenance. ✅'; }
-    if (ql.includes('overdue')||ql.includes('past due')) { var l=_aiVehicles.filter(function(v){return v.status==='Overdue';}); return l.length?'PMS Overdue:\n'+l.map(function(v){return '• '+v.plate+' — '+v.desc;}).join('\n')+'\n\nPlease schedule a service soon!':'No vehicles are overdue for PMS. ✅'; }
-    if (ql.includes('due soon')||ql.includes('due this week')||ql.includes('upcoming')) { var l=_aiVehicles.filter(function(v){return v.status==='Due Soon'||v.status==='Due This Week';}); return l.length?'PMS Due Soon / This Week:\n'+l.map(function(v){return '• '+v.plate+' — '+v.desc+' ('+v.status+')';}).join('\n'):'No vehicles have PMS due soon. ✅'; }
-    if (ql.includes('history')||ql.includes('service record')||ql.includes('completed')) { var done=_aiMaintenance.filter(function(m){return (m.status||'').toLowerCase()==='completed';}); if (!done.length) return 'No completed service records found for your vehicles.'; var total=done.reduce(function(s,r){var c=r.totalCost?parseFloat(r.totalCost)||0:parseFloat((r.cost||'0').replace(/[₱,]/g,''))||0;return s+c;},0); return 'You have '+done.length+' completed service record'+(done.length!==1?'s':'')+'. \nTotal spent: ₱'+total.toLocaleString('en-PH',{minimumFractionDigits:2})+'\n\nGo to "PMS History" tab to view full details.'; }
-    if (ql.includes('summary')||ql.includes('status')||ql.includes('report')) { var active=_aiVehicles.filter(function(v){return v.status==='On Track'||v.status==='Scheduled';}).length,maint=_aiVehicles.filter(function(v){return (v.status||'').includes('Maintenance');}).length,over=_aiVehicles.filter(function(v){return v.status==='Overdue';}).length,week=_aiVehicles.filter(function(v){return v.status==='Due This Week';}).length,soon=_aiVehicles.filter(function(v){return v.status==='Due Soon';}).length; return 'Fleet Summary:\n✅ Active: '+active+'\n🔧 Under Maintenance: '+maint+'\n⚠️ PMS Overdue: '+over+'\n📅 Due This Week: '+week+'\n🕐 Due Soon: '+soon+'\n🚗 Total: '+_aiVehicles.length; }
-    if (ql.includes('vehicle')||ql.includes('fleet')||ql.includes('list')||ql.includes('all my')) { var lines=_aiVehicles.map(function(v){var e=(v.status==='On Track'||v.status==='Scheduled')?'✅':v.status==='Under Maintenance'?'🔧':v.status==='Overdue'?'⚠️':v.status==='Due This Week'?'📅':v.status==='Due Soon'?'🕐':'•';return e+' '+v.plate+' — '+v.desc+' ('+(v.status||'Active')+')';}).join('\n'); return 'Your fleet ('+_aiVehicles.length+' vehicle'+(_aiVehicles.length!==1?'s':'')+'):\n'+lines; }
+    if (ql.includes('maintenance') || ql.includes('serviced')) {
+        var list = _aiVehicles.filter(function(v) { return (v.status || '').toLowerCase().includes('maintenance'); });
+        return list.length ? 'Under maintenance:\n' + list.map(function(v) { return '• ' + v.plate + ' — ' + v.desc; }).join('\n')
+            : 'None of your vehicles are currently under maintenance. ✅';
+    }
+    if (ql.includes('overdue') || ql.includes('past due')) {
+        var list = _aiVehicles.filter(function(v) { return v.status === 'Overdue'; });
+        return list.length ? 'PMS Overdue:\n' + list.map(function(v) { return '• ' + v.plate + ' — ' + v.desc; }).join('\n') + '\n\nPlease schedule a service soon!'
+            : 'No vehicles are overdue for PMS. ✅';
+    }
+    if (ql.includes('due soon') || ql.includes('due this week') || ql.includes('upcoming')) {
+        var list = _aiVehicles.filter(function(v) { return v.status === 'Due Soon' || v.status === 'Due This Week'; });
+        return list.length ? 'PMS Due Soon / This Week:\n' + list.map(function(v) { return '• ' + v.plate + ' — ' + v.desc + ' (' + v.status + ')'; }).join('\n')
+            : 'No vehicles have PMS due soon. ✅';
+    }
+    if (ql.includes('history') || ql.includes('service record') || ql.includes('completed')) {
+        var done = _aiMaintenance.filter(function(m) { return (m.status || '').toLowerCase() === 'completed'; });
+        if (!done.length) return 'No completed service records found for your vehicles.';
+        var total = done.reduce(function(s, r) {
+            var c = r.totalCost ? parseFloat(r.totalCost) || 0 : parseFloat((r.cost || '0').replace(/[₱,]/g, '')) || 0;
+            return s + c;
+        }, 0);
+        return 'You have ' + done.length + ' completed service record' + (done.length !== 1 ? 's' : '') + '.\nTotal spent: ₱' + total.toLocaleString('en-PH', {minimumFractionDigits:2}) + '\n\nGo to "PMS History" tab to view full details.';
+    }
+    if (ql.includes('summary') || ql.includes('status') || ql.includes('report')) {
+        var active = _aiVehicles.filter(function(v) { return v.status === 'On Track' || v.status === 'Scheduled'; }).length;
+        var maint  = _aiVehicles.filter(function(v) { return (v.status || '').includes('Maintenance'); }).length;
+        var over   = _aiVehicles.filter(function(v) { return v.status === 'Overdue'; }).length;
+        var week   = _aiVehicles.filter(function(v) { return v.status === 'Due This Week'; }).length;
+        var soon   = _aiVehicles.filter(function(v) { return v.status === 'Due Soon'; }).length;
+        return 'Fleet Summary:\n✅ Active: ' + active + '\n🔧 Under Maintenance: ' + maint + '\n⚠️ PMS Overdue: ' + over + '\n📅 Due This Week: ' + week + '\n🕐 Due Soon: ' + soon + '\n🚗 Total: ' + _aiVehicles.length;
+    }
+    if (ql.includes('vehicle') || ql.includes('fleet') || ql.includes('list') || ql.includes('all my')) {
+        var lines = _aiVehicles.map(function(v) {
+            var e = (v.status === 'On Track' || v.status === 'Scheduled') ? '✅' : v.status === 'Under Maintenance' ? '🔧' : v.status === 'Overdue' ? '⚠️' : v.status === 'Due This Week' ? '📅' : v.status === 'Due Soon' ? '🕐' : '•';
+            return e + ' ' + v.plate + ' — ' + v.desc + ' (' + (v.status || 'Active') + ')';
+        }).join('\n');
+        return 'Your fleet (' + _aiVehicles.length + ' vehicle' + (_aiVehicles.length !== 1 ? 's' : '') + '):\n' + lines;
+    }
     return 'I can help you with:\n• Vehicle status & fleet summary\n• PMS overdue or due soon\n• Vehicles under maintenance\n• Service history & total cost\n\nTry asking: "Which vehicles are overdue?"';
 }
-function _aiAddBubble(text,cls){var msgs=document.getElementById('aiMessages'),el=document.createElement('div');el.className=cls;el.textContent=text;msgs.appendChild(el);el.scrollIntoView({behavior:'smooth'});return el;}
-function _aiAddTyping(){var msgs=document.getElementById('aiMessages'),el=document.createElement('div');el.className='ai-typing-dots';el.innerHTML='<span></span><span></span><span></span>';msgs.appendChild(el);el.scrollIntoView({behavior:'smooth'});return el;}
-window.aiSend=function(preset){var input=document.getElementById('aiInput'),text=(preset||input.value).trim();if(!text)return;document.getElementById('aiWelcome').style.display='none';document.getElementById('aiChips').style.display='none';document.getElementById('aiClearBtn').style.display='block';_aiAddBubble(text,'ai-bubble-user');input.value='';input.style.height='auto';if(!_aiLoaded){_aiAddBubble('Loading your fleet data, please try again in a moment.','ai-bubble-bot');return;}var typing=_aiAddTyping();setTimeout(function(){typing.remove();_aiAddBubble(_aiProcess(text),'ai-bubble-bot');},500);};
-window.aiClear=function(){var msgs=document.getElementById('aiMessages');msgs.innerHTML='';var w=document.getElementById('aiWelcome');w.style.display='block';msgs.appendChild(w);document.getElementById('aiChips').style.display='flex';document.getElementById('aiClearBtn').style.display='none';};
-firebase.auth().onAuthStateChanged(function(user){if(user)document.getElementById('aiWidget').style.display='flex';});
+
+function _aiAddBubble(text, cls) {
+    var msgs = document.getElementById('aiMessages');
+    var el = document.createElement('div');
+    el.className = cls;
+    el.textContent = text;
+    msgs.appendChild(el);
+    el.scrollIntoView({behavior:'smooth'});
+    return el;
+}
+
+function _aiAddTyping() {
+    var msgs = document.getElementById('aiMessages');
+    var el = document.createElement('div');
+    el.className = 'ai-typing-dots';
+    el.innerHTML = '<span></span><span></span><span></span>';
+    msgs.appendChild(el);
+    el.scrollIntoView({behavior:'smooth'});
+    return el;
+}
+
+window.aiSend = function(preset) {
+    var input = document.getElementById('aiInput');
+    var text = (preset || input.value).trim();
+    if (!text) return;
+
+    document.getElementById('aiWelcome').style.display = 'none';
+    document.getElementById('aiChips').style.display = 'none';
+    document.getElementById('aiClearBtn').style.display = 'block';
+
+    _aiAddBubble(text, 'ai-bubble-user');
+    input.value = '';
+    input.style.height = 'auto';
+
+    if (!_aiLoaded) {
+        _aiAddBubble('Loading your fleet data, please try again in a moment.', 'ai-bubble-bot');
+        return;
+    }
+    var typing = _aiAddTyping();
+    setTimeout(function() {
+        typing.remove();
+        _aiAddBubble(_aiProcess(text), 'ai-bubble-bot');
+    }, 500);
+};
+
+window.aiClear = function() {
+    var msgs = document.getElementById('aiMessages');
+    msgs.innerHTML = '';
+    var welcome = document.getElementById('aiWelcome');
+    welcome.style.display = 'block';
+    msgs.appendChild(welcome);
+    document.getElementById('aiChips').style.display = 'flex';
+    document.getElementById('aiClearBtn').style.display = 'none';
+};
+
+// Show the FAB once auth is ready
+firebase.auth().onAuthStateChanged(function(user) {
+    if (user) document.getElementById('aiWidget').style.display = 'flex';
+});
 </script>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -396,6 +570,14 @@ firebase.auth().onAuthStateChanged(function(user){if(user)document.getElementByI
 <script>
   fetch('customer_header.html').then(r => r.text()).then(html => {
     document.getElementById('customerHeader').innerHTML = html;
+    var sess = JSON.parse(sessionStorage.getItem('cpUser') || '{}');
+    if (sess.name) {
+      var parts = sess.name.trim().split(' ').filter(Boolean);
+      var ini = parts.length >= 2 ? (parts[0][0]+parts[1][0]).toUpperCase() : (parts[0]?parts[0][0].toUpperCase():'CU');
+      var av = document.getElementById('cuAvatar'); if(av) av.textContent = ini;
+      var hn = document.getElementById('cuHeaderName'); if(hn) hn.textContent = sess.name;
+      var mn = document.getElementById('cuAvatarName'); if(mn) mn.textContent = sess.name;
+    }
   });
 </script>
 </body>
