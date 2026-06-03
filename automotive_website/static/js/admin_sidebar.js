@@ -86,18 +86,21 @@ function bindHeaderControls() {
     if (typeof firebase !== 'undefined') {
         firebase.auth().onAuthStateChanged(user => {
             if (user) {
-                const avatar   = document.getElementById('adminHeaderAvatar');
+                const avatar   = document.getElementById('adminHeaderAvatar') || document.getElementById('adminAvatar');
                 const nameEl   = document.getElementById('adminAvatarName');
+                const topbarName = document.getElementById('adminName');
 
                 // Try sessionStorage first (instant)
                 const sess = JSON.parse(sessionStorage.getItem('apUser') || '{}');
                 const sessName = sess.name || '';
-                if (sessName && avatar) {
+                if (sessName) {
                     const parts = sessName.trim().split(' ').filter(Boolean);
-                    avatar.textContent = parts.length >= 2
+                    const ini = parts.length >= 2
                         ? (parts[0][0] + parts[1][0]).toUpperCase()
                         : parts[0].slice(0, 2).toUpperCase();
+                    if (avatar) avatar.textContent = ini;
                     if (nameEl) nameEl.textContent = sessName;
+                    if (topbarName) topbarName.textContent = sessName;
                 }
 
                 // Then update from Firestore
@@ -110,6 +113,12 @@ function bindHeaderControls() {
                         : parts[0].slice(0, 2).toUpperCase();
                     if (avatar) avatar.textContent = initials;
                     if (nameEl) nameEl.textContent  = name;
+                    if (topbarName) topbarName.textContent = name;
+                    // Also update sidebar
+                    const sidebarNameEl = document.getElementById('sidebarName');
+                    const sidebarAvatarEl = document.getElementById('sidebarAvatar');
+                    if (sidebarNameEl) sidebarNameEl.textContent = name;
+                    if (sidebarAvatarEl) sidebarAvatarEl.textContent = initials;
                 }).catch(() => {});
             }
         });

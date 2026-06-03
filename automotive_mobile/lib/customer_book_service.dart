@@ -14,8 +14,9 @@ class _CustomerBookServiceState extends State<CustomerBookService> {
 
   List<Map<String, dynamic>> _services = [];
   List<Map<String, dynamic>> _vehicles = [];
-  final Set<String> _selectedServices = {};
   final Set<String> _selectedVehicleIds = {};
+  // Per-vehicle service selections: vehicleId → Set of service IDs
+  final Map<String, Set<String>> _vehicleServices = {};
   DateTime? _preferredDate;
   String? _preferredTime;
   String _notes = '';
@@ -91,8 +92,14 @@ class _CustomerBookServiceState extends State<CustomerBookService> {
     if (_selectedVehicleIds.isEmpty) {
       _snack('Please select at least one vehicle.'); return;
     }
-    if (_selectedServices.isEmpty) {
-      _snack('Please select at least one service.'); return;
+    // Check each selected vehicle has at least one service
+    for (final vId in _selectedVehicleIds) {
+      final svcs = _vehicleServices[vId] ?? {};
+      if (svcs.isEmpty) {
+        final vehicle = _vehicles.firstWhere((v) => v['id'] == vId, orElse: () => <String, dynamic>{});
+        final plate = vehicle['plate'] as String? ?? 'a vehicle';
+        _snack('Please select services for $plate.'); return;
+      }
     }
     if (_preferredDate == null) {
       _snack('Please select a preferred date.'); return;
@@ -111,12 +118,6 @@ class _CustomerBookServiceState extends State<CustomerBookService> {
       final userStatus = (userDoc.data()?['status'] as String? ?? 'active').toLowerCase();
 
       final selectedVehicles = _vehicles.where((v) => _selectedVehicleIds.contains(v['id'])).toList();
-
-      final selectedServiceNames = _services
-          .where((s) => _selectedServices.contains(s['id']))
-          .map((s) => s['name'] as String? ?? '')
-          .where((n) => n.isNotEmpty)
-          .toList();
 
       final dateStr = '${_preferredDate!.year}-${_preferredDate!.month.toString().padLeft(2, '0')}-${_preferredDate!.day.toString().padLeft(2, '0')}';
 
@@ -177,7 +178,17 @@ class _CustomerBookServiceState extends State<CustomerBookService> {
 
       // 4. Service Type Valid
       final validServiceNames = _services.map((s) => (s['name'] as String? ?? '').toLowerCase()).toList();
-      final invalidSvc = selectedServiceNames.where((n) => !validServiceNames.contains(n.toLowerCase())).toList();
+      // Check all services across all vehicles
+      final allSelectedServiceNames = <String>{};
+      for (final vId in _selectedVehicleIds) {
+        final svcIds = _vehicleServices[vId] ?? {};
+        for (final sId in svcIds) {
+          final svc = _services.firstWhere((s) => s['id'] == sId, orElse: () => <String, dynamic>{});
+          final name = svc['name'] as String? ?? '';
+          if (name.isNotEmpty) allSelectedServiceNames.add(name);
+        }
+      }
+      final invalidSvc = allSelectedServiceNames.where((n) => !validServiceNames.contains(n.toLowerCase())).toList();
       if (invalidSvc.isNotEmpty) {
         autoApprove = false;
         denyReason = 'Invalid service selected: ${invalidSvc.join(', ')}';
@@ -209,18 +220,25 @@ class _CustomerBookServiceState extends State<CustomerBookService> {
       // ═══════════════════════════════════════════════════════════
       final finalStatus = autoApprove ? 'Approved' : 'Pending';
 
-      // Create one booking per selected vehicle
+      // Create one booking per selected vehicle with its own services
       for (final vehicle in selectedVehicles) {
         final plate = vehicle['plate'] as String? ?? '';
         final vehicleDesc = vehicle['desc'] as String? ?? '';
+        final vId = vehicle['id'] as String;
+        final vSvcIds = _vehicleServices[vId] ?? {};
+        final vServiceNames = _services
+            .where((s) => vSvcIds.contains(s['id']))
+            .map((s) => s['name'] as String? ?? '')
+            .where((n) => n.isNotEmpty)
+            .toList();
 
         await db.collection('service_bookings').add({
           'customerId': uid,
           'customerName': customerName,
-          'vehicleId': vehicle['id'],
+          'vehicleId': vId,
           'plate': plate,
           'vehicleDesc': vehicleDesc,
-          'services': selectedServiceNames,
+          'services': vServiceNames,
           'preferredDate': dateStr,
           'preferredTime': _preferredTime,
           'notes': _notes.trim(),
@@ -233,35 +251,53 @@ class _CustomerBookServiceState extends State<CustomerBookService> {
 
       final allPlates = selectedVehicles.map((v) => v['plate'] as String? ?? '—').join(', ');
 
+      // Build per-vehicle service breakdown for notifications
+      final vehicleBreakdown = <String>[];
+      for (final vehicle in selectedVehicles) {
+        final vId = vehicle['id'] as String;
+        final plate = vehicle['plate'] as String? ?? '—';
+        final vSvcIds = _vehicleServices[vId] ?? {};
+        final vNames = _services
+            .where((s) => vSvcIds.contains(s['id']))
+            .map((s) => s['name'] as String? ?? '')
+            .where((n) => n.isNotEmpty)
+            .toList();
+        vehicleBreakdown.add('$plate: ${vNames.join(", ")}');
+      }
+      final detailedMsg = vehicleBreakdown.join(' | ');
+
       // Send notifications based on decision
       if (autoApprove) {
-        final msg = '$customerName booked ${selectedServiceNames.join(", ")} for $allPlates on ${_fmtDatePretty(bookDate)}. (Auto-approved ✅)';
+        final msg = '$customerName booked service for ${selectedVehicles.length} vehicle${selectedVehicles.length > 1 ? 's' : ''} on ${_fmtDatePretty(bookDate)}. $detailedMsg (Auto-approved ✅)';
         await db.collection('notifications').add({
-          'title': '📅 Booking Auto-Approved', 'message': msg, 'type': 'info',
+          'title': '📅 Booking Auto-Approved (${selectedVehicles.length} vehicle${selectedVehicles.length > 1 ? 's' : ''})',
+          'message': msg, 'type': 'info',
           'targetRole': 'admin', 'targetUid': '',
           'createdAt': FieldValue.serverTimestamp(), 'readBy': <String, bool>{}, 'isRead': false,
         });
         await db.collection('notifications').add({
-          'title': '📅 Booking Auto-Approved', 'message': msg, 'type': 'info',
+          'title': '📅 Booking Auto-Approved (${selectedVehicles.length} vehicle${selectedVehicles.length > 1 ? 's' : ''})',
+          'message': msg, 'type': 'info',
           'targetRole': 'staff', 'targetUid': '',
           'createdAt': FieldValue.serverTimestamp(), 'readBy': <String, bool>{}, 'isRead': false,
         });
         await db.collection('notifications').add({
           'title': '✅ Booking Confirmed',
-          'message': 'Your service booking for $allPlates on ${_fmtDatePretty(bookDate)} has been confirmed. Services: ${selectedServiceNames.join(", ")}',
+          'message': 'Your service booking on ${_fmtDatePretty(bookDate)} has been confirmed.\n$detailedMsg',
           'type': 'success', 'targetRole': 'customer', 'targetUid': uid,
           'createdAt': FieldValue.serverTimestamp(), 'readBy': <String, bool>{}, 'isRead': false,
         });
       } else {
-        final msg = '$customerName requested ${selectedServiceNames.join(", ")} for $allPlates on ${_fmtDatePretty(bookDate)}. Needs review: $denyReason';
+        final msg = '$customerName requested service for ${selectedVehicles.length} vehicle${selectedVehicles.length > 1 ? 's' : ''} on ${_fmtDatePretty(bookDate)}. $detailedMsg. Needs review: $denyReason';
         await db.collection('notifications').add({
-          'title': '⏳ Booking Needs Review', 'message': msg, 'type': 'warning',
+          'title': '⏳ Booking Needs Review (${selectedVehicles.length} vehicle${selectedVehicles.length > 1 ? 's' : ''})',
+          'message': msg, 'type': 'warning',
           'targetRole': 'admin', 'targetUid': '',
           'createdAt': FieldValue.serverTimestamp(), 'readBy': <String, bool>{}, 'isRead': false,
         });
         await db.collection('notifications').add({
           'title': '⏳ Booking Pending',
-          'message': 'Your booking for $allPlates on ${_fmtDatePretty(bookDate)} is pending admin approval. Reason: $denyReason',
+          'message': 'Your booking on ${_fmtDatePretty(bookDate)} is pending admin approval.\n$detailedMsg\nReason: $denyReason',
           'type': 'warning', 'targetRole': 'customer', 'targetUid': uid,
           'createdAt': FieldValue.serverTimestamp(), 'readBy': <String, bool>{}, 'isRead': false,
         });
@@ -313,15 +349,73 @@ class _CustomerBookServiceState extends State<CustomerBookService> {
                 else
                   ..._vehicles.map((v) => _vehicleTile(v)),
 
-                const SizedBox(height: 20),
-
-                // ── Select Services ──
-                _sectionTitle('Select Services'),
-                const SizedBox(height: 8),
-                if (_services.isEmpty)
-                  _emptyCard('No services available.')
-                else
-                  ..._services.map((s) => _serviceTile(s)),
+                // ── Per-vehicle service selection ──
+                if (_selectedVehicleIds.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  _sectionTitle('Select Services'),
+                  const SizedBox(height: 4),
+                  const Text('Choose services for each vehicle below.',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF718096))),
+                  const SizedBox(height: 12),
+                  ..._selectedVehicleIds.map((vId) {
+                    final vehicle = _vehicles.firstWhere((v) => v['id'] == vId, orElse: () => <String, dynamic>{});
+                    final plate = vehicle['plate'] as String? ?? '—';
+                    final desc = vehicle['desc'] as String? ?? '';
+                    final selectedSvcs = _vehicleServices[vId] ?? {};
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFe2e8f0)),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2))],
+                      ),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        // Vehicle header
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFFFF5F5),
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+                            border: Border(bottom: BorderSide(color: Color(0xFFFED7D7))),
+                          ),
+                          child: Row(children: [
+                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(plate, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF1a202c))),
+                              if (desc.isNotEmpty)
+                                Text(desc, style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+                            ])),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: selectedSvcs.isNotEmpty ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                selectedSvcs.isNotEmpty ? '${selectedSvcs.length} service${selectedSvcs.length > 1 ? 's' : ''}' : 'None selected',
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
+                                  color: selectedSvcs.isNotEmpty ? Colors.green : Colors.orange),
+                              ),
+                            ),
+                          ]),
+                        ),
+                        // Service list
+                        Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: Column(children: [
+                            if (_services.isEmpty)
+                              const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: Text('No services available.', style: TextStyle(fontSize: 12, color: Color(0xFF718096))),
+                              )
+                            else
+                              ..._services.map((s) => _perVehicleServiceTile(vId, s)),
+                          ]),
+                        ),
+                      ]),
+                    );
+                  }),
+                ],
 
                 const SizedBox(height: 20),
 
@@ -444,47 +538,90 @@ class _CustomerBookServiceState extends State<CustomerBookService> {
   }
 
   Widget _buildDateSuggestion() {
-    final vehicle = _vehicles.firstWhere(
-      (v) => v['id'] == _selectedVehicleIds.first,
-      orElse: () => <String, dynamic>{},
-    );
-    if (vehicle.isEmpty) return const SizedBox.shrink();
+    if (_selectedVehicleIds.isEmpty) return const SizedBox.shrink();
 
-    final lastSvc = (vehicle['lastSvcDate'] ?? '').toString();
-    final freq = int.tryParse((vehicle['svcFreq'] ?? '').toString()) ?? 0;
-    DateTime? suggestedDate;
+    // Gather PMS data from all selected vehicles to find the best suggestion
+    DateTime? bestSuggestion;
     String reason = '';
+    DateTime? earliestPmsDue;
 
-    if (lastSvc.isNotEmpty && freq > 0) {
-      final lastDate = DateTime.tryParse(lastSvc);
-      if (lastDate != null) {
-        final nextPms = DateTime(lastDate.year, lastDate.month + freq, lastDate.day);
-        final now = DateTime.now();
-        if (nextPms.isAfter(now)) {
-          // Suggest 3 days before PMS due
-          suggestedDate = nextPms.subtract(const Duration(days: 3));
-          if (suggestedDate.isBefore(now)) suggestedDate = now.add(const Duration(days: 1));
-          reason = 'Based on your PMS schedule (due ${_fmtDatePretty(nextPms)})';
-        } else {
-          // Overdue — suggest tomorrow
-          suggestedDate = now.add(const Duration(days: 1));
-          reason = 'Your PMS is overdue — we recommend booking ASAP';
+    for (final vId in _selectedVehicleIds) {
+      final vehicle = _vehicles.firstWhere((v) => v['id'] == vId, orElse: () => <String, dynamic>{});
+      if (vehicle.isEmpty) continue;
+
+      final lastSvc = (vehicle['lastSvcDate'] ?? '').toString();
+      final freq = int.tryParse((vehicle['svcFreq'] ?? '').toString()) ?? 0;
+
+      if (lastSvc.isNotEmpty && freq > 0) {
+        final lastDate = DateTime.tryParse(lastSvc);
+        if (lastDate != null) {
+          final nextPms = DateTime(lastDate.year, lastDate.month + freq, lastDate.day);
+          if (earliestPmsDue == null || nextPms.isBefore(earliestPmsDue)) {
+            earliestPmsDue = nextPms;
+          }
         }
       }
     }
 
-    if (suggestedDate == null) {
-      // Default: suggest next available weekday
-      var next = DateTime.now().add(const Duration(days: 2));
-      while (next.weekday == DateTime.saturday || next.weekday == DateTime.sunday) {
-        next = next.add(const Duration(days: 1));
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+
+    if (earliestPmsDue != null) {
+      if (earliestPmsDue.isAfter(now)) {
+        // Suggest 3 days before earliest PMS due
+        bestSuggestion = earliestPmsDue.subtract(const Duration(days: 3));
+        if (bestSuggestion!.isBefore(tomorrow)) bestSuggestion = tomorrow;
+        // Skip Sunday
+        while (bestSuggestion!.weekday == DateTime.sunday) {
+          bestSuggestion = bestSuggestion!.subtract(const Duration(days: 1));
+        }
+        if (bestSuggestion!.isBefore(tomorrow)) bestSuggestion = tomorrow;
+        reason = 'PMS due ${_fmtDatePretty(earliestPmsDue)} — book before it\'s overdue';
+      } else {
+        // Overdue — suggest tomorrow (skip Sunday)
+        bestSuggestion = tomorrow;
+        while (bestSuggestion!.weekday == DateTime.sunday) {
+          bestSuggestion = bestSuggestion!.add(const Duration(days: 1));
+        }
+        reason = 'PMS is overdue — book ASAP';
       }
-      suggestedDate = next;
-      reason = 'Next available weekday';
     }
 
+    if (bestSuggestion == null) {
+      // Default: next available weekday (not Sunday, not fully booked)
+      bestSuggestion = tomorrow;
+      int attempts = 0;
+      while (attempts < 30) {
+        final dateStr = '${bestSuggestion!.year}-${bestSuggestion!.month.toString().padLeft(2, '0')}-${bestSuggestion!.day.toString().padLeft(2, '0')}';
+        final isSunday = bestSuggestion!.weekday == DateTime.sunday;
+        final isFull = (_bookedDates[dateStr] ?? 0) >= _maxBookingsPerDay;
+        if (!isSunday && !isFull) break;
+        bestSuggestion = bestSuggestion!.add(const Duration(days: 1));
+        attempts++;
+      }
+      reason = 'Next available open day';
+    } else {
+      // Also check if the suggested date is fully booked → shift forward
+      int attempts = 0;
+      while (attempts < 14) {
+        final dateStr = '${bestSuggestion!.year}-${bestSuggestion!.month.toString().padLeft(2, '0')}-${bestSuggestion!.day.toString().padLeft(2, '0')}';
+        final isSunday = bestSuggestion!.weekday == DateTime.sunday;
+        final isFull = (_bookedDates[dateStr] ?? 0) >= _maxBookingsPerDay;
+        if (!isSunday && !isFull) break;
+        bestSuggestion = bestSuggestion!.add(const Duration(days: 1));
+        attempts++;
+      }
+    }
+
+    final suggestedDate = bestSuggestion!;
+
     return GestureDetector(
-      onTap: () => setState(() => _preferredDate = suggestedDate),
+      onTap: () => setState(() {
+        _preferredDate = suggestedDate;
+        // Update calendar view to show the suggested month
+        _calYear = suggestedDate.year;
+        _calMonth = suggestedDate.month;
+      }),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -502,11 +639,18 @@ class _CustomerBookServiceState extends State<CustomerBookService> {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('AI Suggested Date', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF003087))),
             Text(
-              '${_fmtDatePretty(suggestedDate!)} — $reason',
+              '${_fmtDatePretty(suggestedDate)} — $reason',
               style: const TextStyle(fontSize: 11, color: Color(0xFF718096)),
             ),
           ])),
-          const Text('Use', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF003087))),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFF003087),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Text('Use', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
+          ),
         ]),
       ),
     );
@@ -713,8 +857,13 @@ class _CustomerBookServiceState extends State<CustomerBookService> {
     final isSelected = _selectedVehicleIds.contains(id);
     return GestureDetector(
       onTap: () => setState(() {
-        if (isSelected) { _selectedVehicleIds.remove(id); }
-        else { _selectedVehicleIds.add(id); }
+        if (isSelected) {
+          _selectedVehicleIds.remove(id);
+          _vehicleServices.remove(id);
+        } else {
+          _selectedVehicleIds.add(id);
+          _vehicleServices.putIfAbsent(id, () => <String>{});
+        }
       }),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
@@ -727,12 +876,6 @@ class _CustomerBookServiceState extends State<CustomerBookService> {
             width: isSelected ? 2 : 1),
         ),
         child: Row(children: [
-          Icon(
-            ((v['type'] as String?) ?? '').toLowerCase().contains('truck')
-                ? Icons.local_shipping_outlined
-                : Icons.directions_car_outlined,
-            color: isSelected ? _red : const Color(0xFF718096), size: 22),
-          const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(v['plate'] as String? ?? '—',
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14,
@@ -748,9 +891,10 @@ class _CustomerBookServiceState extends State<CustomerBookService> {
     );
   }
 
-  Widget _serviceTile(Map<String, dynamic> s) {
+  Widget _perVehicleServiceTile(String vehicleId, Map<String, dynamic> s) {
     final id = s['id'] as String;
-    final isSelected = _selectedServices.contains(id);
+    final svcs = _vehicleServices[vehicleId] ?? {};
+    final isSelected = svcs.contains(id);
     final name = (s['name'] ?? '').toString();
     final rawCost = (s['cost'] ?? '').toString().replaceAll('₱', '').replaceAll(',', '').trim();
     final costDisplay = rawCost.isNotEmpty ? '₱$rawCost' : '';
@@ -758,40 +902,49 @@ class _CustomerBookServiceState extends State<CustomerBookService> {
 
     return GestureDetector(
       onTap: () => setState(() {
-        if (isSelected) { _selectedServices.remove(id); }
-        else { _selectedServices.add(id); }
+        _vehicleServices.putIfAbsent(vehicleId, () => <String>{});
+        if (isSelected) {
+          _vehicleServices[vehicleId]!.remove(id);
+        } else {
+          _vehicleServices[vehicleId]!.add(id);
+        }
       }),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFFF5F5) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? const Color(0xFFFFF5F5) : const Color(0xFFFAFBFC),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? _red : const Color(0xFFe2e8f0),
-            width: isSelected ? 2 : 1),
+            color: isSelected ? _red : const Color(0xFFF0F4F8),
+            width: isSelected ? 1.5 : 1),
         ),
         child: Row(children: [
           Container(
-            width: 36, height: 36,
+            width: 20, height: 20,
             decoration: BoxDecoration(
-              color: isSelected ? _red.withOpacity(0.1) : const Color(0xFFF0F4FF),
-              borderRadius: BorderRadius.circular(10)),
-            child: Icon(Icons.build_outlined,
-              color: isSelected ? _red : const Color(0xFF003087), size: 18),
+              color: isSelected ? _red : Colors.transparent,
+              borderRadius: BorderRadius.circular(5),
+              border: Border.all(color: isSelected ? _red : const Color(0xFFcbd5e0), width: 1.5),
+            ),
+            child: isSelected
+                ? const Icon(Icons.check, size: 14, color: Colors.white)
+                : null,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(name, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13,
               color: isSelected ? _red : const Color(0xFF1a202c))),
             if (costDisplay.isNotEmpty)
               Text('$costDisplay / $uom', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
           ])),
-          Icon(
-            isSelected ? Icons.check_box : Icons.check_box_outline_blank,
-            color: isSelected ? _red : const Color(0xFFcbd5e0), size: 22),
         ]),
       ),
     );
+  }
+
+  Widget _serviceTile(Map<String, dynamic> s) {
+    // Legacy — kept for compatibility but not used in new flow
+    return _perVehicleServiceTile('', s);
   }
 }

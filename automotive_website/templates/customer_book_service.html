@@ -99,10 +99,13 @@
     </div>
 
     <div class="bs-grid">
-      <!-- Left column: Vehicle + Date + Notes -->
+      <!-- Left column: Vehicle + Services per vehicle + Date + Notes -->
       <div class="bs-col">
         <div class="bs-section-title">Select Vehicle(s)</div>
         <div id="bsVehicles"><div class="bs-empty">Loading vehicles...</div></div>
+
+        <!-- Per-vehicle service selection (shown in modal) -->
+        <div id="bsPerVehicleServices"></div>
 
         <div style="height:20px;"></div>
 
@@ -163,12 +166,12 @@
 
         <div class="bs-section-title">Notes <span style="font-weight:400;color:#a0aec0;">(optional)</span></div>
         <textarea id="bsNotes" class="bs-notes" rows="3" placeholder="Any special requests or details..."></textarea>
+      </div>
 
-        <div style="height:20px;"></div>
-
-        <!-- Booking Summary Card -->
+      <!-- Right column: Booking Summary -->
+      <div class="bs-col">
+        <div class="bs-section-title">Booking Summary</div>
         <div id="bsSummaryCard" class="bs-summary-card" style="display:none;">
-          <div class="bs-section-title" style="margin-bottom:14px;">Booking Summary</div>
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4a5568" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             <span style="font-size:13px;color:#4a5568;">Estimated Duration: <strong id="bsSummaryDuration">—</strong></span>
@@ -182,12 +185,7 @@
             <span style="font-size:12px;color:#718096;">Shop Hours: Mon-Sat: 8:00 AM - 5:00 PM | Sunday: Closed</span>
           </div>
         </div>
-      </div>
-
-      <!-- Right column: Services -->
-      <div class="bs-col">
-        <div class="bs-section-title">Select Services</div>
-        <div id="bsServices" class="bs-svc-list"><div class="bs-empty">Loading services...</div></div>
+        <div id="bsSummaryEmpty" class="bs-empty">Select vehicles and services to see booking summary.</div>
       </div>
     </div>
 
@@ -197,6 +195,24 @@
     </div>
   </div>
 </main>
+
+<!-- Service Selection Modal -->
+<div id="bsServiceModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:20px;width:480px;max-width:90vw;max-height:80vh;box-shadow:0 20px 60px rgba(0,0,0,0.2);overflow:hidden;display:flex;flex-direction:column;">
+    <div style="background:#E8001C;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <div>
+        <div style="color:white;font-size:15px;font-weight:700;" id="bsModalTitle">Select Services</div>
+        <div style="color:rgba(255,255,255,0.75);font-size:12px;" id="bsModalSub"></div>
+      </div>
+      <button onclick="bsCloseServiceModal()" style="background:rgba(255,255,255,0.15);border:none;color:white;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;">×</button>
+    </div>
+    <div id="bsModalServiceList" style="flex:1;overflow-y:auto;padding:16px;"></div>
+    <div style="padding:14px 20px;border-top:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <span id="bsModalCount" style="font-size:12px;color:#718096;">0 services selected</span>
+      <button onclick="bsCloseServiceModal()" style="padding:10px 24px;background:#E8001C;border:none;border-radius:10px;color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">Done</button>
+    </div>
+  </div>
+</div>
 
 <div id="cuToast"></div>
 
@@ -218,7 +234,8 @@
 <script>
 var _bsVehicles = [], _bsServices = [];
 var _bsSelectedVehicles = {};
-var _bsSelectedServices = {};
+// Per-vehicle service selections: vehicleId → { serviceId: true }
+var _bsVehicleServices = {};
 var _bsDate = '';
 var _bsTime = '';
 
@@ -240,23 +257,31 @@ window.bsSelectTime = function(btn) {
 };
 
 function _updateSummaryCard() {
-  var svcIds = Object.keys(_bsSelectedServices);
   var card = document.getElementById('bsSummaryCard');
+  var empty = document.getElementById('bsSummaryEmpty');
   if (!card) return;
-  if (svcIds.length === 0) { card.style.display = 'none'; return; }
-  card.style.display = 'block';
-  // Duration: ~1 hour per service
-  var hours = svcIds.length;
-  document.getElementById('bsSummaryDuration').textContent = hours + ' hour' + (hours > 1 ? 's' : '');
-  // Cost: sum of selected service costs
+
+  // Count total services across all vehicles
+  var totalSvcs = 0;
   var totalCost = 0;
-  _bsServices.forEach(function(s) {
-    if (_bsSelectedServices[s.id]) {
-      var raw = String(s.cost || '').replace(/[₱,\s]/g, '').trim();
-      var num = parseFloat(raw);
-      if (!isNaN(num)) totalCost += num;
-    }
+  var vehicleIds = Object.keys(_bsSelectedVehicles);
+  vehicleIds.forEach(function(vId) {
+    var svcs = _bsVehicleServices[vId] || {};
+    var svcIds = Object.keys(svcs);
+    totalSvcs += svcIds.length;
+    _bsServices.forEach(function(s) {
+      if (svcs[s.id]) {
+        var raw = String(s.cost || '').replace(/[₱,\s]/g, '').trim();
+        var num = parseFloat(raw);
+        if (!isNaN(num)) totalCost += num;
+      }
+    });
   });
+
+  if (totalSvcs === 0) { card.style.display = 'none'; if (empty) empty.style.display = 'block'; return; }
+  card.style.display = 'block';
+  if (empty) empty.style.display = 'none';
+  document.getElementById('bsSummaryDuration').textContent = totalSvcs + ' hour' + (totalSvcs > 1 ? 's' : '');
   document.getElementById('bsSummaryCost').textContent = '₱' + totalCost.toLocaleString('en-PH', {minimumFractionDigits:2});
 }
 
@@ -306,11 +331,7 @@ function _renderVehicles() {
   if (!_bsVehicles.length) { el.innerHTML = '<div class="bs-empty">No vehicles found under your account.</div>'; return; }
   el.innerHTML = _bsVehicles.map(function(v){
     var sel = !!_bsSelectedVehicles[v.id];
-    var icon = (v.type||'').toLowerCase().includes('truck')
-      ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>'
-      : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1l2-4h10l2 4h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg>';
     return '<div class="bs-card'+(sel?' selected':'')+'" onclick="bsToggleVehicle(\''+v.id+'\')">'
-      +'<div class="bs-card-icon" style="background:'+(sel?'rgba(232,0,28,0.1)':'#f0f4ff')+';color:'+(sel?'#E8001C':'#003087')+';">'+icon+'</div>'
       +'<div style="flex:1;"><div class="bs-card-title" style="'+(sel?'color:#E8001C;':'')+'">'+_esc(v.plate||'—')+'</div><div class="bs-card-sub">'+_esc(v.desc||'')+'</div></div>'
       +'<div class="bs-check'+(sel?' checked':'')+'">'+( sel?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>':'')+'</div>'
       +'</div>';
@@ -318,34 +339,112 @@ function _renderVehicles() {
 }
 
 window.bsToggleVehicle = function(id) {
-  if (_bsSelectedVehicles[id]) delete _bsSelectedVehicles[id];
-  else _bsSelectedVehicles[id] = true;
+  if (_bsSelectedVehicles[id]) {
+    delete _bsSelectedVehicles[id];
+    delete _bsVehicleServices[id];
+  } else {
+    _bsSelectedVehicles[id] = true;
+    _bsVehicleServices[id] = {};
+  }
   _renderVehicles();
+  _renderPerVehicleServices();
   _updateDateSuggestion();
+  _updateSummaryCard();
 };
 
-function _renderServices() {
-  var el = document.getElementById('bsServices');
-  if (!_bsServices.length) { el.innerHTML = '<div class="bs-empty">No services available.</div>'; return; }
-  el.innerHTML = _bsServices.map(function(s){
-    var sel = !!_bsSelectedServices[s.id];
-    var cost = String(s.cost||'');
-    var uom = String(s.uom||'');
-    return '<div class="bs-card'+(sel?' selected':'')+'" onclick="bsToggleService(\''+s.id+'\')">'
-      +'<div class="bs-card-icon" style="background:'+(sel?'rgba(232,0,28,0.1)':'#f0f4ff')+';color:'+(sel?'#E8001C':'#003087')+'"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>'
-      +'<div style="flex:1;"><div class="bs-card-title" style="'+(sel?'color:#E8001C;':'')+'">'+_esc(s.name||'')+'</div>'
-      +(cost?'<div class="bs-card-sub">'+_esc(_fmtCost(cost))+' / '+_esc(uom)+'</div>':'')
-      +'</div>'
-      +'<div class="bs-check'+(sel?' checked':'')+'">'+( sel?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>':'')+'</div>'
-      +'</div>';
+function _renderPerVehicleServices() {
+  var el = document.getElementById('bsPerVehicleServices');
+  if (!el) return;
+  var vehicleIds = Object.keys(_bsSelectedVehicles);
+  if (!vehicleIds.length) { el.innerHTML = ''; return; }
+
+  el.innerHTML = '<div style="height:20px;"></div><div class="bs-section-title">Services per Vehicle</div><div style="font-size:11px;color:#718096;margin-bottom:12px;">Click to select services for each vehicle.</div>'
+    + vehicleIds.map(function(vId) {
+      var vehicle = _bsVehicles.find(function(v){ return v.id === vId; });
+      if (!vehicle) return '';
+      var plate = vehicle.plate || '—';
+      var desc = vehicle.desc || '';
+      var svcs = _bsVehicleServices[vId] || {};
+      var svcCount = Object.keys(svcs).length;
+      var badgeColor = svcCount > 0 ? '#38a169' : '#ed8936';
+      var badgeBg = svcCount > 0 ? 'rgba(56,161,105,0.1)' : 'rgba(237,137,54,0.1)';
+      var badgeText = svcCount > 0 ? svcCount + ' service' + (svcCount > 1 ? 's' : '') : 'None selected';
+
+      // Show selected service names
+      var svcNames = [];
+      if (svcCount > 0) {
+        _bsServices.forEach(function(s) { if (svcs[s.id]) svcNames.push(s.name || ''); });
+      }
+      var svcPreview = svcNames.length ? '<div style="font-size:11px;color:#4a5568;margin-top:4px;line-height:1.5;">' + _esc(svcNames.join(', ')) + '</div>' : '';
+
+      return '<div class="bs-card" style="flex-direction:column;align-items:stretch;gap:8px;cursor:pointer;" onclick="bsOpenServiceModal(\'' + vId + '\')">'
+        + '<div style="display:flex;align-items:center;gap:12px;">'
+        + '<div style="flex:1;"><div class="bs-card-title">' + _esc(plate) + '</div>'
+        + (desc ? '<div class="bs-card-sub">' + _esc(desc) + '</div>' : '')
+        + '</div>'
+        + '<span style="font-size:10px;font-weight:600;padding:3px 10px;border-radius:12px;background:' + badgeBg + ';color:' + badgeColor + ';">' + badgeText + '</span>'
+        + '</div>'
+        + svcPreview
+        + '</div>';
+    }).join('');
+}
+
+var _bsModalVehicleId = '';
+
+window.bsOpenServiceModal = function(vehicleId) {
+  _bsModalVehicleId = vehicleId;
+  var vehicle = _bsVehicles.find(function(v){ return v.id === vehicleId; });
+  var plate = vehicle ? (vehicle.plate || '—') : '—';
+  var desc = vehicle ? (vehicle.desc || '') : '';
+  document.getElementById('bsModalTitle').textContent = 'Select Services';
+  document.getElementById('bsModalSub').textContent = plate + (desc ? ' — ' + desc : '');
+  _renderModalServices();
+  document.getElementById('bsServiceModal').style.display = 'flex';
+};
+
+window.bsCloseServiceModal = function() {
+  document.getElementById('bsServiceModal').style.display = 'none';
+  _renderPerVehicleServices();
+  _updateSummaryCard();
+};
+
+function _renderModalServices() {
+  var el = document.getElementById('bsModalServiceList');
+  var countEl = document.getElementById('bsModalCount');
+  var svcs = _bsVehicleServices[_bsModalVehicleId] || {};
+  var svcCount = Object.keys(svcs).length;
+  if (countEl) countEl.textContent = svcCount + ' service' + (svcCount !== 1 ? 's' : '') + ' selected';
+
+  if (!_bsServices.length) { el.innerHTML = '<div style="text-align:center;padding:20px;color:#718096;">No services available.</div>'; return; }
+
+  el.innerHTML = _bsServices.map(function(s) {
+    var sel = !!svcs[s.id];
+    var cost = String(s.cost || '');
+    var uom = String(s.uom || '');
+    return '<div class="bs-card' + (sel ? ' selected' : '') + '" style="margin-bottom:8px;" onclick="bsModalToggleService(\'' + s.id + '\')">'
+      + '<div style="flex:1;"><div class="bs-card-title" style="' + (sel ? 'color:#E8001C;' : '') + '">' + _esc(s.name || '') + '</div>'
+      + (cost ? '<div class="bs-card-sub">' + _esc(_fmtCost(cost)) + ' / ' + _esc(uom) + '</div>' : '')
+      + '</div>'
+      + '<div class="bs-check' + (sel ? ' checked' : '') + '">' + (sel ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '') + '</div>'
+      + '</div>';
   }).join('');
 }
 
-window.bsSelectVehicle = function(id) {
-  _bsSelectedVehicle = id;
-  _renderVehicles();
-  _updateDateSuggestion();
+window.bsModalToggleService = function(serviceId) {
+  if (!_bsVehicleServices[_bsModalVehicleId]) _bsVehicleServices[_bsModalVehicleId] = {};
+  if (_bsVehicleServices[_bsModalVehicleId][serviceId]) {
+    delete _bsVehicleServices[_bsModalVehicleId][serviceId];
+  } else {
+    _bsVehicleServices[_bsModalVehicleId][serviceId] = true;
+  }
+  _renderModalServices();
 };
+
+function _renderServices() {
+  // No longer needed — services are rendered per-vehicle
+  var el = document.getElementById('bsServices');
+  if (el) el.innerHTML = '';
+}
 
 var _bsSuggestedDate = '';
 function _updateDateSuggestion() {
@@ -404,10 +503,7 @@ window.bsUseSuggestion = function() {
 };
 
 window.bsToggleService = function(id) {
-  if (_bsSelectedServices[id]) delete _bsSelectedServices[id];
-  else _bsSelectedServices[id] = true;
-  _renderServices();
-  _updateSummaryCard();
+  // Legacy — no longer used
 };
 
 // ── Custom Calendar ──
@@ -534,8 +630,17 @@ _loadBookedDates();
 
 window.bsSubmit = async function() {
   if (!Object.keys(_bsSelectedVehicles).length) { _toast('Please select at least one vehicle.','error'); return; }
-  var svcIds = Object.keys(_bsSelectedServices);
-  if (!svcIds.length) { _toast('Please select at least one service.','error'); return; }
+  // Check each vehicle has at least one service
+  var vehicleIds = Object.keys(_bsSelectedVehicles);
+  for (var vi2 = 0; vi2 < vehicleIds.length; vi2++) {
+    var vId2 = vehicleIds[vi2];
+    var svcs2 = _bsVehicleServices[vId2] || {};
+    if (!Object.keys(svcs2).length) {
+      var veh2 = _bsVehicles.find(function(v){return v.id===vId2;});
+      _toast('Please select services for ' + (veh2?veh2.plate:'a vehicle') + '.','error');
+      return;
+    }
+  }
   if (!_bsDate) { _toast('Please select a preferred date.','error'); return; }
   if (!_bsTime) { _toast('Please select a preferred start time.','error'); return; }
 
@@ -551,10 +656,16 @@ window.bsSubmit = async function() {
     var vehicleIds = Object.keys(_bsSelectedVehicles);
     var selectedVehicles = _bsVehicles.filter(function(v){ return _bsSelectedVehicles[v.id]; });
 
-    var selectedNames = _bsServices
-      .filter(function(s){return _bsSelectedServices[s.id];})
-      .map(function(s){return s.name||'';})
-      .filter(Boolean);
+    // Collect all unique service names for notifications
+    var allSelectedNames = [];
+    vehicleIds.forEach(function(vId) {
+      var svcs = _bsVehicleServices[vId] || {};
+      _bsServices.forEach(function(s) {
+        if (svcs[s.id] && allSelectedNames.indexOf(s.name||'') === -1) {
+          allSelectedNames.push(s.name||'');
+        }
+      });
+    });
 
     // Use first selected vehicle for validation checks
     var firstVehicle = selectedVehicles[0];
@@ -610,7 +721,7 @@ window.bsSubmit = async function() {
 
     // 4. Service Type Valid — must be from item_master services list
     var validServiceNames = _bsServices.map(function(s){ return (s.name||'').toLowerCase(); });
-    var invalidSvc = selectedNames.filter(function(n){ return validServiceNames.indexOf(n.toLowerCase()) === -1; });
+    var invalidSvc = allSelectedNames.filter(function(n){ return validServiceNames.indexOf(n.toLowerCase()) === -1; });
     if (invalidSvc.length > 0) {
       autoApprove = false;
       denyReason = 'Invalid service selected: ' + invalidSvc.join(', ');
@@ -655,18 +766,25 @@ window.bsSubmit = async function() {
 
     btn.textContent = 'Booking...';
 
-    // Create one booking per selected vehicle
+    // Create one booking per selected vehicle with its own services
     var allPlates = [];
     for (var vi = 0; vi < selectedVehicles.length; vi++) {
       var v = selectedVehicles[vi];
       allPlates.push(v.plate || '—');
+      // Get this vehicle's selected service names
+      var vSvcs = _bsVehicleServices[v.id] || {};
+      var vServiceNames = _bsServices
+        .filter(function(s) { return vSvcs[s.id]; })
+        .map(function(s) { return s.name || ''; })
+        .filter(Boolean);
+
       await db.collection('service_bookings').add({
         customerId: user.uid,
         customerName: customerName,
         vehicleId: v.id,
         plate: v.plate || '',
         vehicleDesc: v.desc || '',
-        services: selectedNames,
+        services: vServiceNames,
         preferredDate: _bsDate,
         preferredTime: _bsTime,
         notes: (document.getElementById('bsNotes').value||'').trim(),
@@ -680,33 +798,48 @@ window.bsSubmit = async function() {
 
     var plateStr = allPlates.join(', ');
 
+    // Build per-vehicle service breakdown for notifications
+    var vehicleBreakdown = [];
+    for (var vi3 = 0; vi3 < selectedVehicles.length; vi3++) {
+      var vb = selectedVehicles[vi3];
+      var vbSvcs = _bsVehicleServices[vb.id] || {};
+      var vbNames = _bsServices
+        .filter(function(s) { return vbSvcs[s.id]; })
+        .map(function(s) { return s.name || ''; })
+        .filter(Boolean);
+      vehicleBreakdown.push((vb.plate || '—') + ': ' + vbNames.join(', '));
+    }
+    var detailedMsg = vehicleBreakdown.join(' | ');
+    var vCount = selectedVehicles.length;
+    var vLabel = vCount + ' vehicle' + (vCount > 1 ? 's' : '');
+
     if (autoApprove) {
-      var msg = customerName + ' booked ' + selectedNames.join(', ') + ' for ' + plateStr + ' on ' + _fmtDatePretty(_bsDate) + '. (Auto-approved ✅)';
+      var msg = customerName + ' booked service for ' + vLabel + ' on ' + _fmtDatePretty(_bsDate) + '. ' + detailedMsg + ' (Auto-approved ✅)';
       await db.collection('notifications').add({
-        title: '📅 Booking Auto-Approved', message: msg, type: 'info',
+        title: '📅 Booking Auto-Approved (' + vLabel + ')', message: msg, type: 'info',
         targetRole: 'admin', targetUid: '',
         createdAt: firebase.firestore.FieldValue.serverTimestamp(), readBy: {}, isRead: false,
       });
       await db.collection('notifications').add({
-        title: '📅 Booking Auto-Approved', message: msg, type: 'info',
+        title: '📅 Booking Auto-Approved (' + vLabel + ')', message: msg, type: 'info',
         targetRole: 'staff', targetUid: '',
         createdAt: firebase.firestore.FieldValue.serverTimestamp(), readBy: {}, isRead: false,
       });
       await db.collection('notifications').add({
-        title: '✅ Booking Confirmed', message: 'Your service booking for ' + plateStr + ' on ' + _fmtDatePretty(_bsDate) + ' has been confirmed. Services: ' + selectedNames.join(', '),
+        title: '✅ Booking Confirmed', message: 'Your service booking on ' + _fmtDatePretty(_bsDate) + ' has been confirmed.\n' + detailedMsg,
         type: 'success', targetRole: 'customer', targetUid: user.uid,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(), readBy: {}, isRead: false,
       });
-      _toast('Booking confirmed for ' + allPlates.length + ' vehicle(s)! ✅','success');
+      _toast('Booking confirmed for ' + vCount + ' vehicle(s)! ✅','success');
     } else {
-      var msg = customerName + ' requested ' + selectedNames.join(', ') + ' for ' + plateStr + ' on ' + _fmtDatePretty(_bsDate) + '. Needs review: ' + denyReason;
+      var msg = customerName + ' requested service for ' + vLabel + ' on ' + _fmtDatePretty(_bsDate) + '. ' + detailedMsg + '. Needs review: ' + denyReason;
       await db.collection('notifications').add({
-        title: '⏳ Booking Needs Review', message: msg, type: 'warning',
+        title: '⏳ Booking Needs Review (' + vLabel + ')', message: msg, type: 'warning',
         targetRole: 'admin', targetUid: '',
         createdAt: firebase.firestore.FieldValue.serverTimestamp(), readBy: {}, isRead: false,
       });
       await db.collection('notifications').add({
-        title: '⏳ Booking Pending', message: 'Your booking for ' + plateStr + ' on ' + _fmtDatePretty(_bsDate) + ' is pending admin approval. Reason: ' + denyReason,
+        title: '⏳ Booking Pending', message: 'Your booking on ' + _fmtDatePretty(_bsDate) + ' is pending admin approval.\n' + detailedMsg + '\nReason: ' + denyReason,
         type: 'warning', targetRole: 'customer', targetUid: user.uid,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(), readBy: {}, isRead: false,
       });

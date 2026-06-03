@@ -202,16 +202,38 @@
     body.innerHTML = docs.map(function(r) {
       var isPending  = r.status === 'Pending';
       var isApproved = r.status === 'Approved';
-      var sc = isPending ? '#d69e2e' : isApproved ? '#38a169' : '#718096';
-      var sb = isPending ? 'rgba(214,158,46,0.1)' : isApproved ? 'rgba(56,161,105,0.1)' : 'rgba(113,128,150,0.1)';
+      var isRescheduled = r.previousDate && r.previousDate !== r.preferredDate;
+      var sc, sb, statusLabel;
+      if (isRescheduled && isApproved) {
+        sc = '#003087'; sb = 'rgba(0,48,135,0.1)'; statusLabel = 'Rescheduled';
+      } else if (isPending) {
+        sc = '#d69e2e'; sb = 'rgba(214,158,46,0.1)'; statusLabel = 'Pending';
+      } else if (isApproved) {
+        sc = '#38a169'; sb = 'rgba(56,161,105,0.1)'; statusLabel = 'Approved';
+      } else {
+        sc = '#718096'; sb = 'rgba(113,128,150,0.1)'; statusLabel = 'Cancelled';
+      }
       var svcList = (r.services || []).join(', ') || '—';
+
+      // Date display: show both original (customer's preferred) and rescheduled date
+      var dateHtml = '';
+      if (isRescheduled) {
+        dateHtml = '<div style="font-weight:600;color:#003087;font-size:13px;">' + _formatDate(r.preferredDate) + '</div>'
+          + '<div style="font-size:11px;color:#718096;margin-top:2px;text-decoration:line-through;">' + _formatDate(r.previousDate) + '</div>'
+          + '<div style="font-size:10px;color:#003087;margin-top:1px;display:flex;align-items:center;gap:3px;">'
+          + '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#003087" stroke-width="2.5"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>'
+          + 'Rescheduled</div>';
+      } else {
+        dateHtml = '<div style="font-weight:600;color:#003087;">' + _formatDate(r.preferredDate) + '</div>';
+      }
+
       return '<div class="table-row" style="grid-template-columns:1fr 1.5fr 1.5fr 1fr 0.8fr 1fr 140px;align-items:center;">'
         + '<div style="font-weight:700;color:#1a202c;">' + (r.plate || '—') + '</div>'
         + '<div style="color:#4a5568;font-size:13px;">' + (r.customerName || '—') + '</div>'
         + '<div style="color:#718096;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + svcList + '">' + svcList + '</div>'
-        + '<div style="font-weight:600;color:#003087;">' + _formatDate(r.preferredDate) + '</div>'
+        + '<div>' + dateHtml + '</div>'
         + '<div style="font-size:12px;color:#4a5568;">' + (r.preferredTime || '—') + '</div>'
-        + '<div><span style="background:' + sb + ';color:' + sc + ';font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">' + (r.status || 'Approved') + '</span></div>'
+        + '<div><span style="background:' + sb + ';color:' + sc + ';font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">' + statusLabel + '</span></div>'
         + '<div style="display:flex;gap:6px;">'
         + (isPending
           ? '<button onclick="approveBooking(\'' + r.id + '\',\'' + (r.plate||'') + '\')" style="padding:5px 12px;background:#38a169;border:none;border-radius:7px;color:white;font-size:12px;font-weight:600;cursor:pointer;">Approve</button>'

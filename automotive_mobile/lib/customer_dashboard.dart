@@ -296,16 +296,10 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // ── Header: icon + plate/desc + status badge ──
+          // ── Header: plate/desc + status badge ──
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(children: [
-              Container(
-                width: 46, height: 46,
-                decoration: BoxDecoration(color: _red.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
-                child: _vehicleIcon(v['type'] ?? '', size: 24),
-              ),
-              const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(v['plate']!, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF1a202c))),
                 const SizedBox(height: 2),
@@ -328,7 +322,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
             child: Row(children: [
               _metaItem(Icons.speed_outlined, v['odo']!.isNotEmpty ? v['odo']! : '—'),
               const SizedBox(width: 20),
-              _metaItem(Icons.calendar_today_outlined, v['lastSvcDate']!.isNotEmpty ? v['lastSvcDate']! : '—'),
+              _metaItem(Icons.calendar_today_outlined, v['lastSvcDate']!.isNotEmpty ? _fmtDateLong(v['lastSvcDate']!) : '—'),
             ]),
           ),
 
@@ -359,6 +353,15 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
       const SizedBox(width: 5),
       Text(text, style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
     ]);
+  }
+
+  static const _monthsFull = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  String _fmtDateLong(String dateStr) {
+    if (dateStr.isEmpty) return '—';
+    final d = DateTime.tryParse(dateStr);
+    if (d == null) return dateStr;
+    return '${_monthsFull[d.month - 1]} ${d.day}, ${d.year}';
   }
 
   Widget _stripDivider() => Container(
@@ -442,10 +445,6 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                   decoration: BoxDecoration(color: Colors.white38, borderRadius: BorderRadius.circular(2))),
                 const SizedBox(height: 16),
                 Row(children: [
-                  Container(width: 52, height: 52,
-                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(14)),
-                    child: _vehicleIcon(v['type'] ?? '', size: 26, color: Colors.white)),
-                  const SizedBox(width: 14),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(v['plate']!, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                     Text(v['desc']!, style: const TextStyle(color: Colors.white70, fontSize: 12)),
@@ -471,9 +470,9 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                     child: Column(children: [
                       _detailRow(Icons.speed_outlined, 'Odometer', v['odo']!.isNotEmpty ? v['odo']! : '—', const Color(0xFF718096)),
                       _divider(),
-                      _detailRow(Icons.calendar_today_outlined, 'Last Service', lastSvcDate.isNotEmpty ? lastSvcDate : '—', const Color(0xFF2b6cb0)),
+                      _detailRow(Icons.calendar_today_outlined, 'Last Service', lastSvcDate.isNotEmpty ? _fmtDateLong(lastSvcDate) : '—', const Color(0xFF2b6cb0)),
                       _divider(),
-                      _detailRow(Icons.event_outlined, 'Next PMS Due', nextPms, statusColor),
+                      _detailRow(Icons.event_outlined, 'Next PMS Due', _fmtDateLong(nextPms), statusColor),
                       _divider(),
                       _detailRow(Icons.info_outline, 'Status', statusLabel, statusColor),
                     ]),

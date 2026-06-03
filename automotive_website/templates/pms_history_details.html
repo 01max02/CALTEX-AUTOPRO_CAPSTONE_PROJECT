@@ -8,30 +8,119 @@
     <link rel="stylesheet" href="../static/css/customer_dashboard.css">
     <style>
         
-        /* Main content */
-        .phd-main {
-            padding: 16px;
+        /* Layout */
+        .phd-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px 32px;
         }
         
-        /* Chips */
-        .phd-chip {
-            background: #f7f8fa;
-            border: 1px solid #e2e8f0;
-            border-radius: 20px;
-            padding: 8px 12px;
-            font-size: 12px;
-            color: #4a5568;
-            white-space: nowrap;
-            flex-shrink: 0;
+        /* Left sidebar - vehicle info */
+        .phd-sidebar {
+            position: sticky;
+            top: 24px;
+            align-self: start;
+        }
+        .phd-vehicle-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            border: 1.5px solid #e2e8f0;
+        }
+        .phd-vehicle-plate {
+            font-size: 20px;
+            font-weight: 800;
+            color: #1a202c;
+            margin-bottom: 4px;
+        }
+        .phd-vehicle-desc {
+            font-size: 13px;
+            color: #718096;
+            margin-bottom: 16px;
+        }
+        .phd-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .phd-stat-item {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 12px;
+            padding: 12px 14px;
+            background: #f7f8fa;
+            border-radius: 12px;
+            border: 1px solid #f0f4f8;
         }
-        .phd-chip-value {
+        .phd-stat-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .phd-stat-value {
+            font-size: 16px;
             font-weight: 700;
             color: #1a202c;
         }
+        .phd-stat-label {
+            font-size: 11px;
+            color: #718096;
+        }
+        .phd-back-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 16px;
+            padding: 10px 16px;
+            background: #f7f8fa;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #4a5568;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all .15s;
+            width: 100%;
+            justify-content: center;
+        }
+        .phd-back-btn:hover {
+            background: #E8001C;
+            border-color: #E8001C;
+            color: white;
+        }
         
+        /* Right content - records */
+        .phd-records {
+            min-width: 0;
+        }
+        .phd-records-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .phd-records-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1a202c;
+        }
+        .phd-records-count {
+            font-size: 12px;
+            color: #718096;
+            background: #f7f8fa;
+            padding: 3px 10px;
+            border-radius: 20px;
+        }
+
         /* Record card */
         .phd-record-card {
             background: white;
@@ -39,6 +128,12 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             margin-bottom: 14px;
             overflow: hidden;
+            border: 1px solid #f0f4f8;
+            transition: box-shadow .15s, transform .15s;
+        }
+        .phd-record-card:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+            transform: translateY(-1px);
         }
         .phd-record-header {
             background: #f7f8fa;
@@ -64,7 +159,6 @@
             padding: 2px 8px;
             border-radius: 20px;
         }
-        
         .phd-record-body {
             padding: 14px;
         }
@@ -76,7 +170,6 @@
             color: #718096;
             margin-bottom: 10px;
         }
-        
         .phd-section-label {
             display: flex;
             align-items: center;
@@ -87,7 +180,6 @@
             margin-top: 10px;
         }
         .phd-section-label:first-child { margin-top: 0; }
-        
         .phd-line-item {
             display: flex;
             align-items: center;
@@ -102,13 +194,11 @@
             border-radius: 50%;
             flex-shrink: 0;
         }
-        
         .phd-divider {
             border: none;
             border-top: 1px solid #e2e8f0;
             margin: 12px 0;
         }
-        
         .phd-total {
             display: flex;
             justify-content: space-between;
@@ -128,7 +218,7 @@
         /* Empty state */
         .phd-empty {
             text-align: center;
-            padding: 40px 20px;
+            padding: 60px 20px;
             color: #718096;
         }
         .phd-empty-icon {
@@ -142,6 +232,18 @@
             padding: 40px 20px;
             color: #718096;
         }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .phd-layout {
+                grid-template-columns: 1fr;
+                padding: 16px;
+                gap: 16px;
+            }
+            .phd-sidebar {
+                position: static;
+            }
+        }
     </style>
 </head>
 <body data-page="pms-details">
@@ -150,8 +252,10 @@
 <div id="customerHeader"></div>
 
 <!-- Main content -->
-<main class="phd-main" id="phdMain">
-    <div class="phd-loading">Loading...</div>
+<main class="cu-main">
+    <div class="phd-layout" id="phdMain">
+        <div class="phd-loading">Loading...</div>
+    </div>
 </main>
 
 <!-- Firebase SDK -->
@@ -192,26 +296,6 @@
     }
 
     try {
-      // Render vehicle info card at top
-      const vehicleInfoHtml = `
-        <div style="background:white;border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-            <div style="flex:1;">
-              <div style="font-size:16px;font-weight:700;color:#1a202c;" id="phdPlate">—</div>
-              <div style="font-size:12px;color:#718096;margin-top:2px;" id="phdDesc">—</div>
-            </div>
-            <button onclick="history.back()" style="background:none;border:none;color:#E8001C;cursor:pointer;font-size:20px;padding:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">←</button>
-          </div>
-          <div id="phdSummary" style="display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;"></div>
-        </div>
-      `;
-
-      document.getElementById('phdMain').innerHTML = vehicleInfoHtml;
-
-      // Set vehicle info
-      document.getElementById('phdPlate').textContent = plate;
-      document.getElementById('phdDesc').textContent = desc || '—';
-
       // Load maintenance records for this plate
       const snap = await db.collection('maintenance')
         .where('plate', '==', plate)
@@ -229,121 +313,148 @@
         return sum + num;
       }, 0);
 
-      // Render summary chips
-      document.getElementById('phdSummary').innerHTML = `
-        <div class="phd-chip">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          <span class="phd-chip-value">${records.length}</span> service${records.length !== 1 ? 's' : ''}
-        </div>
-        <div class="phd-chip">
-          <span style="font-size:13px;font-weight:700;color:#4a5568;">₱</span>
-          <span class="phd-chip-value">${totalCost.toLocaleString('en-PH', {minimumFractionDigits:2})}</span> total
+      // ── LEFT SIDEBAR ──
+      const sidebarHtml = `
+        <div class="phd-sidebar">
+          <div class="phd-vehicle-card">
+            <div class="phd-vehicle-plate">${plate}</div>
+            <div class="phd-vehicle-desc">${desc || '—'}</div>
+            <div class="phd-stats">
+              <div class="phd-stat-item">
+                <div class="phd-stat-icon" style="background:rgba(0,48,135,0.08);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#003087" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                </div>
+                <div>
+                  <div class="phd-stat-value">${records.length}</div>
+                  <div class="phd-stat-label">Service Records</div>
+                </div>
+              </div>
+              <div class="phd-stat-item">
+                <div class="phd-stat-icon" style="background:rgba(232,0,28,0.08);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8001C" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                </div>
+                <div>
+                  <div class="phd-stat-value">₱${totalCost.toLocaleString('en-PH', {minimumFractionDigits:2})}</div>
+                  <div class="phd-stat-label">Total Spent</div>
+                </div>
+              </div>
+            </div>
+            <a href="customer_pms_history.html" class="phd-back-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+              Back to PMS History
+            </a>
+          </div>
         </div>
       `;
 
-      // Render records
+      // ── RIGHT CONTENT — Records ──
+      let recordsHtml = '';
       if (!records.length) {
-        document.getElementById('phdMain').innerHTML += '<div class="phd-empty"><div class="phd-empty-icon">📋</div><div>No completed services yet.</div></div>';
-        return;
+        recordsHtml = '<div class="phd-empty"><div class="phd-empty-icon">📋</div><div>No completed services yet.</div></div>';
+      } else {
+        recordsHtml = `
+          <div class="phd-records-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8001C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>
+            <span class="phd-records-title">Service Records</span>
+            <span class="phd-records-count">${records.length} record${records.length !== 1 ? 's' : ''}</span>
+          </div>
+        ` + records.map(r => {
+          const svcRows = (r.svcRows || []).filter(s => s.name);
+          const matRows = (r.matRows || []).filter(m => m.name);
+          const issues  = (r.issues  || []).filter(i => i && i.toString().trim());
+
+          function rowSubtotal(row) {
+            const unitCost = parseFloat((row.cost || '0').replace(/[₱,]/g, '')) || 0;
+            const qty = parseFloat(row.qty) || 1;
+            return unitCost * qty;
+          }
+          const svcTotal = svcRows.reduce((s, row) => s + rowSubtotal(row), 0);
+          const matTotal = matRows.reduce((s, row) => s + rowSubtotal(row), 0);
+
+          return `
+            <div class="phd-record-card">
+              <div class="phd-record-header">
+                <div class="phd-record-date">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#718096" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  ${r.date || '—'}
+                </div>
+                <span class="phd-record-status">Completed</span>
+              </div>
+              <div class="phd-record-body">
+                <div class="phd-mechanic">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  Mechanic: ${r.mechanic || '—'}
+                </div>
+                ${issues.length ? `
+                  <div class="phd-section-label" style="color:#E8001C;margin-bottom:8px;">
+                    <span style="background:#fff5f5;padding:3px 5px;border-radius:6px;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#E8001C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    </span>
+                    Vehicle Issues Reported
+                  </div>
+                  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
+                    ${issues.map(issue => `<span style="background:#fff5f5;border:1.5px solid #fed7d7;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;color:#E8001C;">${issue}</span>`).join('')}
+                  </div>
+                ` : ''}
+                ${svcRows.length ? `
+                  <div class="phd-section-label" style="color:#2b6cb0;">
+                    <span style="background:#ebf8ff;padding:3px 5px;border-radius:6px;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2b6cb0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                    </span>
+                    Services Rendered
+                  </div>
+                  ${svcRows.map(s => {
+                    const sub = rowSubtotal(s);
+                    return `
+                    <div class="phd-line-item">
+                      <div class="phd-dot" style="background:#2b6cb0;"></div>
+                      <span style="flex:1;">${s.name}</span>
+                      <span style="color:#718096;margin-right:10px;">${s.qty} ${s.uom}</span>
+                      <span style="font-size:12px;font-weight:600;color:#1a202c;">₱${sub.toLocaleString('en-PH',{minimumFractionDigits:2})}</span>
+                    </div>`;
+                  }).join('')}
+                  <div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0;">
+                    <span style="font-size:11px;color:#718096;">Services subtotal</span>
+                    <span style="font-size:13px;font-weight:700;color:#2b6cb0;">₱${svcTotal.toLocaleString('en-PH',{minimumFractionDigits:2})}</span>
+                  </div>
+                ` : ''}
+                ${matRows.length ? `
+                  <div class="phd-section-label" style="color:#0d9488;margin-top:10px;">
+                    <span style="background:#f0fdfa;padding:3px 5px;border-radius:6px;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7.5L12 3l10 4.5V17L12 21 2 17V7.5z"/><path d="M12 3v18"/><path d="M2 7.5l10 4.5 10-4.5"/><path d="M7 5.25L17 9.75"/></svg>
+                    </span>
+                    Materials Used
+                  </div>
+                  ${matRows.map(m => {
+                    const sub = rowSubtotal(m);
+                    return `
+                    <div class="phd-line-item">
+                      <div class="phd-dot" style="background:#0d9488;"></div>
+                      <span style="flex:1;">${m.name}</span>
+                      <span style="color:#718096;margin-right:10px;">${m.qty} ${m.uom}</span>
+                      <span style="font-size:12px;font-weight:600;color:#1a202c;">₱${sub.toLocaleString('en-PH',{minimumFractionDigits:2})}</span>
+                    </div>`;
+                  }).join('')}
+                  <div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0;">
+                    <span style="font-size:11px;color:#718096;">Materials subtotal</span>
+                    <span style="font-size:13px;font-weight:700;color:#0d9488;">₱${matTotal.toLocaleString('en-PH',{minimumFractionDigits:2})}</span>
+                  </div>
+                ` : ''}
+                <hr class="phd-divider">
+                <div class="phd-total">
+                  <span class="phd-total-label">Total</span>
+                  <span class="phd-total-value">${
+                    r.totalCost
+                      ? '₱' + parseFloat(r.totalCost).toLocaleString('en-PH', {minimumFractionDigits:2})
+                      : (r.cost || '—')
+                  }</span>
+                </div>
+              </div>
+            </div>`;
+        }).join('');
       }
 
-      const recordsHtml = records.map(r => {
-        const svcRows = (r.svcRows || []).filter(s => s.name);
-        const matRows = (r.matRows || []).filter(m => m.name);
-        const issues  = (r.issues  || []).filter(i => i && i.toString().trim());
-
-        // Compute subtotals per section (mirrors mobile _lineItem: unitCost * qty)
-        function rowSubtotal(row) {
-          const unitCost = parseFloat((row.cost || '0').replace(/[₱,]/g, '')) || 0;
-          const qty = parseFloat(row.qty) || 1;
-          return unitCost * qty;
-        }
-        const svcTotal = svcRows.reduce((s, row) => s + rowSubtotal(row), 0);
-        const matTotal = matRows.reduce((s, row) => s + rowSubtotal(row), 0);
-
-        return `
-          <div class="phd-record-card">
-            <div class="phd-record-header">
-              <div class="phd-record-date">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#718096" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                ${r.date || '—'}
-              </div>
-              <span class="phd-record-status">Completed</span>
-            </div>
-            <div class="phd-record-body">
-              <div class="phd-mechanic">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                Mechanic: ${r.mechanic || '—'}
-              </div>
-              ${issues.length ? `
-                <div class="phd-section-label" style="color:#E8001C;margin-bottom:8px;">
-                  <span style="background:#fff5f5;padding:3px 5px;border-radius:6px;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#E8001C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                  </span>
-                  Vehicle Issues Reported
-                </div>
-                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
-                  ${issues.map(issue => `<span style="background:#fff5f5;border:1.5px solid #fed7d7;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;color:#E8001C;">${issue}</span>`).join('')}
-                </div>
-              ` : ''}
-              ${svcRows.length ? `
-                <div class="phd-section-label" style="color:#2b6cb0;">
-                  <span style="background:#ebf8ff;padding:3px 5px;border-radius:6px;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2b6cb0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-                  </span>
-                  Services Rendered
-                </div>
-                ${svcRows.map(s => {
-                  const sub = rowSubtotal(s);
-                  return `
-                  <div class="phd-line-item">
-                    <div class="phd-dot" style="background:#2b6cb0;"></div>
-                    <span style="flex:1;">${s.name}</span>
-                    <span style="color:#718096;margin-right:10px;">${s.qty} ${s.uom}</span>
-                    <span style="font-size:12px;font-weight:600;color:#1a202c;">₱${sub.toLocaleString('en-PH',{minimumFractionDigits:2})}</span>
-                  </div>`;
-                }).join('')}
-                <div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0;">
-                  <span style="font-size:11px;color:#718096;">Services subtotal</span>
-                  <span style="font-size:13px;font-weight:700;color:#2b6cb0;">₱${svcTotal.toLocaleString('en-PH',{minimumFractionDigits:2})}</span>
-                </div>
-              ` : ''}
-              ${matRows.length ? `
-                <div class="phd-section-label" style="color:#0d9488;margin-top:10px;">
-                  <span style="background:#f0fdfa;padding:3px 5px;border-radius:6px;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7.5L12 3l10 4.5V17L12 21 2 17V7.5z"/><path d="M12 3v18"/><path d="M2 7.5l10 4.5 10-4.5"/><path d="M7 5.25L17 9.75"/></svg>
-                  </span>
-                  Materials Used
-                </div>
-                ${matRows.map(m => {
-                  const sub = rowSubtotal(m);
-                  return `
-                  <div class="phd-line-item">
-                    <div class="phd-dot" style="background:#0d9488;"></div>
-                    <span style="flex:1;">${m.name}</span>
-                    <span style="color:#718096;margin-right:10px;">${m.qty} ${m.uom}</span>
-                    <span style="font-size:12px;font-weight:600;color:#1a202c;">₱${sub.toLocaleString('en-PH',{minimumFractionDigits:2})}</span>
-                  </div>`;
-                }).join('')}
-                <div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0;">
-                  <span style="font-size:11px;color:#718096;">Materials subtotal</span>
-                  <span style="font-size:13px;font-weight:700;color:#0d9488;">₱${matTotal.toLocaleString('en-PH',{minimumFractionDigits:2})}</span>
-                </div>
-              ` : ''}
-              <hr class="phd-divider">
-              <div class="phd-total">
-                <span class="phd-total-label">Total</span>
-                <span class="phd-total-value">${
-                  r.totalCost
-                    ? '₱' + parseFloat(r.totalCost).toLocaleString('en-PH', {minimumFractionDigits:2})
-                    : (r.cost || '—')
-                }</span>
-              </div>
-            </div>
-          </div>`;
-      }).join('');
-
-      document.getElementById('phdMain').innerHTML += recordsHtml;
+      document.getElementById('phdMain').innerHTML = sidebarHtml + `<div class="phd-records">${recordsHtml}</div>`;
 
     } catch (err) {
       console.error('Error loading PMS history:', err);

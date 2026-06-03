@@ -1,4 +1,4 @@
-﻿// customer_shared.js — runs as a proper <script src> on all customer pages.
+// customer_shared.js — runs as a proper <script src> on all customer pages.
 // Handles: avatar dropdown, notification panel, active tab highlight.
 
 (function () {
@@ -186,18 +186,39 @@
         firebase.firestore().collection('notifications').doc(docId).delete().catch(function () {});
         _cuNotifs = _cuNotifs.filter(function (n) { return n.id !== docId; });
         _renderNotifPanel();
+        _showCuNotifToast('Notification deleted');
     };
 
     window.clearCuNotifications = function () {
         var db = firebase.firestore();
         var batch = db.batch();
+        var count = _cuNotifs.length;
         _cuNotifs.forEach(function (n) {
             batch.delete(db.collection('notifications').doc(n.id));
         });
         batch.commit().catch(function () {});
         _cuNotifs = [];
         _renderNotifPanel();
+        _showCuNotifToast(count + ' notification' + (count !== 1 ? 's' : '') + ' deleted');
     };
+
+    function _showCuNotifToast(msg) {
+        var toast = document.getElementById('cuNotifToast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'cuNotifToast';
+            toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a202c;color:white;padding:12px 24px;border-radius:12px;font-size:13px;font-weight:600;z-index:99999;opacity:0;transition:all .3s cubic-bezier(0.4,0,0.2,1);pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.2);display:flex;align-items:center;gap:8px;';
+            document.body.appendChild(toast);
+        }
+        toast.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>' + msg;
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(-50%) translateY(0)';
+        clearTimeout(window._cuNotifToastTimer);
+        window._cuNotifToastTimer = setTimeout(function() {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(-50%) translateY(80px)';
+        }, 3000);
+    }
 
     function _mergeNotifs(roleDocs, personalDocs) {
         var map = {};

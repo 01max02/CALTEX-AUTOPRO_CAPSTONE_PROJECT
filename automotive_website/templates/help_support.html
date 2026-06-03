@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Help & Support</title>
     <link rel="icon" type="image/png" href="../static/img/LOGO_CALTEX.png" />
+    <link rel="stylesheet" href="../static/css/style.css">
+    <link rel="stylesheet" href="../static/css/admin.css">
     <link rel="stylesheet" href="../static/css/help_support.css">
 </head>
 <body class="portal-body" data-page="help_support">
@@ -58,7 +60,7 @@
     if (!_role) { window.location.href = 'login.html'; return; }
     window._hsRole = _role;
     if (_role === 'admin') {
-        var scripts = ['../static/js/admin_firebase.js','../static/js/admin_functions.js','../static/js/admin.js','../static/js/admin_sidebar.js','../static/js/customer_shared.js'];
+        var scripts = ['../static/js/admin_sidebar.js','../static/js/admin_firebase.js','../static/js/admin_functions.js','../static/js/admin.js','../static/js/customer_shared.js'];
         (function loadNext(i) {
             if (i >= scripts.length) return;
             var s = document.createElement('script'); s.src = scripts[i];

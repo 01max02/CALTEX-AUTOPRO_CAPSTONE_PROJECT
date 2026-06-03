@@ -103,50 +103,8 @@ function buildAdminNotifications() {
 
 // ── Render panel ────────────────────────────────────────────
 function renderAdminNotifications() {
-    const notifs    = buildAdminNotifications();
-    const unread    = notifs.filter(n => n.unread).length;
-    const badge     = document.getElementById('adminNotifBadge');
-    const countEl   = document.getElementById('adminNotifPanelCount');
-    const listEl    = document.getElementById('adminNotifList');
-
-    // Badge on button
-    if (badge) {
-        badge.textContent = unread;
-        badge.style.display = unread > 0 ? 'inline-flex' : 'none';
-    }
-
-    // ── Update the header badge — use only Firestore unread count ──
-    const headerBadge = document.getElementById('adminHeaderNotifBadge');
-    if (headerBadge) {
-        const uid = (firebase.auth().currentUser || {}).uid;
-        const fbUnread = uid ? (window._fbNotifications || []).filter(n => {
-            return (n.readBy || {})[uid] !== true;
-        }).length : 0;
-        headerBadge.textContent = fbUnread > 99 ? '99+' : fbUnread;
-        headerBadge.style.display = fbUnread > 0 ? 'flex' : 'none';
-    }
-    if (countEl) countEl.textContent = notifs.length + ' alert' + (notifs.length !== 1 ? 's' : '');
-
-    if (!listEl) return;
-
-    if (notifs.length === 0) {
-        listEl.innerHTML = '<div class="admin-notif-empty"><div class="admin-notif-empty-icon">🔔</div><div class="admin-notif-empty-text">No notifications</div></div>';
-        return;
-    }
-
-    listEl.innerHTML = notifs.map((n, i) => {
-        return `<div class="admin-notif-item${n.unread ? ' unread' : ''}" onclick="adminNotifClick(${i})">
-            <div class="admin-notif-icon">${n.icon}</div>
-            <div>
-                <div class="admin-notif-title">${n.title}</div>
-                <div class="admin-notif-msg">${n.msg}</div>
-                <div class="admin-notif-time">${n.time}</div>
-            </div>
-        </div>`;
-    }).join('');
-
-    // Store actions for click handler
-    window._adminNotifActions = notifs.map(n => n.action);
+    // Delegate to the Firestore-backed panel renderer
+    _renderAdminNotifPanel();
 }
 
 window.adminNotifClick = function (i) {
@@ -215,9 +173,6 @@ function _renderAdminNotifPanel() {
     const countEl = document.getElementById('adminNotifPanelCount');
     if (!listEl) return;
 
-    // Local-data alerts (PMS, stock, services) — from Firestore-backed window.assets
-    const localNotifs = buildAdminNotifications();
-
     // Firestore notifications
     const uid = (firebase.auth().currentUser || {}).uid;
     const _bellIcon = '<span style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;background:rgba(0,48,135,0.1);border-radius:8px;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#003087" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>';
@@ -232,7 +187,7 @@ function _renderAdminNotifPanel() {
         _docId: n._id,
     }));
 
-    const all = [...fbNotifs, ...localNotifs];
+    const all = [...fbNotifs];
     // Badge counts only Firestore unread (local alerts don't persist as "read")
     const fbUnreadCount = fbNotifs.filter(n => n.unread).length;
 
@@ -299,12 +254,14 @@ window._adminDeleteNotif = function(docId) {
         window._fbNotifications = window._fbNotifications.filter(n => n._id !== docId);
     }
     _renderAdminNotifPanel();
+    _showAdminNotifToast('Notification deleted');
 };
 
 window.clearAdminNotifications = function () {
     // Delete ALL Firestore notifications shown in the panel
     const db = firebase.firestore();
     const batch = db.batch();
+    const count = (window._fbNotifications || []).length;
     (window._fbNotifications || []).forEach(n => {
         batch.delete(db.collection('notifications').doc(n._id));
     });
@@ -317,7 +274,28 @@ window.clearAdminNotifications = function () {
     if (listEl)  listEl.innerHTML = '<div class="admin-notif-empty"><div class="admin-notif-empty-icon">🔔</div><div class="admin-notif-empty-text">No notifications</div></div>';
     if (badge)   badge.style.display = 'none';
     if (countEl) countEl.textContent = '0 notifications';
+    _showAdminNotifToast(count + ' notification' + (count !== 1 ? 's' : '') + ' deleted');
 };
+
+// ── Toast helper for admin notification actions ──
+function _showAdminNotifToast(msg) {
+    // Reuse existing toast element if available, otherwise create one
+    var toast = document.getElementById('adminNotifToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'adminNotifToast';
+        toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a202c;color:white;padding:12px 24px;border-radius:12px;font-size:13px;font-weight:600;z-index:99999;opacity:0;transition:all .3s cubic-bezier(0.4,0,0.2,1);pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.2);display:flex;align-items:center;gap:8px;';
+        document.body.appendChild(toast);
+    }
+    toast.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>' + msg;
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateX(-50%) translateY(0)';
+    clearTimeout(window._adminNotifToastTimer);
+    window._adminNotifToastTimer = setTimeout(function() {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(-50%) translateY(80px)';
+    }, 3000);
+}
 
 // ── DSS — Stock Replenishment Decision Support System ───────
 

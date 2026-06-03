@@ -91,6 +91,15 @@
     });
   }
 
+  // ── Date format helper (e.g. "2026-06-01" → "June 1, 2026") ──
+  const _MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  function fmtDateLong(dateStr) {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    if (isNaN(d)) return dateStr;
+    return _MONTHS_FULL[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+  }
+
   // ── Vehicle icon SVG based on type ───────────────────────
   function vehicleIconSvg(type, size) {
     const t = (type || '').toLowerCase();
@@ -178,9 +187,6 @@
       return `
         <div class="cu-vehicle-card" onclick="cuShowVehicle('${v.id}')">
           <div class="cu-vehicle-card-header">
-            <div class="cu-vehicle-card-icon">
-              ${vehicleIconSvg(v.type, 24)}
-            </div>
             <div style="flex:1;min-width:0;">
               <div class="cu-vehicle-plate">${v.plate || '—'}</div>
               <div class="cu-vehicle-desc">${v.desc || '—'}</div>
@@ -195,7 +201,7 @@
               </div>
               <div class="cu-vehicle-meta-item">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                <span>${v.lastSvcDate || '—'}</span>
+                <span>${v.lastSvcDate ? fmtDateLong(v.lastSvcDate) : '—'}</span>
               </div>
             </div>
           </div>
@@ -246,12 +252,11 @@
 
     document.getElementById('cuModalPlate').textContent = v.plate || '—';
     document.getElementById('cuModalDesc').textContent = v.desc || '—';
-    document.getElementById('cuModalIcon').innerHTML = vehicleIconSvg(v.type, 22);
 
     document.getElementById('cuModalDetails').innerHTML = `
       ${detailRow('#718096', 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 5v5l3 3', 'Odometer', v.odo ? String(v.odo).replace(/\s*km$/i, '') + ' km' : '—')}
-      ${detailRow('#2b6cb0', 'M3 4h18v18H3zM16 2v4M8 2v4M3 10h18', 'Last Service', v.lastSvcDate || '—')}
-      ${detailRow(color, 'M8 6l4-4 4 4M8 18l4 4 4-4M4 12h16', 'Next PMS Due', nextPms)}
+      ${detailRow('#2b6cb0', 'M3 4h18v18H3zM16 2v4M8 2v4M3 10h18', 'Last Service', v.lastSvcDate ? fmtDateLong(v.lastSvcDate) : '—')}
+      ${detailRow(color, 'M8 6l4-4 4 4M8 18l4 4 4-4M4 12h16', 'Next PMS Due', fmtDateLong(nextPms))}
       ${detailRow(color, 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'Status', `<span style="background:${bg};color:${color};padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:700;">${statusLabel}</span>`)}
       ${status === 'Overdue' ? `
         <div style="margin-top:14px;padding:12px;background:#fff5f5;border-radius:12px;border:1.5px solid #fed7d7;" id="cuRescheduleSection">

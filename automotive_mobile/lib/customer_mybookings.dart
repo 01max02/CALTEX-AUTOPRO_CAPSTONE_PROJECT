@@ -116,26 +116,36 @@ class _CustomerMyBookingsState extends State<CustomerMyBookings> {
     final time = data['preferredTime'] as String? ?? '';
     final status = data['status'] as String? ?? 'Pending';
     final notes = data['notes'] as String? ?? '';
+    final previousDate = data['previousDate'] as String? ?? '';
+    final isRescheduled = previousDate.isNotEmpty && previousDate != date;
 
     Color statusColor;
     IconData statusIcon;
-    switch (status.toLowerCase()) {
-      case 'approved':
-        statusColor = Colors.green;
-        statusIcon = Icons.check_circle_outline;
-        break;
-      case 'completed':
-        statusColor = const Color(0xFF003087);
-        statusIcon = Icons.task_alt;
-        break;
-      case 'cancelled':
-      case 'rejected':
-        statusColor = Colors.red;
-        statusIcon = Icons.cancel_outlined;
-        break;
-      default: // Pending
-        statusColor = Colors.orange;
-        statusIcon = Icons.schedule_outlined;
+    String displayStatus = status;
+
+    if (isRescheduled && status.toLowerCase() == 'approved') {
+      statusColor = const Color(0xFF003087);
+      statusIcon = Icons.update;
+      displayStatus = 'Rescheduled';
+    } else {
+      switch (status.toLowerCase()) {
+        case 'approved':
+          statusColor = Colors.green;
+          statusIcon = Icons.check_circle_outline;
+          break;
+        case 'completed':
+          statusColor = const Color(0xFF003087);
+          statusIcon = Icons.task_alt;
+          break;
+        case 'cancelled':
+        case 'rejected':
+          statusColor = Colors.red;
+          statusIcon = Icons.cancel_outlined;
+          break;
+        default: // Pending
+          statusColor = Colors.orange;
+          statusIcon = Icons.schedule_outlined;
+      }
     }
 
     return Container(
@@ -148,15 +158,6 @@ class _CustomerMyBookingsState extends State<CustomerMyBookings> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Header: plate + status
         Row(children: [
-          Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(
-              color: _red.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.directions_car_outlined, color: _red, size: 20),
-          ),
-          const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(plate, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF1a202c))),
             if (vehicleDesc.isNotEmpty)
@@ -171,7 +172,7 @@ class _CustomerMyBookingsState extends State<CustomerMyBookings> {
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Icon(statusIcon, size: 13, color: statusColor),
               const SizedBox(width: 4),
-              Text(status, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: statusColor)),
+              Text(displayStatus, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: statusColor)),
             ]),
           ),
         ]),
@@ -215,6 +216,34 @@ class _CustomerMyBookingsState extends State<CustomerMyBookings> {
             Expanded(child: Text(notes,
                 style: const TextStyle(fontSize: 11, color: Color(0xFF718096), fontStyle: FontStyle.italic))),
           ]),
+        ],
+
+        // Reschedule note
+        if (isRescheduled) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBEB),
+              border: Border.all(color: const Color(0xFFF6E05E)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(children: [
+              const Icon(Icons.update, size: 14, color: Color(0xFF92400E)),
+              const SizedBox(width: 8),
+              Expanded(child: RichText(
+                text: TextSpan(
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF92400E)),
+                  children: [
+                    const TextSpan(text: 'Rescheduled from '),
+                    TextSpan(text: _fmtDate(previousDate), style: const TextStyle(fontWeight: FontWeight.w700, decoration: TextDecoration.lineThrough)),
+                    const TextSpan(text: ' to '),
+                    TextSpan(text: _fmtDate(date), style: const TextStyle(fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              )),
+            ]),
+          ),
         ],
       ]),
     );

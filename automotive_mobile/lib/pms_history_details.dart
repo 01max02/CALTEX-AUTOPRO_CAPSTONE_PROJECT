@@ -72,16 +72,6 @@ class PmsHistoryDetails extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const SizedBox(height: 44),
-                          Container(
-                            width: 60, height: 60,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: Icon(_vehicleIcon,
-                                color: Colors.white, size: 30),
-                          ),
-                          const SizedBox(height: 10),
                           Text(plate,
                               style: const TextStyle(
                                   color: Colors.white,

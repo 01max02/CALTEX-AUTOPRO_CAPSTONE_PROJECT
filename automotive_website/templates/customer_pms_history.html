@@ -506,9 +506,6 @@ firebase.auth().onAuthStateChanged(function(user) {
           desc:  (v.desc  || '').toLowerCase(),
           html: `
             <div class="ph-vehicle-card" onclick="window.location.href='${detailsUrl}'">
-              <div class="ph-vehicle-icon">
-                ${vehicleIconSvg(v.type, 22)}
-              </div>
               <div style="flex:1;">
                 <div class="ph-plate">${v.plate}</div>
                 <div class="ph-desc">${v.desc || '—'}</div>

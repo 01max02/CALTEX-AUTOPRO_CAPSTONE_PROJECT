@@ -230,12 +230,6 @@ class _VehicleHistoryCard extends StatelessWidget {
             ),
             padding: const EdgeInsets.all(16),
             child: Row(children: [
-              Container(
-                width: 46, height: 46,
-                decoration: BoxDecoration(color: _red.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
-                child: Icon(_vehicleIcon, color: _red, size: 22),
-              ),
-              const SizedBox(width: 14),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(plate, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1a202c))),
                 Text(desc,  style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
