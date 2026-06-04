@@ -205,18 +205,12 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
         child: Row(children: [
-          Container(width: 44, height: 44,
-            decoration: BoxDecoration(color: const Color(0xFFF0F4FF), borderRadius: BorderRadius.circular(12)),
-            child: Icon(
-              isTruck ? Icons.local_shipping_outlined : Icons.directions_car_outlined,
-              color: isTruck ? _red : const Color(0xFF003087), size: 22,
-            )),
-          const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(v['plate']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             Text(v['desc']!, style: const TextStyle(fontSize: 12, color: Color(0xFF4a5568))),
             Text('${v['owner']} • ${v['odo']}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
           ])),
+          const Icon(Icons.chevron_right, size: 20, color: Color(0xFFa0aec0)),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF718096)),
             onSelected: (val) {
@@ -249,10 +243,6 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
               decoration: const BoxDecoration(color: _red,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
               child: Row(children: [
-                Container(width: 44, height: 44,
-                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(Icons.directions_car_outlined, color: Colors.white, size: 22)),
-                const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(v['plate']!, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                   Text(v['desc']!, style: const TextStyle(color: Colors.white70, fontSize: 12)),

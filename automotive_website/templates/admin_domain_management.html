@@ -167,13 +167,9 @@ function dmRenderCards() {
     card.onclick = function(){ dmOpenDomain(d); };
 
     var hex = d.color;
-    var iconBg = 'background:' + hex + '1a;';
 
     card.innerHTML =
-      '<div style="width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;' + iconBg + '">'
-      + _dmIcon(d.icon, hex, 22)
-      + '</div>'
-      + '<div style="flex:1;">'
+      '<div style="flex:1;">'
       + '<div style="font-weight:600;font-size:0.95rem;color:#1a202c;">' + d.label + '</div>'
       + '<div id="dmCount_' + d.key + '" style="font-size:0.78rem;color:#718096;margin-top:2px;">Loading…</div>'
       + '</div>'
@@ -246,9 +242,6 @@ function dmRenderItems() {
   list.innerHTML = filtered.map(function(item) {
     return '<div class="table-row" style="grid-template-columns:1fr 160px;align-items:center;">'
       + '<div style="display:flex;align-items:center;gap:0.75rem;">'
-      + '<div style="width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:' + color + '1a;flex-shrink:0;">'
-      + _dmIcon(_dmDomains.find(function(d){ return d.key===_dmCurrentKey; })?.icon || 'category', color, 16)
-      + '</div>'
       + '<span style="font-weight:500;font-size:0.88rem;color:#1a202c;">' + item.name + '</span>'
       + '</div>'
       + '<div style="display:flex;gap:0.3rem;">'

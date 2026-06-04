@@ -233,10 +233,6 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
         child: Row(children: [
-          Container(width: 44, height: 44,
-            decoration: BoxDecoration(color: const Color(0xFFF0F4FF), borderRadius: BorderRadius.circular(12)),
-            child: const Icon(Icons.build_outlined, color: _red, size: 22)),
-          const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(s['plate'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             Text((s['desc'] as String).isNotEmpty ? s['desc'] as String : s['plate'] as String,
@@ -252,6 +248,8 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
               child: Text(s['status'] as String, style: TextStyle(fontSize: 10, color: sc, fontWeight: FontWeight.w600)),
             ),
           ]),
+          const SizedBox(width: 4),
+          const Icon(Icons.chevron_right, size: 20, color: Color(0xFFa0aec0)),
         ]),
       ),
     );
@@ -274,10 +272,6 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
                 decoration: const BoxDecoration(color: _red, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
                 child: Row(children: [
-                  Container(width: 44, height: 44,
-                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(Icons.build_outlined, color: Colors.white, size: 22)),
-                  const SizedBox(width: 12),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(s['plate'] as String, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                     Text(s['desc'] as String, style: const TextStyle(color: Colors.white70, fontSize: 12)),

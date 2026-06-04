@@ -317,6 +317,40 @@ function openStockActionModal() {
     document.getElementById('stockActionModal').classList.add('active');
 }
 
+// Auto-open Add Stock modal if navigated from Item Master with item data
+(function() {
+    var hash = window.location.hash;
+    if (hash.startsWith('#add=')) {
+        var parts = decodeURIComponent(hash.substring(5)).split('|');
+        if (parts.length >= 4) {
+            setTimeout(function() {
+                _addFoundMaster = {
+                    itemNum: parts[0],
+                    itemName: parts[1],
+                    commodityGroup: parts[2],
+                    uom: parts[3],
+                };
+                // Open modal and pre-fill
+                document.getElementById('invItemSearch').value = parts[1];
+                document.getElementById('invPreviewInfo').innerHTML =
+                    '<div style="display:grid;grid-template-columns:110px 1fr;gap:0.3rem 0;">'
+                    + '<span style="color:#718096;font-size:0.78rem;">Item Number</span><span style="font-weight:600;font-size:0.83rem;">' + parts[0] + '</span>'
+                    + '<span style="color:#718096;font-size:0.78rem;">Item Name</span><span style="font-weight:600;font-size:0.83rem;">' + parts[1] + '</span>'
+                    + '<span style="color:#718096;font-size:0.78rem;">Group</span><span style="font-weight:600;font-size:0.83rem;">' + parts[2] + '</span>'
+                    + '<span style="color:#718096;font-size:0.78rem;">UOM</span><span style="font-weight:600;font-size:0.83rem;">' + parts[3] + '</span>'
+                    + '</div>';
+                document.getElementById('invItemPreview').style.display = 'block';
+                document.getElementById('invStockFields').style.display = 'flex';
+                document.getElementById('invAlreadyExists').style.display = 'none';
+                document.getElementById('invNotFound').style.display = 'none';
+                document.getElementById('addInventoryModal').classList.add('active');
+                // Clean hash
+                history.replaceState(null, '', window.location.pathname);
+            }, 1000);
+        }
+    }
+})();
+
 // ── Shared state ──
 var _receiveFoundItem = null;
 var _addFoundMaster = null;
@@ -389,7 +423,7 @@ function stockConfirmReceive() {
 
     db.collection('stock_inventory').doc(docId).update({
         stock: newStock,
-        status: newStock >= min ? 'OK' : 'Low',
+        status: newStock > min ? 'OK' : 'Low',
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }).then(function() {
         // Log to transactions collection so it appears in Inventory Transactions
@@ -496,7 +530,7 @@ function stockSaveNewItem() {
         group: _addFoundMaster.commodityGroup || '',
         uom: _addFoundMaster.uom || '',
         stock: stock, min: min, max: max, reorder: reorder,
-        status: stock >= min ? 'OK' : 'Low',
+        status: stock > min ? 'OK' : 'Low',
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
@@ -634,7 +668,7 @@ function stockSaveEdit() {
     if (btn) { btn.disabled = true; btn.innerHTML = spinHtml; }
     firebase.firestore().collection('stock_inventory').doc(_editingInvDocId).update({
         stock: stock, min: min, max: max, reorder: reorder,
-        status: stock >= min ? 'OK' : 'Low',
+        status: stock > min ? 'OK' : 'Low',
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }).then(function() {
         closeModal('editInventoryModal');

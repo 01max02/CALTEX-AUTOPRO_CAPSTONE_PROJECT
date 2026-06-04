@@ -703,21 +703,13 @@ class _AdminDSSState extends State<AdminDSS> {
 
             // ── Row 1: Item name + priority badge ──
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Row(children: [
-                Container(
-                  width: 38, height: 38,
-                  decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-                  child: Icon(Icons.inventory_2_outlined, color: color, size: 18),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(item['name']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                Text(
+                  '${item['itemNum'] ?? ''}${item['itemNum'] != null && item['group'] != null ? '  ·  ' : ''}${item['group'] ?? ''}',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF718096)),
                 ),
-                const SizedBox(width: 10),
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(item['name']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  Text(
-                    '${item['itemNum'] ?? ''}${item['itemNum'] != null && item['group'] != null ? '  ·  ' : ''}${item['group'] ?? ''}',
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF718096)),
-                  ),
-                ]),
-              ]),
+              ])),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -1170,10 +1162,6 @@ class _AdminDSSState extends State<AdminDSS> {
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
               decoration: BoxDecoration(color: color, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
               child: Row(children: [
-                Container(width: 44, height: 44,
-                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(Icons.inventory_2_outlined, color: Colors.white, size: 22)),
-                const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(item['name']!, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                   Text(item['group'] ?? '—', style: const TextStyle(color: Colors.white70, fontSize: 12)),
@@ -1348,12 +1336,6 @@ class _AdminDSSState extends State<AdminDSS> {
                   Padding(
                     padding: const EdgeInsets.all(14),
                     child: Row(children: [
-                      Container(
-                        width: 48, height: 48,
-                        decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                        child: Icon(Icons.directions_car_outlined, color: color, size: 24),
-                      ),
-                      const SizedBox(width: 12),
                       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(a['plate']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                         Text(a['desc']!, style: const TextStyle(fontSize: 12, color: Color(0xFF4a5568))),
@@ -1369,6 +1351,8 @@ class _AdminDSSState extends State<AdminDSS> {
                         decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
                         child: Text(a['priority']!, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w700)),
                       ),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.chevron_right, size: 18, color: Color(0xFFa0aec0)),
                     ]),
                   ),
                 ]),
@@ -1400,10 +1384,6 @@ class _AdminDSSState extends State<AdminDSS> {
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
               decoration: BoxDecoration(color: color, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
               child: Row(children: [
-                Container(width: 44, height: 44,
-                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(Icons.directions_car_outlined, color: Colors.white, size: 22)),
-                const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(a['plate']!, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                   Text(a['desc']!, style: const TextStyle(color: Colors.white70, fontSize: 12)),

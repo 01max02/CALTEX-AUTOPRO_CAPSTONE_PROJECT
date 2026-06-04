@@ -402,7 +402,7 @@
     _setStat('statDueForPms', dueForPms);
 
     const lowStock = (window._fbInventory || []).filter(i =>
-      (i.status || '').toLowerCase() === 'low'
+      (i.status || '').toLowerCase() === 'low' || ((i.stock ?? 0) <= (i.min ?? 0) && (i.min ?? 0) > 0)
     ).length;
     _setStat('statLowStock', lowStock);
 
@@ -471,7 +471,7 @@
   function _updateInventoryStats() {
     const inv = window._fbInventory || [];
     _setStat('totalInventoryItems', inv.length);
-    const low = inv.filter(i => (i.status || '').toLowerCase() === 'low');
+    const low = inv.filter(i => (i.status || '').toLowerCase() === 'low' || ((i.stock ?? 0) <= (i.minLevel ?? i.min ?? 0) && (i.minLevel ?? i.min ?? 0) > 0));
     _setStat('lowStockCount', low.length);
     _setStat('inStockCount', inv.length - low.length);
     const total = inv.reduce((s, i) => {

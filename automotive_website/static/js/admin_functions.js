@@ -1381,11 +1381,11 @@ function renderItemMasterList() {
         filtered = itemMaster.filter(function(i){ return (i.itemName||'').toLowerCase().includes(q) || (i.itemNum||'').toLowerCase().includes(q); });
     }
 
-    // Sort by item number sequentially (ITM-001, ITM-002, ...)
+    // Sort by item number descending (newest first — ITM-003, ITM-002, ITM-001)
     filtered = filtered.slice().sort(function(a, b) {
         var na = parseInt((a.itemNum || '').replace(/[^0-9]/g, '')) || 0;
         var nb = parseInt((b.itemNum || '').replace(/[^0-9]/g, '')) || 0;
-        return na - nb;
+        return nb - na;
     });
 
     if (filtered.length === 0) {
@@ -1563,16 +1563,19 @@ function viewItemMasterDetails(itemNum) {
     if (groupEl) groupEl.textContent = item.commodityGroup || '—';
 
     // Detail rows — same as mobile _detailRow
+    var isService = (item.itemType || '') === 'Service';
     var rows = [
         ['Item Number', item.itemNum || '—'],
-        ['SKU', item.sku || '—'],
+    ];
+    if (!isService && item.sku) rows.push(['SKU', item.sku]);
+    rows.push(
         ['Item Name', item.itemName || '—'],
         ['Description', item.description || '—'],
         ['Commodity Group', item.commodityGroup || '—'],
         ['UOM', item.uom || '—'],
         ['Cost', '₱' + (parseFloat(String(item.cost||0).replace(/[₱,]/g,''))||0).toLocaleString('en-PH',{minimumFractionDigits:2})],
-        ['Type', item.itemType || '—'],
-    ];
+        ['Type', item.itemType || '—']
+    );
     var rowsEl = document.getElementById('imDetailRows');
     if (rowsEl) rowsEl.innerHTML = rows.map(function(r) {
         return '<div style="display:flex;padding:0.55rem 0;border-bottom:1px solid #f7fafc;">'
@@ -1711,6 +1714,21 @@ document.addEventListener('DOMContentLoaded', function() {
                     .then(function() {
                         showToast('Item added successfully!', 'success');
                         closeModal('addItemMasterModal');
+                        // Auto-prompt to set stock levels for Material items
+                        if (data.type === 'Material') {
+                            setTimeout(function() {
+                                if (confirm('Would you like to set stock levels (min, max, current quantity) for "' + data.name + '" now?')) {
+                                    // Pre-fill and open the Add Stock modal
+                                    _addFoundMaster = {
+                                        itemNum: data.num,
+                                        itemName: data.name,
+                                        commodityGroup: data.group,
+                                        uom: data.uom,
+                                    };
+                                    openAddInventoryModalWithItem(_addFoundMaster);
+                                }
+                            }, 300);
+                        }
                     })
                     .catch(function(err) { showToast('Save failed: ' + err.message, 'error'); })
                     .finally(function() { if (submitBtn2) { submitBtn2.disabled = false; submitBtn2.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save'; } });

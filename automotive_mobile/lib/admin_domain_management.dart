@@ -81,15 +81,6 @@ class _AdminDomainManagementState extends State<AdminDomainManagement> {
                 boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
               ),
               child: Row(children: [
-                Container(
-                  width: 46, height: 46,
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(d['icon'] as IconData, color: color, size: 22),
-                ),
-                const SizedBox(width: 14),
                 Expanded(child: Text(d['label'] as String,
                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF1a202c)))),
                 const Icon(Icons.chevron_right, color: Color(0xFFcbd5e0), size: 20),
@@ -125,107 +116,41 @@ class _DomainDetailScreenState extends State<_DomainDetailScreen> {
 
   void _showAddEdit({DocumentSnapshot? doc}) {
     final ctrl = TextEditingController(text: doc != null ? (doc['name'] as String? ?? '') : '');
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (sheetCtx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Container(
-                width: 40, height: 40,
-                decoration: BoxDecoration(color: widget.color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-                child: Icon(widget.icon, color: widget.color, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Text(doc == null ? 'Add ${widget.label}' : 'Edit',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              const Spacer(),
-              GestureDetector(
-                onTap: () => Navigator.pop(sheetCtx),
-                child: const Icon(Icons.close, color: Color(0xFF718096))),
-            ]),
-            const SizedBox(height: 20),
-            TextField(
-              controller: ctrl,
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: 'Name *',
-                border: const OutlineInputBorder(),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: widget.color, width: 2)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(children: [
-              Expanded(child: OutlinedButton(
-                onPressed: () => Navigator.pop(sheetCtx),
-                child: const Text('Cancel'),
-              )),
-              const SizedBox(width: 12),
-              Expanded(child: ElevatedButton(
-                onPressed: () async {
-                  final name = ctrl.text.trim();
-                  if (name.isEmpty) return;
-                  // Close sheet first, then show snackbar on the parent scaffold
-                  Navigator.pop(sheetCtx);
-                  try {
-                    if (doc == null) {
-                      await _col.add({'name': name, 'createdAt': FieldValue.serverTimestamp()});
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: const Row(children: [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Item added successfully!')]),
-                          backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
-                      }
-                    } else {
-                      await doc.reference.update({'name': name});
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: const Row(children: [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Item updated successfully!')]),
-                          backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
-                      }
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
-                    }
-                  }
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: widget.color, foregroundColor: Colors.white),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.save_outlined, size: 16),
-                  const SizedBox(width: 6),
-                  Text(doc == null ? 'Save' : 'Update'),
-                ]),
-              )),
-            ]),
-          ]),
-        ),
-      ),
-    ).whenComplete(() => ctrl.dispose()); // dispose controller when sheet closes
+      builder: (sheetCtx) {
+        return _AddEditSheet(
+          ctrl: ctrl,
+          doc: doc,
+          label: widget.label,
+          color: widget.color,
+          col: _col,
+          parentContext: context,
+          parentMounted: () => mounted,
+        );
+      },
+    );
   }
 
   void _confirmDelete(DocumentSnapshot doc) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: Text('Delete from ${widget.label}'),
         content: Text('Delete "${doc['name']}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogCtx);
               try {
                 await doc.reference.delete();
                 if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Item deleted successfully!')]),
+                  content: const Row(children: [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Item deleted successfully!')]),
                   backgroundColor: Colors.red, behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
               } catch (e) {
@@ -266,7 +191,6 @@ class _DomainDetailScreenState extends State<_DomainDetailScreen> {
           if (docs.isEmpty) {
             return Center(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Icon(widget.icon, size: 48, color: widget.color.withOpacity(0.3)),
                 const SizedBox(height: 12),
                 Text('No ${widget.label} yet', style: const TextStyle(color: Color(0xFF718096))),
               ]),
@@ -287,15 +211,6 @@ class _DomainDetailScreenState extends State<_DomainDetailScreen> {
                   boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
                 ),
                 child: Row(children: [
-                  Container(
-                    width: 36, height: 36,
-                    decoration: BoxDecoration(
-                      color: widget.color.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(widget.icon, color: widget.color, size: 18),
-                  ),
-                  const SizedBox(width: 12),
                   Expanded(child: Text(name,
                       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
                   PopupMenuButton<String>(
@@ -319,6 +234,112 @@ class _DomainDetailScreenState extends State<_DomainDetailScreen> {
             },
           );
         },
+      ),
+    );
+  }
+}
+
+class _AddEditSheet extends StatefulWidget {
+  final TextEditingController ctrl;
+  final DocumentSnapshot? doc;
+  final String label;
+  final Color color;
+  final CollectionReference col;
+  final BuildContext parentContext;
+  final bool Function() parentMounted;
+
+  const _AddEditSheet({
+    required this.ctrl,
+    required this.doc,
+    required this.label,
+    required this.color,
+    required this.col,
+    required this.parentContext,
+    required this.parentMounted,
+  });
+
+  @override
+  State<_AddEditSheet> createState() => _AddEditSheetState();
+}
+
+class _AddEditSheetState extends State<_AddEditSheet> {
+  @override
+  void dispose() {
+    widget.ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Text(widget.doc == null ? 'Add ${widget.label}' : 'Edit',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Spacer(),
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: const Icon(Icons.close, color: Color(0xFF718096))),
+          ]),
+          const SizedBox(height: 20),
+          TextField(
+            controller: widget.ctrl,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Name *',
+              border: const OutlineInputBorder(),
+              focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: widget.color, width: 2)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(children: [
+            Expanded(child: OutlinedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            )),
+            const SizedBox(width: 12),
+            Expanded(child: ElevatedButton(
+              onPressed: () async {
+                final name = widget.ctrl.text.trim();
+                if (name.isEmpty) return;
+                Navigator.pop(context);
+                try {
+                  if (widget.doc == null) {
+                    await widget.col.add({'name': name, 'createdAt': FieldValue.serverTimestamp()});
+                    if (widget.parentMounted()) {
+                      ScaffoldMessenger.of(widget.parentContext).showSnackBar(SnackBar(
+                        content: const Row(children: [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Item added successfully!')]),
+                        backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                    }
+                  } else {
+                    await widget.doc!.reference.update({'name': name});
+                    if (widget.parentMounted()) {
+                      ScaffoldMessenger.of(widget.parentContext).showSnackBar(SnackBar(
+                        content: const Row(children: [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Item updated successfully!')]),
+                        backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                    }
+                  }
+                } catch (e) {
+                  if (widget.parentMounted()) {
+                    ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: widget.color, foregroundColor: Colors.white),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.save_outlined, size: 16),
+                const SizedBox(width: 6),
+                Text(widget.doc == null ? 'Save' : 'Update'),
+              ]),
+            )),
+          ]),
+        ]),
       ),
     );
   }

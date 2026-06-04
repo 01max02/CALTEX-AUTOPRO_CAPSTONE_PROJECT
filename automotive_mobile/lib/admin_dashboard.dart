@@ -400,7 +400,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 final stockDocs = stockSnap.data?.docs ?? [];
                 final lowStock = stockDocs.where((d) {
                   final data = d.data() as Map<String, dynamic>;
-                  return (data['status'] as String? ?? '') == 'Low';
+                  final stock = (data['stock'] as num?)?.toInt() ?? 0;
+                  final min = (data['min'] as num?)?.toInt() ?? 0;
+                  return (data['status'] as String? ?? '') == 'Low' || (min > 0 && stock <= min);
                 }).length;
                 final vehicleDocs = vehicleSnap.data?.docs ?? [];
                 final dueForPms = vehicleDocs.where((d) {
@@ -1383,12 +1385,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
         ),
         child: Row(children: [
-          Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(color: const Color(0xFFF0F4FF), borderRadius: BorderRadius.circular(10)),
-            child: const Icon(Icons.build_outlined, color: _red, size: 18),
-          ),
-          const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(plate, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             Text('$serviceName • $mechanic', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
@@ -1398,6 +1394,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
             decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
             child: Text(status, style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w600)),
           ),
+          const SizedBox(width: 6),
+          const Icon(Icons.chevron_right, size: 18, color: Color(0xFFa0aec0)),
         ]),
       ),
     );
@@ -1474,10 +1472,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
               decoration: const BoxDecoration(color: _red,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
               child: Row(children: [
-                Container(width: 44, height: 44,
-                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(Icons.build_outlined, color: Colors.white, size: 22)),
-                const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(s['plate'] as String? ?? '—',
                     style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
@@ -1667,7 +1661,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               final minLevel     = (stockDoc['min'] as num?)?.toInt() ?? 0;
                               await stockDoc.reference.update({
                                 'stock': newStock,
-                                'status': newStock >= minLevel ? 'OK' : 'Low',
+                                'status': newStock > minLevel ? 'OK' : 'Low',
                                 'updatedAt': FieldValue.serverTimestamp(),
                               });
                             }
@@ -1950,12 +1944,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
                           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
                         child: Row(children: [
-                          Container(width: 42, height: 42,
-                            decoration: BoxDecoration(
-                              color: isIn ? const Color(0xFFebf8ff) : Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(10)),
-                            child: Icon(isIn ? Icons.download_outlined : Icons.upload_outlined, color: typeColor, size: 20)),
-                          const SizedBox(width: 12),
                           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Text(t['item']!, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                             Text(
@@ -1966,7 +1954,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             Row(children: [
                               const Icon(Icons.calendar_today_outlined, size: 10, color: Color(0xFF718096)),
                               const SizedBox(width: 3),
-                              Text(t['date']!, style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
+                              Text(_fmtDateLong(t['date']!), style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
                               const SizedBox(width: 8),
                               const Icon(Icons.person_outline, size: 10, color: Color(0xFF718096)),
                               const SizedBox(width: 3),
@@ -1982,6 +1970,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                 style: TextStyle(fontSize: 10, color: typeColor, fontWeight: FontWeight.w700)),
                             ),
                           ]),
+                          const SizedBox(width: 6),
+                          const Icon(Icons.chevron_right, size: 18, color: Color(0xFFa0aec0)),
                         ]),
                       ),
                     );
@@ -2015,10 +2005,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                Container(width: 44, height: 44,
-                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
-                  child: Icon(isIn ? Icons.download_outlined : Icons.upload_outlined, color: Colors.white, size: 22)),
-                const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(t['item']!, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                   Text(isIn ? 'Stock In' : 'Stock Out', style: const TextStyle(color: Colors.white70, fontSize: 12)),
@@ -2037,7 +2023,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   .replaceAll(RegExp(r'for maintenance SVC-\d+'), '')),
                 _txnDetailRow('Type', isIn ? 'Stock In (IN)' : 'Stock Out (OUT)'),
                 _txnDetailRow('Quantity', t['qty'] ?? '—'),
-                _txnDetailRow('Date', t['date'] ?? '—'),
+                _txnDetailRow('Date', _fmtDateLong(t['date'] ?? '—')),
                 _txnDetailRow('Performed By', t['by'] ?? '—'),
                 const SizedBox(height: 8),
               ]),
@@ -2302,10 +2288,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
                           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
                         child: Row(children: [
-                          Container(width: 44, height: 44,
-                            decoration: BoxDecoration(color: typeBg, borderRadius: BorderRadius.circular(12)),
-                            child: Icon(isService ? Icons.build_outlined : Icons.inventory_2_outlined, color: typeColor, size: 20)),
-                          const SizedBox(width: 12),
                           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Text(iss['plate']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                             Text('${iss['itemName']} • ${iss['commodityGroup']}', style: const TextStyle(fontSize: 11, color: Color(0xFF4a5568))),
@@ -2316,7 +2298,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                 child: Text(iss['itemType']!, style: TextStyle(fontSize: 9, color: typeColor, fontWeight: FontWeight.w700)),
                               ),
                               const SizedBox(width: 6),
-                              Text(iss['date']!, style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
+                              Text(_fmtDateLong(iss['date']!), style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
                             ]),
                           ])),
                           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -2325,6 +2307,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             Text('${iss['qty']} ${iss['uom']}',
                               style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
                           ]),
+                          const SizedBox(width: 6),
+                          const Icon(Icons.chevron_right, size: 18, color: Color(0xFFa0aec0)),
                         ]),
                       ),
                     );
@@ -2407,7 +2391,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     ]),
                     Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                       const Text('Date', style: TextStyle(color: Color(0xFF718096), fontSize: 10, fontWeight: FontWeight.w700)),
-                      Text(iss['date']!, style: const TextStyle(color: Color(0xFF1a202c), fontSize: 13, fontWeight: FontWeight.w700)),
+                      Text(_fmtDateLong(iss['date']!), style: const TextStyle(color: Color(0xFF1a202c), fontSize: 13, fontWeight: FontWeight.w700)),
                     ]),
                   ]),
                 ),
@@ -2753,6 +2737,37 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _sectionTitle(String title) =>
     Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1a202c)));
+
+  static const _monthsShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  static const _monthsLong = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  /// Converts dates to "June 1, 2026" format
+  /// Handles: "Jun 1, 2026", "6/1/2026", "2026-06-01"
+  String _fmtDateLong(String dateStr) {
+    if (dateStr.isEmpty || dateStr == '—') return dateStr;
+    // Handle "Jun 1, 2026" short month format
+    for (int i = 0; i < _monthsShort.length; i++) {
+      if (dateStr.startsWith(_monthsShort[i])) {
+        return dateStr.replaceFirst(_monthsShort[i], _monthsLong[i]);
+      }
+    }
+    // Handle "6/1/2026" or "06/01/2026" format
+    final slashParts = dateStr.split('/');
+    if (slashParts.length == 3) {
+      final m = int.tryParse(slashParts[0]);
+      final d = int.tryParse(slashParts[1]);
+      final y = int.tryParse(slashParts[2]);
+      if (m != null && d != null && y != null && m >= 1 && m <= 12) {
+        return '${_monthsLong[m - 1]} $d, $y';
+      }
+    }
+    // Handle "2026-06-01" ISO format
+    final dt = DateTime.tryParse(dateStr);
+    if (dt != null) {
+      return '${_monthsLong[dt.month - 1]} ${dt.day}, ${dt.year}';
+    }
+    return dateStr;
+  }
 }
 
 class _ScanAddStockWidget extends StatefulWidget {
@@ -2877,7 +2892,7 @@ class _ScanAddStockWidgetState extends State<_ScanAddStockWidget> {
                   'min': min,
                   'max': max,
                   'reorder': reorder,
-                  'status': stock >= min ? 'OK' : 'Low',
+                  'status': stock > min ? 'OK' : 'Low',
                   'createdAt': FieldValue.serverTimestamp(),
                   'updatedAt': FieldValue.serverTimestamp(),
                 });
@@ -3001,7 +3016,7 @@ class _ScanReceiveWidgetState extends State<_ScanReceiveWidget> {
                       .doc(widget.stockId)
                       .update({
                     'stock': newStock,
-                    'status': newStock >= min ? 'OK' : 'Low',
+                    'status': newStock > min ? 'OK' : 'Low',
                     'updatedAt': FieldValue.serverTimestamp(),
                   });
                   // Log transaction

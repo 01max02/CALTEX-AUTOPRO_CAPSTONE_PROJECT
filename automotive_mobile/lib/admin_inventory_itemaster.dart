@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'barcode_scanner_screen.dart';
+import 'admin_inventory_stock.dart';
 
 class AdminInventoryItemMaster extends StatefulWidget {
   const AdminInventoryItemMaster({super.key});
@@ -94,7 +95,7 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
         ],
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: _db.orderBy('createdAt', descending: false).snapshots(),
+        stream: _db.orderBy('createdAt', descending: true).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -181,44 +182,71 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
 
   Widget _itemCard(Map<String, String> item) {
     final isSvc = item['type'] == 'Service';
+    final accentColor = isSvc ? const Color(0xFF003087) : _red;
     return GestureDetector(
       onTap: () => _showItemDetails(item),
       child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
-        child: Row(children: [
-          Container(
-            width: 44, height: 44,
-            decoration: BoxDecoration(
-              color: isSvc ? const Color(0xFFebf8ff) : const Color(0xFFF0F4FF),
-              borderRadius: BorderRadius.circular(10)),
-            child: Icon(isSvc ? Icons.build_outlined : Icons.inventory_2_outlined,
-              color: isSvc ? const Color(0xFF003087) : _red, size: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFF0F4F8)),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+        ),
+        child: Column(children: [
+          // Top: name + group + menu
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 6, 10),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(item['name']!, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF1a202c))),
+                const SizedBox(height: 4),
+                Text(item['group']!, style: const TextStyle(fontSize: 12, color: Color(0xFF718096))),
+              ])),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_horiz, size: 20, color: Color(0xFFa0aec0)),
+                onSelected: (val) {
+                  if (val == 'edit') _showAddItemModal(item: item);
+                  if (val == 'delete') _confirmDelete(item);
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text('Edit')])),
+                  PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: Colors.red), SizedBox(width: 8), Text('Delete', style: TextStyle(color: Colors.red))])),
+                ],
+              ),
+            ]),
           ),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(item['name']!, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-            Text('${item['num']} • ${item['group']}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
-            if ((item['desc'] ?? '').isNotEmpty)
-              Text(item['desc']!, style: const TextStyle(fontSize: 11, color: Color(0xFF718096)),
-                maxLines: 1, overflow: TextOverflow.ellipsis),
-          ])),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text(item['cost']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            Text('${item['uom']} • ${item['type']}', style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
-          ]),
-          const SizedBox(width: 4),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF718096)),
-            onSelected: (val) {
-              if (val == 'edit') _showAddItemModal(item: item);
-              if (val == 'delete') _confirmDelete(item);
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text('Edit')])),
-              PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: Colors.red), SizedBox(width: 8), Text('Delete', style: TextStyle(color: Colors.red))])),
-            ],
+          // Bottom: price + uom + type + arrow
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFFFAFBFC),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(14)),
+              border: Border(top: BorderSide(color: Color(0xFFF0F4F8))),
+            ),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: accentColor.withOpacity(0.2)),
+                ),
+                child: Text(item['type']!, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: accentColor)),
+              ),
+              const SizedBox(width: 10),
+              Text(item['uom']!, style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+              const Spacer(),
+              Text(_fmtCost(item['cost']!), style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: accentColor)),
+              const SizedBox(width: 10),
+              Container(
+                width: 24, height: 24,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F4F8),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(Icons.chevron_right, size: 16, color: Color(0xFF718096)),
+              ),
+            ]),
           ),
         ]),
       ),
@@ -244,10 +272,6 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Row(children: [
-                Container(width: 48, height: 48,
-                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
-                  child: Icon(isSvc ? Icons.build_outlined : Icons.inventory_2_outlined, color: Colors.white, size: 24)),
-                const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(item['name']!, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                   Text(item['group'] ?? '—', style: const TextStyle(color: Colors.white70, fontSize: 12)),
@@ -260,7 +284,8 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
               padding: const EdgeInsets.all(20),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 _detailRow('Item Number', item['num'] ?? '—'),
-                _detailRow('SKU', item['sku']?.isNotEmpty == true ? item['sku']! : '—'),
+                if (!isSvc && (item['sku']?.isNotEmpty == true))
+                  _detailRow('SKU', item['sku']!),
                 _detailRow('Item Name', item['name'] ?? '—'),
                 _detailRow('Description', item['desc']?.isNotEmpty == true ? item['desc']! : '—'),
                 _detailRow('Commodity Group', item['group']?.isNotEmpty == true ? item['group']! : '—'),
@@ -319,6 +344,13 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
         ),
       ),
     );
+  }
+
+  String _fmtCost(String raw) {
+    final clean = raw.replaceAll('₱', '').replaceAll(',', '').trim();
+    final val = double.tryParse(clean);
+    if (val == null || clean.isEmpty) return '₱0.00';
+    return '₱${val.toStringAsFixed(2)}';
   }
 
   Widget _detailRow(String label, String value) {
@@ -381,9 +413,6 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  TextField(controller: skuCtrl, keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'SKU', border: OutlineInputBorder(), hintText: 'e.g. 10001')),
-                  const SizedBox(height: 10),
                   TextField(controller: nameCtrl,
                     decoration: const InputDecoration(labelText: 'Item Name *', border: OutlineInputBorder())),
                   const SizedBox(height: 10),
@@ -426,6 +455,9 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
                     )),
                   ]),
                   if (selectedType == 'Material') ...[
+                    const SizedBox(height: 10),
+                    TextField(controller: skuCtrl, keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'SKU', border: OutlineInputBorder(), hintText: 'e.g. 10001')),
                     const SizedBox(height: 10),
                     // Barcode field with scan button
                     Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -539,6 +571,35 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
                                 content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Item added successfully!')]),
                                 backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                              // Auto-navigate to Stock Inventory to set stock levels for Material items
+                              if (selectedType == 'Material' && context.mounted) {
+                                final shouldSetStock = await showDialog<bool>(
+                                  context: context,
+                                  builder: (_) => AlertDialog(
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    title: const Text('Set Stock Levels?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                    content: const Text(
+                                      'Would you like to set the stock levels (min, max, current quantity) for this item now?',
+                                      style: TextStyle(fontSize: 13, color: Color(0xFF4a5568)),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context, false),
+                                        child: const Text('Later', style: TextStyle(color: Color(0xFF718096))),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context, true),
+                                        style: TextButton.styleFrom(foregroundColor: _red),
+                                        child: const Text('Set Now', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (shouldSetStock == true && context.mounted) {
+                                  // Show stock level fields directly in a modal
+                                  _showSetStockModal(itemNum, nameCtrl.text.trim(), selectedGroup ?? '', selectedUom ?? '');
+                                }
+                              }
                             }
                           }
                         } catch (e) {
@@ -551,6 +612,144 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
                         const Icon(Icons.save_outlined, size: 16),
                         const SizedBox(width: 6),
                         Text(isEdit ? 'Update' : 'Save'),
+                      ]),
+                    )),
+                  ]),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSetStockModal(String itemNum, String itemName, String group, String uom) {
+    final stockCtrl = TextEditingController();
+    final minCtrl = TextEditingController();
+    final maxCtrl = TextEditingController();
+    final reorderCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sheetCtx, _) => AnimatedPadding(
+          duration: const Duration(milliseconds: 150),
+          padding: EdgeInsets.only(bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
+          child: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                decoration: const BoxDecoration(color: Color(0xFF003087),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+                child: Row(children: [
+                  const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Set Stock Levels', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text('Configure inventory levels for this item', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  ])),
+                  GestureDetector(onTap: () => Navigator.pop(sheetCtx),
+                    child: const Icon(Icons.close, color: Colors.white)),
+                ]),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  // Item info
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF68d391)),
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.check_circle_outline, color: Colors.green, size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(itemName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                        Text('$itemNum • $group • $uom', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+                      ])),
+                    ]),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Stock Level Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 10),
+                  TextField(controller: stockCtrl, keyboardType: TextInputType.number, autofocus: true,
+                    decoration: const InputDecoration(labelText: 'Current Quantity *', border: OutlineInputBorder())),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(child: TextField(controller: minCtrl, keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Min Level *', border: OutlineInputBorder()))),
+                    const SizedBox(width: 10),
+                    Expanded(child: TextField(controller: maxCtrl, keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Max Level *', border: OutlineInputBorder()))),
+                  ]),
+                  const SizedBox(height: 10),
+                  TextField(controller: reorderCtrl, keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Reorder Quantity *', border: OutlineInputBorder())),
+                  const SizedBox(height: 20),
+                  Row(children: [
+                    Expanded(child: OutlinedButton(
+                      onPressed: () => Navigator.pop(sheetCtx),
+                      child: const Text('Skip'))),
+                    const SizedBox(width: 12),
+                    Expanded(child: ElevatedButton(
+                      onPressed: () async {
+                        final stock = int.tryParse(stockCtrl.text) ?? 0;
+                        final min = int.tryParse(minCtrl.text) ?? 0;
+                        final max = int.tryParse(maxCtrl.text) ?? 0;
+                        final reorder = int.tryParse(reorderCtrl.text) ?? 0;
+                        try {
+                          // Check if already exists in stock_inventory
+                          final existing = await FirebaseFirestore.instance
+                              .collection('stock_inventory')
+                              .where('num', isEqualTo: itemNum)
+                              .limit(1).get();
+                          if (existing.docs.isNotEmpty) {
+                            // Update existing
+                            await existing.docs.first.reference.update({
+                              'stock': stock, 'min': min, 'max': max, 'reorder': reorder,
+                              'status': stock > min ? 'OK' : 'Low',
+                              'updatedAt': FieldValue.serverTimestamp(),
+                            });
+                          } else {
+                            // Create new stock entry
+                            await FirebaseFirestore.instance.collection('stock_inventory').add({
+                              'num': itemNum,
+                              'name': itemName,
+                              'group': group,
+                              'uom': uom,
+                              'stock': stock, 'min': min, 'max': max, 'reorder': reorder,
+                              'status': stock > min ? 'OK' : 'Low',
+                              'createdAt': FieldValue.serverTimestamp(),
+                              'updatedAt': FieldValue.serverTimestamp(),
+                            });
+                          }
+                          if (sheetCtx.mounted) {
+                            Navigator.pop(sheetCtx);
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Row(children: const [
+                                Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                                SizedBox(width: 8),
+                                Text('Stock levels saved!'),
+                              ]),
+                              backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                          }
+                        } catch (e) {
+                          if (sheetCtx.mounted) ScaffoldMessenger.of(sheetCtx).showSnackBar(
+                            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF003087), foregroundColor: Colors.white),
+                      child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.save_outlined, size: 16),
+                        SizedBox(width: 6),
+                        Text('Save Stock'),
                       ]),
                     )),
                   ]),

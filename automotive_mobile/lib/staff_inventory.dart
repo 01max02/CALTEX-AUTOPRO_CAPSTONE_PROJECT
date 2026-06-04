@@ -103,7 +103,7 @@ class _StaffInventoryState extends State<StaffInventory> {
               'uom': data['uom'] as String? ?? '',
               'stock': stock, 'min': min, 'max': max,
               'reorder': (data['reorder'] as num?)?.toInt() ?? 0,
-              'status': stock >= min ? (stock > max ? 'Over' : 'OK') : 'Low',
+              'status': stock > min ? (stock > max ? 'Over' : 'OK') : 'Low',
             };
           }).toList()
             ..sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
@@ -201,15 +201,9 @@ class _StaffInventoryState extends State<StaffInventory> {
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Container(width: 42, height: 42,
-              decoration: BoxDecoration(
-                color: isLow ? Colors.orange.shade50 : isOver ? Colors.purple.shade50 : Colors.green.shade50,
-                borderRadius: BorderRadius.circular(10)),
-              child: Icon(Icons.inventory_2_outlined, color: barColor, size: 20)),
-            const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(item['name'] as String, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-              Text('${item['num']} • ${item['group']}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+              Text('${item['group']}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
             ])),
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
               Text('$stock ${item['uom']}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: barColor)),
@@ -253,10 +247,6 @@ class _StaffInventoryState extends State<StaffInventory> {
               decoration: const BoxDecoration(color: _red,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
               child: Row(children: [
-                Container(width: 44, height: 44,
-                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(Icons.inventory_2_outlined, color: Colors.white, size: 22)),
-                const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(item['name'] as String, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                   Text(item['group'] as String, style: const TextStyle(color: Colors.white70, fontSize: 12)),
@@ -436,7 +426,7 @@ class _StaffInventoryState extends State<StaffInventory> {
                           try {
                             await _db.doc(selectedItem!['id'] as String).update({
                               'stock': newStock,
-                              'status': newStock >= min ? 'OK' : 'Low',
+                              'status': newStock > min ? 'OK' : 'Low',
                               'updatedAt': FieldValue.serverTimestamp(),
                             });
                             if (context.mounted) {

@@ -88,7 +88,7 @@
                 <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Item Number</label>
                 <input type="text" name="itemNum" id="itemMasterItemNum" readonly style="background:#f7fafc;margin-top:0.3rem;">
             </div>
-            <div class="form-group" style="margin:0;">
+            <div class="form-group" style="margin:0;" id="imSkuRow">
                 <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">SKU</label>
                 <input type="number" name="sku" placeholder="e.g. 10001" min="0" step="1" style="margin-top:0.3rem;">
             </div>
@@ -115,7 +115,7 @@
                 </div>
                 <div class="form-group" style="margin:0;">
                     <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Type *</label>
-                    <select name="itemType" id="itemMasterItemType" required style="margin-top:0.3rem;">
+                    <select name="itemType" id="itemMasterItemType" required style="margin-top:0.3rem;" onchange="onItemTypeChange(this.value)">
                         <option value="">Select Type</option>
                         <option value="Material">Material</option>
                         <option value="Service">Service</option>
@@ -260,6 +260,25 @@
 <script src="../static/js/admin.js"></script>
 <script src="../static/js/admin_sidebar.js"></script>
 <script>
+  // Hide SKU + Barcode/QR fields when type is Service
+  window.onItemTypeChange = function(val) {
+    var skuRow = document.getElementById('imSkuRow');
+    var barcodeRow = document.getElementById('imBarcodeQRRow');
+    if (val === 'Service') {
+      if (skuRow) skuRow.style.display = 'none';
+      if (barcodeRow) barcodeRow.style.display = 'none';
+    } else {
+      if (skuRow) skuRow.style.display = '';
+      if (barcodeRow) barcodeRow.style.display = '';
+    }
+  };
+
+  // Auto-open stock level modal after adding a Material item
+  window.openAddInventoryModalWithItem = function(item) {
+    // Navigate to stock inventory page with the item pre-selected
+    window.location.href = 'admin_inventory_stock.html#add=' + encodeURIComponent(item.itemNum + '|' + item.itemName + '|' + item.commodityGroup + '|' + item.uom);
+  };
+
   // Update Item Master stat cards from live data
   (function() {
     function updateImStats() {
