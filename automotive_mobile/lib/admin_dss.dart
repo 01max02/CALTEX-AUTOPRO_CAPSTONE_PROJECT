@@ -1,13 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'alert_prefs.dart';
+import 'admin_calendar_widget.dart' show PmsCalendarFloating;
 
 // ── OneSignal credentials ──
 const _kOneSignalAppId  = 'c4f82ac7-5340-4e7a-877d-1d38a6f6f8ea';
@@ -16,8 +13,8 @@ const _kOneSignalApiKey = 'os_v7_app_yt4cvr2f1hkhvh5ldu4k637i51snjeyuythen3fd61a
 /// Resolves Firebase UIDs → OneSignal subscription IDs stored in Firestore,
 /// then sends a push notification via the OneSignal REST API.
 ///
-/// Uses `include_subscription_ids` (free plan compatible) instead of
-/// `include_external_user_ids` (requires paid plan).
+/// Uses `include_aliases` with `external_id` (set via OneSignal.login(uid))
+/// which works on the free plan and doesn't require subscription ID lookup.
 Future<void> _sendViaOneSignal({
   required List<String> userIds,   // Firebase UIDs
   required String title,
@@ -26,31 +23,18 @@ Future<void> _sendViaOneSignal({
 }) async {
   if (userIds.isEmpty) return;
   try {
-    // Look up OneSignal subscription IDs from Firestore
-    final subIds = <String>[];
-    for (final uid in userIds) {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .get();
-      final subId = doc.data()?['oneSignalId'] as String?;
-      if (subId != null && subId.isNotEmpty) subIds.add(subId);
-    }
-
-    if (subIds.isEmpty) {
-      debugPrint('⚠️ OneSignal: no subscription IDs found for UIDs: $userIds');
-      return;
-    }
-
     final res = await http.post(
-      Uri.parse('https://onesignal.com/api/v1/notifications'),
+      Uri.parse('https://api.onesignal.com/notifications'),
       headers: {
         'Authorization': 'Basic $_kOneSignalApiKey',
         'Content-Type': 'application/json; charset=utf-8',
       },
       body: jsonEncode({
         'app_id': _kOneSignalAppId,
-        'include_subscription_ids': subIds,
+        'include_aliases': {
+          'external_id': userIds,
+        },
+        'target_channel': 'push',
         'headings': {'en': title},
         'contents': {'en': message},
         'data': {'type': type},
@@ -75,10 +59,10 @@ class _AdminDSSState extends State<AdminDSS> {
   static const _blue = Color(0xFF003087);
   late int _tab;
 
-  static List<Map<String, String>> _stockItemsCache = [];
-  static List<Map<String, String>> _pmsAssetsCache = [];
-
   static bool _alertsSentThisSession = false;
+  bool _isSearching = false;
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -437,18 +421,33 @@ class _AdminDSSState extends State<AdminDSS> {
         backgroundColor: _red,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text('Decision Support System',
-          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                decoration: const InputDecoration(
+                  hintText: 'Search...',
+                  hintStyle: TextStyle(color: Colors.white60),
+                  border: InputBorder.none,
+                ),
+                onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
+              )
+            : const Text('Decision Support System',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.print_outlined, color: Colors.white),
-            tooltip: 'Print Report',
+            icon: Icon(_isSearching ? Icons.close : Icons.search, color: Colors.white),
             onPressed: () {
-              if (_tab == 0) {
-                _printCriticalItems(_stockItemsCache);
-              } else {
-                _printPMSReport(_pmsAssetsCache);
-              }
+              setState(() {
+                if (_isSearching) {
+                  _isSearching = false;
+                  _searchQuery = '';
+                  _searchController.clear();
+                } else {
+                  _isSearching = true;
+                }
+              });
             },
           ),
         ],
@@ -620,8 +619,15 @@ class _AdminDSSState extends State<AdminDSS> {
                 return aScore.compareTo(bScore);
               });
 
-            _stockItemsCache = items;
-            return _buildStockDSSContent(items);
+            final filtered = _searchQuery.isEmpty
+                ? items
+                : items.where((i) =>
+                    (i['name'] ?? '').toLowerCase().contains(_searchQuery) ||
+                    (i['itemNum'] ?? '').toLowerCase().contains(_searchQuery) ||
+                    (i['group'] ?? '').toLowerCase().contains(_searchQuery)
+                  ).toList();
+
+            return _buildStockDSSContent(filtered);
           },
         );
       },
@@ -860,291 +866,6 @@ class _AdminDSSState extends State<AdminDSS> {
         color: Color(0xFF718096), letterSpacing: 0.5));
   }
 
-  Future<void> _printCriticalItems(List<Map<String, String>> items) async {
-    final critical = items.where((i) => i['priority'] == 'Critical').toList();
-    final pdf = pw.Document();
-    final now = DateTime.now();
-    final dateStr = '${now.day.toString().padLeft(2,'0')}/${now.month.toString().padLeft(2,'0')}/${now.year}';
-
-    // Load logo
-    final logoBytes = await rootBundle.load('assets/img/LOGO_CALTEX.png');
-    final logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
-    final letterBytes = await rootBundle.load('assets/img/CALTEX_LETTER.png');
-    final letterImage = pw.MemoryImage(letterBytes.buffer.asUint8List());
-
-    pdf.addPage(pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.symmetric(horizontal: 40, vertical: 36),
-      build: (pw.Context ctx) {
-        return pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            // ── Header ──
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: pw.CrossAxisAlignment.center,
-              children: [
-                pw.Row(children: [
-                  pw.Image(logoImage, width: 44, height: 44),
-                  pw.SizedBox(width: 10),
-                  pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                    pw.Image(letterImage, height: 18),
-                    pw.SizedBox(height: 2),
-                    pw.Text('AutoPro Fleet Management',
-                      style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
-                  ]),
-                ]),
-                pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-                  pw.Text('Stock Replenishment Report',
-                    style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold,
-                      color: const PdfColor.fromInt(0xFF1a202c))),
-                  pw.SizedBox(height: 2),
-                  pw.Text('Date Generated: $dateStr',
-                    style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
-                ]),
-              ],
-            ),
-            pw.SizedBox(height: 6),
-            pw.Divider(color: const PdfColor.fromInt(0xFFE8001C), thickness: 1.5),
-            pw.SizedBox(height: 16),
-
-            // ── Report Title ──
-            pw.Text('Critical Stock Items — Immediate Reorder Required',
-              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold,
-                color: const PdfColor.fromInt(0xFF1a202c))),
-            pw.SizedBox(height: 4),
-            pw.Text(
-              'The following ${critical.length} item(s) have critically low stock levels and require immediate procurement action.',
-              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
-            ),
-            pw.SizedBox(height: 18),
-
-            // ── Table ──
-            pw.Table(
-              border: pw.TableBorder(
-                top: const pw.BorderSide(color: PdfColor.fromInt(0xFF003087), width: 1.5),
-                bottom: const pw.BorderSide(color: PdfColor.fromInt(0xFF003087), width: 1.5),
-                horizontalInside: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
-              ),
-              columnWidths: {
-                0: const pw.FlexColumnWidth(3),
-                1: const pw.FlexColumnWidth(2),
-                2: const pw.FlexColumnWidth(2),
-              },
-              children: [
-                // Header
-                pw.TableRow(
-                  decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF003087)),
-                  children: ['Item Name', 'Commodity Group', 'Recommended Order Qty']
-                    .map((h) => pw.Padding(
-                      padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                      child: pw.Text(h,
-                        style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 9,
-                          letterSpacing: 0.3)),
-                    )).toList(),
-                ),
-                // Rows
-                ...critical.asMap().entries.map((e) {
-                  final item = e.value;
-                  final isEven = e.key % 2 == 0;
-                  return pw.TableRow(
-                    decoration: pw.BoxDecoration(
-                      color: isEven ? PdfColors.white : const PdfColor.fromInt(0xFFF7F8FA),
-                    ),
-                    children: [item['name']!, item['group']!, item['order']!]
-                      .asMap().entries.map((ce) => pw.Padding(
-                        padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                        child: pw.Text(ce.value,
-                          style: pw.TextStyle(
-                            fontSize: 9,
-                            fontWeight: ce.key == 2 ? pw.FontWeight.bold : pw.FontWeight.normal,
-                            color: ce.key == 2
-                              ? const PdfColor.fromInt(0xFFE8001C)
-                              : const PdfColor.fromInt(0xFF1a202c),
-                          )),
-                      )).toList(),
-                  );
-                }),
-              ],
-            ),
-            pw.SizedBox(height: 20),
-
-            // ── Note ──
-            pw.Container(
-              width: double.infinity,
-              padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: pw.BoxDecoration(
-                border: pw.Border(left: const pw.BorderSide(color: PdfColor.fromInt(0xFFE8001C), width: 3)),
-                color: const PdfColor.fromInt(0xFFFFF5F5),
-              ),
-              child: pw.Text(
-                'Note: Items listed above are critically low. Immediate reordering is recommended to avoid service disruption.',
-                style: const pw.TextStyle(fontSize: 8.5, color: PdfColor.fromInt(0xFF4a5568)),
-              ),
-            ),
-
-            pw.Spacer(),
-
-            // ── Footer ──
-            pw.Divider(color: PdfColors.grey300),
-            pw.SizedBox(height: 4),
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text('Caltex AutoPro — Decision Support System',
-                  style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey500)),
-                pw.Text('Page 1 of 1  •  $dateStr',
-                  style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey500)),
-              ],
-            ),
-          ],
-        );
-      },
-    ));
-
-    await Printing.layoutPdf(onLayout: (_) async => pdf.save());
-  }
-
-  Future<void> _printPMSReport(List<Map<String, String>> assets) async {
-    final pdf = pw.Document();
-    final now = DateTime.now();
-    final dateStr = '${now.day.toString().padLeft(2,'0')}/${now.month.toString().padLeft(2,'0')}/${now.year}';
-
-    final logoBytes = await rootBundle.load('assets/img/LOGO_CALTEX.png');
-    final logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
-    final letterBytes = await rootBundle.load('assets/img/CALTEX_LETTER.png');
-    final letterImage = pw.MemoryImage(letterBytes.buffer.asUint8List());
-
-    pdf.addPage(pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.symmetric(horizontal: 40, vertical: 36),
-      build: (pw.Context ctx) {
-        return pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: pw.CrossAxisAlignment.center,
-              children: [
-                pw.Row(children: [
-                  pw.Image(logoImage, width: 44, height: 44),
-                  pw.SizedBox(width: 10),
-                  pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                    pw.Image(letterImage, height: 18),
-                    pw.SizedBox(height: 2),
-                    pw.Text('AutoPro Fleet Management',
-                      style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
-                  ]),
-                ]),
-                pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-                  pw.Text('PMS Scheduling Report',
-                    style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold,
-                      color: const PdfColor.fromInt(0xFF1a202c))),
-                  pw.SizedBox(height: 2),
-                  pw.Text('Date Generated: $dateStr',
-                    style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
-                ]),
-              ],
-            ),
-            pw.SizedBox(height: 6),
-            pw.Divider(color: const PdfColor.fromInt(0xFFE8001C), thickness: 1.5),
-            pw.SizedBox(height: 16),
-            pw.Text('Preventive Maintenance Schedule',
-              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold,
-                color: const PdfColor.fromInt(0xFF1a202c))),
-            pw.SizedBox(height: 4),
-            pw.Text('${assets.length} vehicle(s) listed below.',
-              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
-            pw.SizedBox(height: 18),
-            pw.Table(
-              border: pw.TableBorder(
-                top: const pw.BorderSide(color: PdfColor.fromInt(0xFF003087), width: 1.5),
-                bottom: const pw.BorderSide(color: PdfColor.fromInt(0xFF003087), width: 1.5),
-                horizontalInside: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
-              ),
-              columnWidths: {
-                0: const pw.FlexColumnWidth(2),
-                1: const pw.FlexColumnWidth(3),
-                2: const pw.FlexColumnWidth(2),
-                3: const pw.FlexColumnWidth(2),
-                4: const pw.FlexColumnWidth(2),
-              },
-              children: [
-                pw.TableRow(
-                  decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF003087)),
-                  children: ['Plate', 'Description', 'Last Service', 'Next PMS Due', 'Priority']
-                    .map((h) => pw.Padding(
-                      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 9),
-                      child: pw.Text(h,
-                        style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 9)),
-                    )).toList(),
-                ),
-                ...assets.asMap().entries.map((e) {
-                  final a = e.value;
-                  final isEven = e.key % 2 == 0;
-                  final priorityColor = a['priority'] == 'Overdue'
-                    ? const PdfColor.fromInt(0xFFE8001C)
-                    : a['priority'] == 'Due Today'
-                      ? const PdfColor.fromInt(0xFFc05621)
-                    : a['priority'] == 'Due This Week'
-                      ? const PdfColor.fromInt(0xFFdd6b20)
-                    : a['priority'] == 'Due Soon'
-                      ? const PdfColor.fromInt(0xFFb7791f)
-                      : const PdfColor.fromInt(0xFF276749);
-                  return pw.TableRow(
-                    decoration: pw.BoxDecoration(
-                      color: isEven ? PdfColors.white : const PdfColor.fromInt(0xFFF7F8FA)),
-                    children: [
-                      pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 9),
-                        child: pw.Text(a['plate']!, style: const pw.TextStyle(fontSize: 9))),
-                      pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 9),
-                        child: pw.Text(a['desc']!, style: const pw.TextStyle(fontSize: 9))),
-                      pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 9),
-                        child: pw.Text(a['lastService']!, style: const pw.TextStyle(fontSize: 9))),
-                      pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 9),
-                        child: pw.Text(a['nextPMS']!, style: const pw.TextStyle(fontSize: 9))),
-                      pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 9),
-                        child: pw.Text(a['priority']!,
-                          style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: priorityColor))),
-                    ],
-                  );
-                }),
-              ],
-            ),
-            pw.Spacer(),
-            pw.Divider(color: PdfColors.grey300),
-            pw.SizedBox(height: 4),
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text('Caltex AutoPro — Decision Support System',
-                  style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey500)),
-                pw.Text('Page 1 of 1  •  $dateStr',
-                  style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey500)),
-              ],
-            ),
-          ],
-        );
-      },
-    ));
-
-    await Printing.layoutPdf(onLayout: (_) async => pdf.save());
-  }
-
-  pw.Widget _pdfChip(String label, String value, PdfColor color) {
-    return pw.Container(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: pw.BoxDecoration(
-        color: color,
-        borderRadius: pw.BorderRadius.circular(6),
-      ),
-      child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-        pw.Text(value, style: pw.TextStyle(color: PdfColors.white, fontSize: 14, fontWeight: pw.FontWeight.bold)),
-        pw.Text(label, style: const pw.TextStyle(color: PdfColors.grey300, fontSize: 9)),
-      ]),
-    );
-  }
-
   void _showStockDetails(Map<String, String> item) {
     final priority = item['priority'] ?? 'Adequate';
     final color = _priorityColor(priority);
@@ -1285,8 +1006,18 @@ class _AdminDSSState extends State<AdminDSS> {
             return (order[a['priority']] ?? 5).compareTo(order[b['priority']] ?? 5);
           });
 
-        _pmsAssetsCache = assets;
-        return _buildPMSDSSContent(assets);
+        final filtered = _searchQuery.isEmpty
+            ? assets
+            : assets.where((a) =>
+                (a['plate'] ?? '').toLowerCase().contains(_searchQuery) ||
+                (a['desc'] ?? '').toLowerCase().contains(_searchQuery) ||
+                (a['priority'] ?? '').toLowerCase().contains(_searchQuery)
+              ).toList();
+
+        return Stack(children: [
+          _buildPMSDSSContent(filtered),
+          const PmsCalendarFloating(),
+        ]);
       },
     );
   }

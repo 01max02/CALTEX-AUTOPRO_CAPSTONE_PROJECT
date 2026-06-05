@@ -82,6 +82,7 @@ label {
 }
 .input-wrap input::placeholder { color: #a0aec0; }
 .input-wrap input:focus { border-color: #E8001C; background: #fff; }
+#password { padding-right: 42px; }
 
 .forgot-row {
   display: flex;

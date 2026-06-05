@@ -255,34 +255,22 @@ Future<void> _sendAlert({
 
   if (targets.isEmpty) return;
 
-  // Resolve UIDs → OneSignal subscription IDs
-  final subIds = <String>[];
-  for (final uid in targets) {
-    try {
-      final doc   = await db.collection('users').doc(uid).get();
-      final subId = doc.data()?['oneSignalId'] as String?;
-      if (subId != null && subId.isNotEmpty) subIds.add(subId);
-    } catch (_) {}
-  }
-
-  if (subIds.isEmpty) {
-    debugPrint('⚠️ OneSignal BG: no subscription IDs for $targets');
-    return;
-  }
-
   try {
     final res = await http.post(
-      Uri.parse('https://onesignal.com/api/v1/notifications'),
+      Uri.parse('https://api.onesignal.com/notifications'),
       headers: {
         'Authorization': 'Basic $_kOneSignalApiKey',
         'Content-Type': 'application/json; charset=utf-8',
       },
       body: jsonEncode({
-        'app_id':                    _kOneSignalAppId,
-        'include_subscription_ids':  subIds,
-        'headings':                  {'en': title},
-        'contents':                  {'en': message},
-        'data':                      {'type': type},
+        'app_id': _kOneSignalAppId,
+        'include_aliases': {
+          'external_id': targets,
+        },
+        'target_channel': 'push',
+        'headings': {'en': title},
+        'contents': {'en': message},
+        'data': {'type': type},
       }),
     );
     debugPrint('📤 OneSignal BG → ${res.statusCode}: ${res.body}');

@@ -15,6 +15,9 @@ class GoogleSignInHelper {
     try {
       print('=== Starting Google Sign-In ===');
       
+      // Always sign out first so the account picker shows every time
+      await _googleSignIn.signOut();
+
       // Step 1: Open Google Sign-In dialog
       print('Step 1: Opening Google Sign-In dialog...');
       final googleUser = await _googleSignIn.signIn();
@@ -64,6 +67,12 @@ class GoogleSignInHelper {
         print('Step 8: Account is inactive - signing out');
         await _auth.signOut();
         throw Exception('Account is inactive');
+      }
+
+      if (status == 'pending') {
+        print('Step 8: Account is pending - signing out');
+        await _auth.signOut();
+        throw Exception('Your account is pending admin approval. You will be notified by email once approved.');
       }
 
       // Step 6: Return role

@@ -14,6 +14,7 @@ import 'notifications.dart';
 import 'admin_rag_ai.dart';
 import 'admin_domain_management.dart';
 import 'barcode_scanner_screen.dart';
+import 'admin_service_bookings.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -2061,7 +2062,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   // ── VEHICLES ──
-  int _vehTab = 1; // 0=Vehicle List, 1=Issuances, 2=Maintenance
+  int _vehTab = 1; // 0=Vehicle List, 1=Issuances, 2=Maintenance, 3=Bookings
 
   Widget _buildVehicles() {
     return Stack(children: [
@@ -2070,12 +2071,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
           color: Colors.white,
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Row(children: [
-            _vehTabBtn('Vehicle List', 0),
+            _vehTabBtn('Vehicles', 0),
             _vehTabBtn('Issuances', 1),
             _vehTabBtn('Maintenance', 2),
+            _vehTabBtn('Bookings', 3),
           ]),
         ),
-        Expanded(child: _vehTab == 0 ? _buildVehicleListRedirect() : _vehTab == 1 ? _buildIssuances() : _buildMaintenanceRedirect()),
+        Expanded(child: _vehTab == 0
+            ? _buildVehicleListRedirect()
+            : _vehTab == 1
+                ? _buildIssuances()
+                : _vehTab == 2
+                    ? _buildMaintenanceRedirect()
+                    : _buildBookingsRedirect()),
       ]),
     ]);
   }
@@ -2115,6 +2123,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         await Navigator.push(context,
           MaterialPageRoute(builder: (_) => const AdminVehicleMaintenance()));
+        if (mounted) setState(() { _vehTab = 1; _vehNavigating = false; });
+      });
+    }
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildBookingsRedirect() {
+    if (!_vehNavigating) {
+      _vehNavigating = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const AdminServiceBookings()));
         if (mounted) setState(() { _vehTab = 1; _vehNavigating = false; });
       });
     }

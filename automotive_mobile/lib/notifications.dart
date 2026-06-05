@@ -103,11 +103,8 @@ class NotifBadge extends StatelessWidget {
 const _kOneSignalAppId  = 'c4f82ac7-5340-4e7a-877d-1d38a6f6f8ea';
 const _kOneSignalApiKey = 'os_v7_app_yt4cvr2f1hkhvh5ldu4k637i51snjeyuythen3fd61ae1yhnprpy6kbxvn9kjd1pqdhygsqmlrouas4kfuydft32nkgj5flbra3oo5q';
 
-/// Resolves Firebase UIDs → OneSignal subscription IDs stored in Firestore,
-/// then sends a push notification via the OneSignal REST API.
-///
-/// Uses `include_subscription_ids` (free plan compatible) instead of
-/// `include_external_user_ids` (requires paid plan).
+/// Sends a push notification via the OneSignal REST API.
+/// Uses `include_aliases` with `external_id` (set via OneSignal.login(uid)).
 Future<void> _sendViaOneSignal({
   required List<String> userIds,   // Firebase UIDs
   required String title,
@@ -120,31 +117,18 @@ Future<void> _sendViaOneSignal({
     return;
   }
   try {
-    // Look up OneSignal subscription IDs from Firestore
-    final subIds = <String>[];
-    for (final uid in userIds) {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .get();
-      final subId = doc.data()?['oneSignalId'] as String?;
-      if (subId != null && subId.isNotEmpty) subIds.add(subId);
-    }
-
-    if (subIds.isEmpty) {
-      debugPrint('⚠️ OneSignal: no subscription IDs found for UIDs: $userIds');
-      return;
-    }
-
     final res = await http.post(
-      Uri.parse('https://onesignal.com/api/v1/notifications'),
+      Uri.parse('https://api.onesignal.com/notifications'),
       headers: {
         'Authorization': 'Basic $_kOneSignalApiKey',
         'Content-Type': 'application/json; charset=utf-8',
       },
       body: jsonEncode({
         'app_id': _kOneSignalAppId,
-        'include_subscription_ids': subIds,
+        'include_aliases': {
+          'external_id': userIds,
+        },
+        'target_channel': 'push',
         'headings': {'en': title},
         'contents': {'en': message},
         'data': {'type': type},

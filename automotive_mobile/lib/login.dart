@@ -178,6 +178,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       // Navigate based on role
+      if (!mounted) return;
       switch (role.toLowerCase()) {
         case 'admin':
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminDashboard()));
@@ -189,19 +190,35 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const CustomerDashboard()));
       }
     } catch (e) {
-      print('Google Sign-In error in UI: $e');
+      debugPrint('Google Sign-In error: $e');
       
-      // Determine error message based on exception type
-      String errorMsg = 'Sign-in failed. Please try again.';
+      String errorMsg;
+      final errStr = e.toString();
       
-      if (e.toString().contains('inactive')) {
+      if (errStr.contains('inactive')) {
         errorMsg = 'Your account has been deactivated. Please contact the administrator.';
-      } else if (e.toString().contains('not found')) {
+      } else if (errStr.contains('pending')) {
+        errorMsg = 'Your account is pending admin approval. You will be notified by email once approved.';
+      } else if (errStr.contains('not found') || errStr.contains('not found')) {
         errorMsg = 'User account not found. Please contact the administrator to register your account.';
+      } else if (errStr.contains('network_error') || errStr.contains('NetworkError')) {
+        errorMsg = 'Network error. Please check your internet connection.';
+      } else if (errStr.contains('sign_in_canceled') || errStr.contains('canceled')) {
+        // User cancelled — don't show error
+        if (mounted) setState(() => _googleLoading = false);
+        return;
+      } else if (errStr.contains('PlatformException')) {
+        // Show actual platform error for debugging
+        errorMsg = 'Google Sign-In configuration error. Please ensure SHA-1 is configured in Firebase.';
+        debugPrint('⚠️ PLATFORM ERROR DETAIL: $errStr');
+      } else {
+        // Show actual error message for debugging
+        errorMsg = errStr.contains('Exception:')
+            ? errStr.split('Exception:').last.trim()
+            : 'Sign-in failed: $errStr';
       }
       
       _showError(errorMsg);
-      
       if (mounted) setState(() => _googleLoading = false);
     }
   }
