@@ -48,12 +48,12 @@
         sessionStorage.removeItem('spUser');
         if (typeof firebase !== 'undefined' && firebase.auth) {
             firebase.auth().signOut().finally(function () {
-                history.replaceState(null, '', '/login.html');
-                window.location.replace('/login.html');
+                history.replaceState(null, '', '/index.html');
+                window.location.replace('/index.html');
             });
         } else {
-            history.replaceState(null, '', '/login.html');
-            window.location.replace('/login.html');
+            history.replaceState(null, '', '/index.html');
+            window.location.replace('/index.html');
         }
     };
 

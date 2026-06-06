@@ -35,10 +35,10 @@ document.addEventListener('DOMContentLoaded', function () {
             sessionStorage.removeItem('apUser');
             if (typeof firebase !== 'undefined' && firebase.auth) {
                 firebase.auth().signOut().finally(() => {
-                    window.location.href = '/login.html';
+                    window.location.href = '/index.html';
                 });
             } else {
-                window.location.href = '/login.html';
+                window.location.href = '/index.html';
             }
         }
     });

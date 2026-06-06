@@ -371,7 +371,7 @@
     if (!confirm('Are you sure you want to logout?')) return;
     auth.signOut().then(() => {
       sessionStorage.removeItem('cpUser');
-      window.location.href = '/login.html';
+      window.location.href = '/index.html';
     });
   };
 

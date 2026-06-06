@@ -171,12 +171,12 @@ window.adminAvatarLogout = function() {
         firebase.auth().signOut().finally(() => {
             // Replace the entire history stack with login page so back button
             // cannot return to any authenticated page
-            history.replaceState(null, '', '/login.html');
-            window.location.replace('/login.html');
+            history.replaceState(null, '', '/index.html');
+            window.location.replace('/index.html');
         });
     } else {
-        history.replaceState(null, '', '/login.html');
-        window.location.replace('/login.html');
+        history.replaceState(null, '', '/index.html');
+        window.location.replace('/index.html');
     }
 };
 
