@@ -1,245 +1,379 @@
 /**
  * Google Sign-In Handler Module
- * Provides reusable functions for Google authentication with Firebase
- * 
- * Usage: Include this script in your HTML file and call GoogleSignInModule.init()
+ * After Google auth succeeds → sends OTP to user's email → verifies → redirects
  */
 
+// ── OTP overlay HTML (injected into the page) ─────────────────────────────
+function _gsInjectOtpOverlay() {
+  if (document.getElementById('_gsOtpOverlay')) return;
+  const overlay = document.createElement('div');
+  overlay.id = '_gsOtpOverlay';
+  overlay.style.cssText = [
+    'position:fixed;inset:0;z-index:99999;',
+    'display:none;align-items:center;justify-content:center;',
+    'background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);',
+  ].join('');
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:20px;width:360px;max-width:92vw;overflow:hidden;
+                box-shadow:0 20px 60px rgba(0,0,0,0.25);animation:_gsFadeIn 0.22s ease;">
+      <!-- Header -->
+      <div style="background:linear-gradient(135deg,#E8001C,#9B0013);padding:1.25rem 1.5rem;
+                  display:flex;align-items:center;gap:0.75rem;">
+        <div style="width:40px;height:40px;background:rgba(255,255,255,0.18);border-radius:10px;
+                    display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+               fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.99 12
+                     19.79 19.79 0 0 1 1.97 3.5 2 2 0 0 1 3.95 1.36h3a2 2 0 0 1 2 1.72
+                     12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91
+                     a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7
+                     A2 2 0 0 1 22 16.92z"/>
+          </svg>
+        </div>
+        <div>
+          <div style="color:#fff;font-size:0.95rem;font-weight:700;line-height:1.2;">Verify Your Identity</div>
+          <div id="_gsOtpSubtitle" style="color:rgba(255,255,255,0.75);font-size:0.75rem;margin-top:2px;"></div>
+        </div>
+      </div>
+      <!-- Body -->
+      <div style="padding:1.5rem;">
+        <p style="font-size:0.82rem;color:#718096;margin:0 0 1rem;text-align:center;line-height:1.6;">
+          A 6-digit verification code was sent to your email.<br/>
+          <span style="font-size:0.75rem;color:#a0aec0;">Expires in 5 minutes.</span>
+        </p>
+        <!-- OTP boxes -->
+        <div id="_gsOtpRow" style="display:flex;gap:0.5rem;justify-content:center;margin-bottom:1rem;">
+          ${[0,1,2,3,4,5].map(i =>
+            `<input id="_gsOtp${i}" type="text" maxlength="1" inputmode="numeric"
+              style="width:44px;height:52px;text-align:center;font-size:1.3rem;font-weight:700;
+                     border:2px solid #e2e8f0;border-radius:10px;outline:none;
+                     transition:border-color 0.15s;font-family:monospace;"
+              onfocus="this.style.borderColor='#E8001C'"
+              onblur="this.style.borderColor='#e2e8f0'">`
+          ).join('')}
+        </div>
+        <!-- Error msg -->
+        <div id="_gsOtpError" style="display:none;background:#fff5f5;border:1px solid #fecaca;
+             border-radius:8px;padding:0.5rem 0.75rem;font-size:0.78rem;color:#c53030;
+             margin-bottom:0.75rem;text-align:center;"></div>
+        <!-- Verify button -->
+        <button id="_gsOtpVerifyBtn"
+          style="width:100%;padding:0.85rem;background:linear-gradient(135deg,#E8001C,#9B0013);
+                 border:none;border-radius:10px;color:#fff;font-weight:700;font-size:0.95rem;
+                 cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.5rem;
+                 transition:opacity 0.2s;">
+          Verify &amp; Continue
+        </button>
+        <!-- Resend -->
+        <p style="text-align:center;margin:0.75rem 0 0;font-size:0.78rem;color:#718096;">
+          Didn't receive the code?
+          <button id="_gsResendBtn" type="button"
+            style="background:none;border:none;color:#E8001C;font-weight:600;cursor:pointer;
+                   font-size:0.78rem;padding:0;">Resend</button>
+        </p>
+      </div>
+    </div>
+    <style>
+      @keyframes _gsFadeIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} }
+    </style>
+  `;
+  document.body.appendChild(overlay);
+  _gsBindOtpInputs();
+}
+
+// ── OTP input behaviour ────────────────────────────────────────────────────
+function _gsBindOtpInputs() {
+  for (let i = 0; i < 6; i++) {
+    const box = document.getElementById('_gsOtp' + i);
+    if (!box) continue;
+    box.addEventListener('input', e => {
+      box.value = e.target.value.replace(/\D/g, '').slice(0, 1);
+      if (box.value && i < 5) document.getElementById('_gsOtp' + (i + 1)).focus();
+      if (_gsAllFilled()) setTimeout(() => document.getElementById('_gsOtpVerifyBtn').click(), 80);
+    });
+    box.addEventListener('keydown', e => {
+      if (e.key === 'Backspace') {
+        if (box.value) { box.value = ''; } else if (i > 0) { document.getElementById('_gsOtp' + (i - 1)).focus(); }
+      }
+    });
+    box.addEventListener('paste', e => {
+      e.preventDefault();
+      const digits = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+      digits.split('').forEach((d, idx) => {
+        const b = document.getElementById('_gsOtp' + idx);
+        if (b) b.value = d;
+      });
+      const next = document.getElementById('_gsOtp' + Math.min(digits.length, 5));
+      if (next) next.focus();
+      if (_gsAllFilled()) setTimeout(() => document.getElementById('_gsOtpVerifyBtn').click(), 80);
+    });
+  }
+}
+
+function _gsAllFilled() {
+  for (let i = 0; i < 6; i++) {
+    const b = document.getElementById('_gsOtp' + i);
+    if (!b || !b.value) return false;
+  }
+  return true;
+}
+
+function _gsGetOtpValue() {
+  return [0,1,2,3,4,5].map(i => (document.getElementById('_gsOtp' + i) || {}).value || '').join('');
+}
+
+function _gsShowOtpOverlay(email) {
+  _gsInjectOtpOverlay();
+  const sub = document.getElementById('_gsOtpSubtitle');
+  if (sub) sub.textContent = email;
+  // Clear boxes and error
+  for (let i = 0; i < 6; i++) {
+    const b = document.getElementById('_gsOtp' + i);
+    if (b) b.value = '';
+  }
+  const err = document.getElementById('_gsOtpError');
+  if (err) { err.style.display = 'none'; err.textContent = ''; }
+  const overlay = document.getElementById('_gsOtpOverlay');
+  overlay.style.display = 'flex';
+  setTimeout(() => { const b = document.getElementById('_gsOtp0'); if (b) b.focus(); }, 100);
+}
+
+function _gsHideOtpOverlay() {
+  const overlay = document.getElementById('_gsOtpOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+// ── Send OTP via server (dedicated endpoint — not the reset-password template) ──
+async function _gsSendOtp(email, name) {
+  const res = await fetch('/api/send-google-otp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to_email: email, to_name: name || email }),
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Failed to send OTP email');
+}
+
+// ── Verify OTP ─────────────────────────────────────────────────────────────
+async function _gsVerifyOtp(email, entered) {
+  const snap = await firebase.firestore().collection('otp_requests').doc(email).get();
+  if (!snap.exists) throw new Error('OTP not found. Please request a new one.');
+  const { otp: stored, expiry } = snap.data();
+  // Ensure expiry is parsed as UTC (append Z if missing)
+  const expiryStr = expiry && !expiry.endsWith('Z') ? expiry + 'Z' : expiry;
+  if (new Date() > new Date(expiryStr)) {
+    await snap.ref.delete();
+    throw new Error('OTP has expired. Please try again.');
+  }
+  if (entered !== stored) throw new Error('Incorrect OTP. Please try again.');
+  await snap.ref.delete();
+}
+
+// ── Main module ────────────────────────────────────────────────────────────
 const GoogleSignInModule = {
-  /**
-   * Initialize Google Sign-In
-   * Call this once when the page loads
-   */
+  _pendingUser: null,
+  _pendingUserData: null,
+
   init: function() {
     console.log('GoogleSignInModule initialized');
     this.setupGoogleButton();
+    _gsInjectOtpOverlay();
   },
 
-  /**
-   * Setup Google Sign-In button event listener
-   */
   setupGoogleButton: function() {
     const googleBtn = document.getElementById('googleBtn');
-    if (!googleBtn) {
-      console.warn('Google button not found');
-      return;
-    }
-
-    googleBtn.addEventListener('click', () => {
-      this.handleGoogleSignIn();
-    });
+    if (!googleBtn) { console.warn('Google button not found'); return; }
+    googleBtn.addEventListener('click', () => this.handleGoogleSignIn());
     console.log('Google button event listener attached');
   },
 
-  /**
-   * Main Google Sign-In handler
-   */
   handleGoogleSignIn: async function() {
-    console.log('=== Starting Google Sign-In ===');
-    
     const googleBtn = document.getElementById('googleBtn');
-    const googleDefault = this.getGoogleButtonHTML();
-    
-    console.log('Google button found:', !!googleBtn);
     this.setButtonLoading(googleBtn, true);
 
     try {
-      // Step 1: Create Google provider
-      console.log('Step 1: Creating Google provider...');
-      console.log('Firebase object exists:', !!window.firebase);
-      console.log('Firebase auth exists:', !!firebase.auth);
-      
       const provider = new firebase.auth.GoogleAuthProvider();
       provider.addScope('profile');
       provider.addScope('email');
-      console.log('Step 1: Google provider created successfully');
+      provider.setCustomParameters({ prompt: 'select_account' }); // always show account picker
 
-      // Step 2: Sign in with popup
-      console.log('Step 2: Opening Google Sign-In popup...');
       const result = await firebase.auth().signInWithPopup(provider);
       const user = result.user;
-      
-      console.log('Step 3: Google authentication successful');
-      console.log('  - UID:', user.uid);
-      console.log('  - Email:', user.email);
-      console.log('  - Display Name:', user.displayName);
 
-      // Step 4: Get or create user in Firestore
-      console.log('Step 4: Checking Firestore for user...');
+      // Lookup user in Firestore
       const userData = await this.getOrCreateUser(user);
-      
-      console.log('Step 5: User data retrieved');
-      console.log('  - Role:', userData.role);
-      console.log('  - Status:', userData.status);
 
-      // Step 6: Validate user status
+      // Validate status
       if (userData.status === 'inactive') {
-        console.warn('User account is inactive');
         await firebase.auth().signOut();
         this.showToast('Your account has been deactivated. Please contact the administrator.', 'error');
         this.setButtonLoading(googleBtn, false);
         return;
       }
-
-      // Step 7: Store user session
-      console.log('Step 6: Storing user session...');
-      this.storeUserSession(user, userData);
-
-      // Step 8: Redirect
-      console.log('Step 7: Redirecting to dashboard...');
-      this.redirectByRole(userData.role);
-
-    } catch (error) {
-      console.error('=== Google Sign-In Error ===');
-      console.error('Error Code:', error.code);
-      console.error('Error Message:', error.message);
-      
-      let errorMsg = 'Sign-in failed. Please try again.';
-      
-      // Custom error messages
-      if (error.message && error.message.includes('not found')) {
-        errorMsg = 'User account not found. Please contact the administrator to register your account.';
-      } else if (error.code === 'auth/popup-closed-by-user') {
-        console.log('User closed the sign-in popup');
+      if (userData.status === 'pending') {
+        await firebase.auth().signOut();
+        this.showToast('Your account is pending admin approval. You will be notified once approved.', 'error');
         this.setButtonLoading(googleBtn, false);
         return;
-      } else if (error.message && error.message.includes('inactive')) {
-        errorMsg = 'Your account has been deactivated. Please contact the administrator.';
       }
-      
-      this.showToast(errorMsg, 'error');
+
+      // Store pending data — will complete after OTP
+      this._pendingUser     = user;
+      this._pendingUserData = userData;
+
+      this.setButtonLoading(googleBtn, false);
+
+      // Send OTP to verified Google email
+      this.showToast('Sending verification code to ' + user.email + '…', 'success');
+      await _gsSendOtp(user.email, user.displayName || '');
+
+      // Show OTP overlay
+      _gsShowOtpOverlay(user.email);
+
+      // Wire up verify button
+      const verifyBtn = document.getElementById('_gsOtpVerifyBtn');
+      const resendBtn = document.getElementById('_gsResendBtn');
+
+      // Remove old listeners
+      const newVerify = verifyBtn.cloneNode(true);
+      verifyBtn.parentNode.replaceChild(newVerify, verifyBtn);
+      const newResend = resendBtn.cloneNode(true);
+      resendBtn.parentNode.replaceChild(newResend, resendBtn);
+
+      document.getElementById('_gsOtpVerifyBtn').addEventListener('click', () => this._verifyAndContinue());
+      document.getElementById('_gsResendBtn').addEventListener('click', () => this._resendOtp());
+      _gsBindOtpInputs(); // re-bind after cloneNode
+
+    } catch (error) {
+      console.error('Google Sign-In error:', error);
+      let msg = 'Sign-in failed. Please try again.';
+      if (error.code === 'auth/popup-closed-by-user') {
+        this.setButtonLoading(googleBtn, false);
+        return;
+      }
+      if (error.message && error.message.includes('not found')) {
+        msg = 'User account not found. Please contact the administrator.';
+      } else if (error.message && error.message.includes('inactive')) {
+        msg = 'Your account has been deactivated.';
+      }
+      this.showToast(msg, 'error');
       this.setButtonLoading(googleBtn, false);
     }
   },
 
-  /**
-   * Get existing user or create new user in Firestore
-   */
+  _verifyAndContinue: async function() {
+    const entered = _gsGetOtpValue();
+    if (entered.length < 6) {
+      _gsShowOtpError('Please enter the 6-digit code.');
+      return;
+    }
+
+    const btn = document.getElementById('_gsOtpVerifyBtn');
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span style="width:18px;height:18px;border:2.5px solid rgba(255,255,255,0.4);border-top-color:#fff;border-radius:50%;display:inline-block;animation:spin 0.8s linear infinite;"></span> Verifying…';
+
+    try {
+      await _gsVerifyOtp(this._pendingUser.email, entered);
+
+      // OTP correct — store session and redirect
+      _gsHideOtpOverlay();
+      this.storeUserSession(this._pendingUser, this._pendingUserData);
+
+      // Check mustChangePassword
+      if (this._pendingUserData.mustChangePassword) {
+        window.location.href = 'change_password.html';
+        return;
+      }
+
+      this.redirectByRole(this._pendingUserData.role || 'customer');
+
+    } catch (e) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+      _gsShowOtpError(e.message || 'Verification failed. Please try again.');
+      // Clear boxes on wrong OTP
+      if (e.message && e.message.includes('Incorrect')) {
+        for (let i = 0; i < 6; i++) { const b = document.getElementById('_gsOtp' + i); if (b) b.value = ''; }
+        const b = document.getElementById('_gsOtp0'); if (b) b.focus();
+      }
+    }
+  },
+
+  _resendOtp: async function() {
+    const resendBtn = document.getElementById('_gsResendBtn');
+    if (!this._pendingUser) return;
+    resendBtn.disabled = true;
+    resendBtn.textContent = 'Sending…';
+    try {
+      await _gsSendOtp(this._pendingUser.email, this._pendingUser.displayName || '');
+      // Clear boxes
+      for (let i = 0; i < 6; i++) { const b = document.getElementById('_gsOtp' + i); if (b) b.value = ''; }
+      const b = document.getElementById('_gsOtp0'); if (b) b.focus();
+      const err = document.getElementById('_gsOtpError');
+      if (err) { err.style.display = 'none'; }
+      this.showToast('New code sent!', 'success');
+    } catch (e) {
+      _gsShowOtpError('Failed to resend. Please try again.');
+    } finally {
+      resendBtn.disabled = false;
+      resendBtn.textContent = 'Resend';
+    }
+  },
+
   getOrCreateUser: async function(googleUser) {
     const uid = googleUser.uid;
     const email = googleUser.email;
     const db = firebase.firestore();
 
-    try {
-      // Try to get user by UID first
-      console.log('  - Checking by UID:', uid);
-      let doc = await db.collection('users').doc(uid).get();
+    let doc = await db.collection('users').doc(uid).get();
+    if (doc.exists) return doc.data();
 
-      if (doc.exists) {
-        console.log('  - User found by UID');
-        return doc.data();
-      }
-
-      // Fallback: check by email
-      console.log('  - User not found by UID, checking by email:', email);
-      const snapshot = await db.collection('users')
-        .where('email', '==', email)
-        .limit(1)
-        .get();
-
-      console.log('  - Email query returned', snapshot.size, 'documents');
-      if (!snapshot.empty) {
-        console.log('  - User found by email');
-        return snapshot.docs[0].data();
-      }
-
-      // User not found - throw error instead of auto-registering
-      console.log('  - User not found in Firestore');
-      throw new Error('User account not found. Please contact the administrator to register your account.');
-
-    } catch (error) {
-      console.error('Error getting/creating user:', error);
-      console.error('Error Code:', error.code);
-      console.error('Error Message:', error.message);
-      console.error('Full Error:', error);
-      throw new Error('Failed to retrieve user information: ' + error.message);
+    const snap = await db.collection('users').where('email', '==', email).limit(1).get();
+    if (!snap.empty) {
+      // Migrate to UID-keyed doc
+      const data = snap.docs[0].data();
+      await db.collection('users').doc(uid).set(data);
+      return data;
     }
+
+    throw new Error('User account not found. Please contact the administrator.');
   },
 
-  /**
-   * Store user data in session storage
-   */
   storeUserSession: function(googleUser, userData) {
     const sessionData = {
-      uid: googleUser.uid,
-      email: googleUser.email,
-      name: googleUser.displayName || userData.name || '',
-      role: userData.role || 'customer',
+      uid:      googleUser.uid,
+      email:    googleUser.email,
+      // Use Firestore name first — fall back to Google display name only if Firestore has none
+      name:     (userData.name || '').trim() || (googleUser.displayName || '').trim() || googleUser.email,
+      role:     userData.role || 'customer',
       photoUrl: googleUser.photoURL || userData.photoUrl || '',
     };
-
-    console.log('Storing session data:', sessionData);
-
-    // Store based on role
-    if (sessionData.role === 'admin') {
-      sessionStorage.setItem('apUser', JSON.stringify(sessionData));
-      console.log('Stored as admin user (apUser)');
-    } else if (sessionData.role === 'staff') {
-      sessionStorage.setItem('spUser', JSON.stringify(sessionData));
-      console.log('Stored as staff user (spUser)');
-    } else {
-      sessionStorage.setItem('cpUser', JSON.stringify(sessionData));
-      console.log('Stored as customer user (cpUser)');
-    }
+    if (sessionData.role === 'admin')  sessionStorage.setItem('apUser', JSON.stringify(sessionData));
+    else if (sessionData.role === 'staff') sessionStorage.setItem('spUser', JSON.stringify(sessionData));
+    else sessionStorage.setItem('cpUser', JSON.stringify(sessionData));
   },
 
-  /**
-   * Redirect user based on role
-   */
   redirectByRole: function(role) {
-    const roleMap = {
-      admin: 'admin_dashboard.html',
-      staff: 'staff_dashboard.html',
-      customer: 'customer_dashboard.html',
-    };
-
-    const target = roleMap[role] || 'customer_dashboard.html';
-    console.log('Redirecting to:', target);
-    
-    // Use a small delay to ensure all logs are flushed
-    setTimeout(() => {
-      window.location.href = target;
-    }, 100);
+    const map = { admin:'admin_dashboard.html', staff:'staff_dashboard.html', customer:'customer_dashboard.html' };
+    setTimeout(() => { window.location.href = map[role] || 'customer_dashboard.html'; }, 100);
   },
 
-  /**
-   * Show toast notification
-   */
   showToast: function(message, type = 'error') {
     const toast = document.getElementById('toast');
-    if (!toast) {
-      console.warn('Toast element not found');
-      return;
-    }
-
+    if (!toast) return;
     toast.textContent = message;
     toast.className = type === 'success' ? 'show success' : 'show';
-    
     clearTimeout(toast._timer);
-    toast._timer = setTimeout(() => {
-      toast.className = '';
-    }, 3500);
-
-    console.log('Toast shown:', message, '(' + type + ')');
+    toast._timer = setTimeout(() => { toast.className = ''; }, 3500);
   },
 
-  /**
-   * Set button loading state
-   */
   setButtonLoading: function(btn, loading) {
     if (!btn) return;
-
     btn.disabled = loading;
-    if (loading) {
-      btn.innerHTML = `<span class="spinner dark"></span>`;
-    } else {
-      btn.innerHTML = this.getGoogleButtonHTML();
-    }
+    btn.innerHTML = loading ? '<span class="spinner dark"></span>' : this.getGoogleButtonHTML();
   },
 
-  /**
-   * Get Google button HTML
-   */
   getGoogleButtonHTML: function() {
     return `<svg class="g-logo" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
       <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -251,16 +385,17 @@ const GoogleSignInModule = {
   },
 };
 
-// Auto-initialize when DOM is ready
-console.log('google_signin.js loaded');
+function _gsShowOtpError(msg) {
+  const err = document.getElementById('_gsOtpError');
+  if (!err) return;
+  err.textContent = msg;
+  err.style.display = 'block';
+}
 
+// Auto-initialize
+console.log('google_signin.js loaded');
 if (document.readyState === 'loading') {
-  console.log('DOM still loading, waiting for DOMContentLoaded');
-  document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOMContentLoaded fired, initializing GoogleSignInModule');
-    GoogleSignInModule.init();
-  });
+  document.addEventListener('DOMContentLoaded', () => GoogleSignInModule.init());
 } else {
-  console.log('DOM already loaded, initializing GoogleSignInModule immediately');
   GoogleSignInModule.init();
 }

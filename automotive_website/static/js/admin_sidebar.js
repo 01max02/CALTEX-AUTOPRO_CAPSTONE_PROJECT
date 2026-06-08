@@ -13,6 +13,49 @@ const PAGE_URLS = {
     'domains':                  'admin_domain_management.html',
 };
 
+// ── Inject mobile-only styles that override inline styles ──────────────
+(function injectMobileStyles() {
+    var style = document.createElement('style');
+    style.id = 'admin-mobile-overrides';
+    style.textContent = [
+        // ── Header: stack vertically on mobile ──
+        '@media (max-width: 900px) {',
+        // Force header to stack: title on top, controls below
+        '  .admin-header { flex-direction: column !important; align-items: flex-start !important; gap: 0.65rem !important; padding: 0.85rem 1rem !important; }',
+        // All direct children except first (title div) go full width, reset margin-left:auto
+        '  .admin-header > *:not(:first-child) { width: 100% !important; margin-left: 0 !important; flex-wrap: wrap !important; gap: 0.4rem !important; }',
+        // All inputs, selects inside header go full width (overrides inline width:220px etc)
+        '  .admin-header input, .admin-header select { width: 100% !important; min-width: 0 !important; box-sizing: border-box !important; }',
+        // ── Data table: horizontal scroll ──
+        '  .data-table { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }',
+        // Keep table rows at desktop min-width so layout isn't broken
+        '  .data-table .table-row { min-width: 560px !important; font-size: 0.82rem !important; }',
+        // Action button containers inside table rows
+        '  .data-table .table-row > div:last-child { display: flex !important; flex-wrap: nowrap !important; gap: 0.3rem !important; align-items: center !important; }',
+        // Equal-width action buttons (overrides inline display:inline-flex)
+        '  .data-table .table-row > div:last-child { display: flex !important; flex-wrap: nowrap !important; gap: 0.3rem !important; align-items: center !important; width: 100% !important; }',
+        '  .data-table .table-row > div:last-child .btn-small,',
+        '  .data-table .table-row > div:last-child button {',
+        '    display: flex !important;',       /* inline-flex ignores flex:1 — must be flex */
+        '    flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important;',   /* width:0 forces equal growth */
+        '    justify-content: center !important; align-items: center !important;',
+        '    padding: 0.3rem 0 !important; font-size: 0.75rem !important;',
+        '    white-space: nowrap !important; box-sizing: border-box !important;',
+        '  }',
+        '  .data-table .table-row > div:last-child > div[style] { display: flex !important; gap: 0.3rem !important; width: 100% !important; }',
+        '  .data-table .table-row > div:last-child > div[style] .btn-small { flex: 1 1 0 !important; display: flex !important; width: 0 !important; justify-content: center !important; padding: 0.3rem 0 !important; }',
+        '}',
+        // ── Small phones ──
+        '@media (max-width: 480px) {',
+        '  .data-table .table-row { font-size: 0.76rem !important; padding: 0.5rem 0.65rem !important; min-width: 480px !important; }',
+        '  .data-table .table-row > div:last-child .btn-small,',
+        '  .data-table .table-row > div:last-child button { font-size: 0.7rem !important; padding: 0.22rem 0.35rem !important; }',
+        '  .admin-header-title { font-size: 1rem !important; }',
+        '}',
+    ].join('\n');
+    document.head.appendChild(style);
+})();
+
 function navigateTo(section) {
     const url = PAGE_URLS[section];
     if (!url) return;

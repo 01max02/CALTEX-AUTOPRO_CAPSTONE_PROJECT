@@ -148,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleGoogleSignIn() async {
     setState(() => _googleLoading = true);
     try {
-      final role = await GoogleSignInHelper.signInWithGoogle();
+      final role = await GoogleSignInHelper.signInWithGoogle(context);
       
       if (role == null) {
         // User cancelled the sign-in

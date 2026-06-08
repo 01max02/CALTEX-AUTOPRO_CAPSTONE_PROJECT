@@ -1585,159 +1585,78 @@ body {
 
 /* 21. Responsive Media Queries */
 
-/* Large screens — collapse stats grid */
+/* ── Large (<=1200px) ── */
 @media (max-width: 1200px) {
-    .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .sr-stat-row {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .admin-sidebar {
-        width: 220px;
-        min-width: 220px;
-    }
+    .stats-grid { grid-template-columns: repeat(3, 1fr); }
+    .sr-stat-row { grid-template-columns: repeat(2, 1fr); }
+    .admin-sidebar { width: 220px; min-width: 220px; }
 }
 
-/* Tablet */
-@media (max-width: 768px) {
-    body {
-        align-items: flex-start;
-        padding: 0;
-    }
-
-    .app-container {
-        max-width: 100%;
-        border-radius: 0;
-        min-height: 100vh;
-    }
-
-    .admin-dashboard {
-        flex-direction: column;
-    }
-
-    .admin-sidebar {
-        width: 100%;
-        min-width: unset;
-        height: auto;
-        max-height: 220px;
-        overflow-y: auto;
-    }
-
-    .admin-nav {
-        flex-direction: row;
-        flex-wrap: wrap;
-        padding: 0.5rem;
-        gap: 0.25rem;
-    }
-
-    .admin-nav-btn {
-        flex: 0 0 auto;
-        padding: 0.5rem 0.75rem;
-        font-size: 0.8rem;
-    }
-
-    .admin-sidebar-footer {
-        /* Keep visible on mobile sidebar too */
-    }
-
-    .admin-main {
-        height: calc(100% - 60px);
-    }
-
-    .admin-header {
-        padding: 1rem;
-        flex-wrap: wrap;
-    }
-
-    .admin-content {
-        padding: 1rem;
-    }
-
-    .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 1rem;
-    }
-
-    .sr-stat-row {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .sr-chat-container {
-        height: 500px;
-    }
-
-    .sr-bubble-ai,
-    .sr-bubble-user {
-        max-width: 90%;
-    }
-
-    .table-header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .modal-content {
-        padding: 1.5rem;
-        border-radius: 16px;
-    }
+/* ── Tablet (<=900px) ── */
+@media (max-width: 900px) {
+    body { align-items: flex-start; padding: 0; }
+    .app-container { max-width: 100%; border-radius: 0; min-height: 100vh; }
+    .admin-main { height: auto; min-height: calc(100vh - 60px); }
+    .admin-header { padding: 0.9rem 1.25rem; flex-wrap: wrap; gap: 0.5rem; }
+    .admin-header-title { font-size: 1.1rem; }
+    .admin-content { padding: 1rem; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+    .sr-stat-row { grid-template-columns: repeat(2, 1fr); }
+    .sr-chat-container { height: 500px; }
+    .sr-bubble-ai, .sr-bubble-user { max-width: 90%; }
+    .table-header { flex-direction: column; align-items: flex-start; }
+    .modal-content { padding: 1.5rem; border-radius: 16px; }
+    .dash-row-1, .dash-row-2 { grid-template-columns: 1fr !important; }
+    #txnHeaderControls, #issuanceHeaderControls { flex-wrap: wrap; }
+    #txnSearch, #issuanceSearch { width: 100% !important; }
+    #issuanceMonthFilter { width: 100% !important; }
 }
 
-/* Mobile */
-@media (max-width: 480px) {
-    .stats-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 0.75rem;
-    }
-
-    .sr-stat-row {
-        grid-template-columns: 1fr 1fr;
-        gap: 0.75rem;
-    }
-
-    .sr-page-header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .sr-chat-container {
-        height: 460px;
-    }
-
-    .sr-bubble-user {
-        max-width: 85%;
-    }
-
-    .admin-header-title {
-        font-size: 1.1rem;
-    }
-
-    .stat-number {
-        font-size: 1.6rem;
-    }
-
+/* ── Mobile (<=600px) ── */
+@media (max-width: 600px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
+    .sr-stat-row { grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .stat-number { font-size: 1.5rem; }
+    .stat-label { font-size: 0.7rem; }
+    .stat-card { padding: 0.9rem; }
+    .admin-content { padding: 0.75rem; }
+    .admin-header { padding: 0.75rem 1rem; }
+    .admin-header-title { font-size: 1rem; }
+    .breadcrumb { font-size: 0.7rem; }
+    .dash-chart-card { padding: 0.9rem !important; }
+    .dash-chart-title { font-size: 0.82rem !important; }
+    .dash-chart-sub { font-size: 0.68rem !important; }
+    .dash-donut-inner { flex-direction: column !important; align-items: center !important; }
+    .data-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .table-row { font-size: 0.8rem; padding: 0.6rem 0.75rem; }
+    .modal { align-items: flex-end; padding: 0; }
     .modal-content {
         padding: 1.25rem;
-        border-radius: 12px;
+        border-radius: 20px 20px 0 0;
+        max-height: 90vh;
+        overflow-y: auto;
+        width: 100%;
+        max-width: 100%;
     }
-
-    .table-row {
-        padding: 0.75rem 1rem;
-        font-size: 0.82rem;
+    .btn-icon, .btn-primary, .btn-secondary, .btn-success, .btn-danger {
+        font-size: 0.8rem;
+        padding: 0.5rem 0.8rem;
     }
-
-    .btn-icon,
-    .btn-primary,
-    .btn-secondary,
-    .btn-success,
-    .btn-danger {
-        font-size: 0.82rem;
-        padding: 0.5rem 0.85rem;
-    }
+    .search-bar { font-size: 0.82rem; }
+    .sr-page-header { flex-direction: column; align-items: flex-start; }
+    .sr-chat-container { height: 460px; }
+    .sr-bubble-user { max-width: 85%; }
 }
 
+/* ── Small phones (<=400px) ── */
+@media (max-width: 400px) {
+    .stats-grid { grid-template-columns: 1fr 1fr !important; gap: 0.5rem; }
+    .stat-number { font-size: 1.3rem; }
+    .stat-card { padding: 0.75rem 0.6rem; }
+    .admin-content { padding: 0.5rem; }
+    .dash-chart-card { padding: 0.75rem !important; }
+    .admin-header-title { font-size: 0.95rem; }
+}
 
 /* ── Notification dropdown panel (shared: admin + customer) ── */
 .notif-dropdown-wrap {

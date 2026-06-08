@@ -115,6 +115,75 @@
         border-radius: 3px;
         flex-shrink: 0;
       }
+
+      /* ── Dashboard responsive ── */
+      @media (max-width: 900px) {
+        /* Stats: 5-col → 2-col */
+        .stats-grid[style*="repeat(5"] {
+          grid-template-columns: repeat(2, 1fr) !important;
+        }
+        /* Chart rows → single column */
+        .dash-row-1, .dash-row-2 {
+          grid-template-columns: 1fr !important;
+        }
+        /* Issuance/txn stats → 2-col */
+        #issuance > div[style*="repeat(3"],
+        #inventory-transactions > div[style*="repeat(3"] {
+          grid-template-columns: repeat(2, 1fr) !important;
+        }
+      }
+
+      @media (max-width: 600px) {
+        /* Stats: 2-col */
+        .stats-grid[style*="repeat(5"] {
+          grid-template-columns: repeat(2, 1fr) !important;
+        }
+        /* Header wraps */
+        .admin-header { padding: 0.75rem 1rem !important; flex-wrap: wrap !important; gap: 0.5rem !important; }
+        #txnHeaderControls, #issuanceHeaderControls { width: 100% !important; flex-wrap: wrap !important; }
+        #txnSearch, #issuanceSearch { width: 100% !important; }
+        #issuanceMonthFilter { width: 100% !important; }
+        /* Content */
+        .admin-content { padding: 0.75rem !important; }
+        /* Chart cards */
+        .dash-chart-card { padding: 0.9rem !important; }
+        /* Chart header: title wraps */
+        .dash-chart-header { flex-wrap: wrap !important; gap: 0.4rem !important; margin-bottom: 0.75rem !important; }
+        .dash-chart-title { font-size: 0.82rem !important; }
+        .dash-chart-sub { font-size: 0.68rem !important; }
+        /* Chart canvas heights → smaller on mobile */
+        #servicesBarChart { max-height: 180px !important; }
+        #vehicleDonutChart { max-height: 130px !important; }
+        #stockLineChart { max-height: 160px !important; }
+        #topPartsBarChart { max-height: 160px !important; }
+        /* Donut: stack chart + legend vertically */
+        .dash-donut-inner { flex-direction: column !important; align-items: center !important; gap: 0.75rem !important; }
+        /* Issuance/txn stats → 1-col */
+        #issuance > div[style*="repeat(3"],
+        #inventory-transactions > div[style*="repeat(3"] {
+          grid-template-columns: 1fr !important;
+        }
+        /* Data table: horizontal scroll */
+        .data-table { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
+        /* Today's service table columns → simpler grid */
+        #todayServicesList .table-row { font-size: 0.78rem !important; }
+      }
+
+      @media (max-width: 400px) {
+        .stats-grid[style*="repeat(5"] { grid-template-columns: repeat(2, 1fr) !important; }
+        .admin-content { padding: 0.5rem !important; }
+        .dash-chart-card { padding: 0.7rem !important; }
+        #servicesBarChart { max-height: 150px !important; }
+        #stockLineChart, #topPartsBarChart { max-height: 140px !important; }
+      }
+
+      /* Chart canvas wrapper: reduce height on mobile */
+      @media (max-width: 600px) {
+        .dash-chart-canvas-wrap { height: 170px !important; }
+      }
+      @media (max-width: 400px) {
+        .dash-chart-canvas-wrap { height: 145px !important; }
+      }
     </style>
 </head>
 <body class="portal-body" data-page="overview">
@@ -199,7 +268,7 @@
                     </div>
 
                     <!-- ── Charts Row 1: Bar + Donut ── -->
-                    <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
+                    <div class="dash-row-1" style="display:grid;grid-template-columns:1.6fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
 
                         <!-- Stacked Bar chart: Services by Type last 7 days -->
                         <div class="dash-chart-card">
@@ -215,7 +284,7 @@
                             </div>
                             <!-- Dynamic legend populated by JS -->
                             <div id="barChartLegend" style="display:flex;flex-wrap:wrap;gap:0.4rem 0.9rem;margin-bottom:0.75rem;"></div>
-                            <div style="position:relative;height:210px;padding:0 4px;">
+                            <div style="position:relative;height:210px;padding:0 4px;" class="dash-chart-canvas-wrap">
                                 <canvas id="servicesBarChart"></canvas>
                             </div>
                         </div>
@@ -231,7 +300,7 @@
                                     <div class="dash-chart-sub">Fleet health overview</div>
                                 </div>
                             </div>
-                            <div style="display:flex;align-items:center;gap:1.25rem;">
+                            <div class="dash-donut-inner" style="display:flex;align-items:center;gap:1.25rem;">
                                 <div style="position:relative;height:150px;width:150px;flex-shrink:0;">
                                     <canvas id="vehicleDonutChart"></canvas>
                                     <div id="donutCenter" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;">
@@ -245,7 +314,7 @@
                     </div>
 
                     <!-- ── Charts Row 2: Line + Top Parts side by side ── -->
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
+                    <div class="dash-row-2" style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
 
                         <!-- Line chart: Stock In vs Stock Out -->
                         <div class="dash-chart-card">
@@ -266,7 +335,7 @@
                                     </span>
                                 </div>
                             </div>
-                            <div style="position:relative;height:220px;padding:0 4px;">
+                            <div style="position:relative;height:220px;padding:0 4px;" class="dash-chart-canvas-wrap">
                                 <canvas id="stockLineChart"></canvas>
                             </div>
                         </div>
@@ -283,7 +352,7 @@
                                 </div>
                                 <div id="topPartsBadge" class="dash-chart-badge" style="margin-left:auto;background:#f5f3ff;color:#7c3aed;flex-shrink:0;"></div>
                             </div>
-                            <div style="position:relative;height:220px;padding:0 4px;">
+                            <div style="position:relative;height:220px;padding:0 4px;" class="dash-chart-canvas-wrap">
                                 <canvas id="topPartsBarChart"></canvas>
                             </div>
                             <div id="topPartsEmpty" style="display:none;text-align:center;padding:2rem;color:#718096;font-size:0.85rem;">
@@ -482,7 +551,7 @@
       }
     </script>
     <script src="../static/js/admin_firebase.js"></script>
-    <script src="../static/js/admin_functions.js"></script>
+    <script src="../static/js/admin_functions.js?v=202606080021"></script>
     <script src="../static/js/admin.js"></script>
     <script src="../static/js/admin_sidebar.js"></script>
     <script>

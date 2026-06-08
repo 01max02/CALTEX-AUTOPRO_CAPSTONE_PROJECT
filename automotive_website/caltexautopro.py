@@ -63,6 +63,81 @@ SMTP_USER     = 'caltexautopro2026@gmail.com'
 SMTP_PASSWORD = os.environ.get('SMTP_APP_PASSWORD', 'kvvp uflz pbdc rcyv')
 SMTP_FROM     = 'Caltex AutoPro <caltexautopro2026@gmail.com>'
 
+@app.route('/api/send-google-otp', methods=['POST'])
+def send_google_otp():
+    """Send a Google Sign-In OTP email via EmailJS (same template as mobile app)."""
+    import random, datetime as _dt, requests as _requests
+    data     = request.get_json(silent=True) or {}
+    to_email = data.get('to_email', '').strip()
+    to_name  = (data.get('to_name', '') or '').strip() or to_email
+
+    if not to_email:
+        return jsonify({'ok': False, 'error': 'Missing email'}), 400
+
+    otp    = str(random.randint(100000, 999999))
+    expiry = (_dt.datetime.utcnow() + _dt.timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S') + 'Z'
+
+    # Store OTP in Firestore via Firebase Admin
+    try:
+        from firebase_admin import firestore as fa_firestore
+        db = fa_firestore.client()
+        db.collection('otp_requests').document(to_email).set({
+            'otp':       otp,
+            'expiry':    expiry,
+            'email':     to_email,
+            'createdAt': fa_firestore.SERVER_TIMESTAMP,
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'Firestore error: {e}'}), 500
+
+    # ── Send via EmailJS — same template as mobile app ──────────────────────
+    EMAILJS_SERVICE  = 'service_i906b4o'
+    EMAILJS_TEMPLATE = 'template_6kkir1s'
+    EMAILJS_KEY      = 'DqRrjCkUnf9w2L_sv'
+
+    try:
+        res = _requests.post(
+            'https://api.emailjs.com/api/v1.0/email/send',
+            headers={
+                'Content-Type': 'application/json',
+                'origin': 'https://dashboard.emailjs.com',
+            },
+            json={
+                'service_id':  EMAILJS_SERVICE,
+                'template_id': EMAILJS_TEMPLATE,
+                'user_id':     EMAILJS_KEY,
+                'template_params': {
+                    'to_email':       to_email,
+                    'to_name':        to_name,
+                    'email':          to_email,
+                    'otp_code':       otp,
+                    'otp':            otp,
+                    'expiry_minutes': '5',
+                    # Purpose: Sign-In Verification
+                    'email_title':    'Sign-In Verification — Caltex AutoPro',
+                    'email_heading':  'Sign-In Verification',
+                    'email_intro':    f'Hi {to_name}, someone is signing in to your Caltex AutoPro account using Google.\nUse the code below to verify your identity.',
+                    'steps_heading':  'Verify your sign-in:',
+                    'step1_icon':  '📲', 'step1_title': 'Enter the code',     'step1_desc': 'Enter the 6-digit code in the verification screen.',
+                    'step2_icon':  '✅', 'step2_title': 'Access your account', 'step2_desc': 'Once verified, you will be signed in to your dashboard.',
+                    'step3_icon':  '🔒', 'step3_title': 'Stay secure',         'step3_desc': 'Never share this code. We will never ask for it.',
+                    'footer_note': 'If you did not attempt to sign in, please secure your account immediately.',
+                },
+            },
+            timeout=15,
+        )
+        if res.status_code != 200:
+            print(f'❌ EmailJS error {res.status_code}: {res.text}')
+            return jsonify({'ok': False, 'error': f'EmailJS error ({res.status_code})'}), 500
+
+        print(f'✅ Google OTP email sent via EmailJS → {to_email}')
+        return jsonify({'ok': True})
+
+    except Exception as e:
+        print(f'❌ Google OTP email error: {e}')
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
 @app.route('/api/send-push-notification', methods=['POST'])
 def send_push_notification():
     """Send OneSignal push notification to specific subscription IDs."""
@@ -80,14 +155,17 @@ def send_push_notification():
     ONESIGNAL_API_KEY = 'os_v7_app_yt4cvr2f1hkhvh5ldu4k637i51snjeyuythen3fd61ae1yhnprpy6kbxvn9kjd1pqdhygsqmlrouas4kfuydft32nkgj5flbra3oo5q'
 
     payload = {
-        'app_id':                   ONESIGNAL_APP_ID,
-        'include_subscription_ids': subscription_ids,
-        'headings':                 {'en': title},
-        'contents':                 {'en': message},
-        'data':                     {'type': notif_type},
+        'app_id':         ONESIGNAL_APP_ID,
+        'include_aliases': {
+            'external_id': subscription_ids,
+        },
+        'target_channel': 'push',
+        'headings':       {'en': title},
+        'contents':       {'en': message},
+        'data':           {'type': notif_type},
     }
     req = urllib.request.Request(
-        'https://onesignal.com/api/v1/notifications',
+        'https://api.onesignal.com/notifications',
         data=_json.dumps(payload).encode('utf-8'),
         headers={
             'Authorization': f'Basic {ONESIGNAL_API_KEY}',
@@ -802,6 +880,16 @@ def ai_report_list():
 @app.route('/customer_my_bookings.html')
 def customer_my_bookings():
     return render_template('customer_my_bookings.html')
+
+
+@app.route('/privacy_policy.html')
+def privacy_policy():
+    return render_template('privacy_policy.html')
+
+
+@app.route('/terms_condiion.html')
+def terms_conditions():
+    return render_template('terms_condiion.html')
 
 
 @app.route('/api/send-reschedule-email', methods=['POST'])

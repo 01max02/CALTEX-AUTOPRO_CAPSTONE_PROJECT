@@ -903,3 +903,245 @@
 #toast.toast-success { background: #16a34a; }
 #toast.toast-error   { background: #E8001C; }
 #toast.toast-info    { background: #2563eb; }
+
+
+
+/* ═══════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — Admin Portal
+   Sidebar = slide-out drawer (hamburger)
+   Content = natural scroll, stacked layout
+   ═══════════════════════════════════════════════════════════ */
+
+@media (max-width: 900px) {
+    /* ─ Let page scroll naturally ─ */
+    html, body {
+        height: auto !important;
+        min-height: 100vh;
+        overflow-x: hidden !important;
+    }
+
+    /* ─ Portal body ─ */
+    .portal-body {
+        overflow-x: hidden !important;
+    }
+
+    /* ─ Dashboard container ─ */
+    .admin-dashboard {
+        height: auto !important;
+        min-height: 100vh;
+        overflow-x: hidden !important;
+    }
+
+    /* ─ Body row: sidebar is a fixed drawer, main fills full width ─ */
+    .admin-dashboard-body {
+        flex-direction: row !important;
+        height: auto !important;
+        min-height: calc(100vh - 60px);
+        overflow: visible !important;
+    }
+
+    /* ─ Main content area scrolls naturally ─ */
+    .admin-main {
+        flex: 1 !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        height: auto !important;
+        overflow: visible !important;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .admin-content {
+        flex: 1;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        padding: 1rem !important;
+        height: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* ─ Header: stack title above search/actions ─ */
+    .admin-header {
+        padding: 0.85rem 1rem !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0.6rem !important;
+    }
+    /* First child (breadcrumb + title) takes full width */
+    .admin-header > div:first-child { width: 100% !important; }
+    .admin-header-title { font-size: 1.1rem !important; }
+    .breadcrumb { font-size: 0.72rem !important; }
+
+    /* All header controls go full width — override inline margin-left:auto */
+    .admin-header > div:not(:first-child),
+    #txnHeaderControls,
+    #issuanceHeaderControls,
+    .admin-header-actions {
+        flex-wrap: wrap !important;
+        width: 100% !important;
+        gap: 0.4rem !important;
+        margin-left: 0 !important;
+    }
+    /* Any search bar inside header goes full width — override inline width:220px */
+    .admin-header .search-bar,
+    .admin-header input[type="text"],
+    .admin-header select,
+    #txnSearch, #issuanceSearch {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    #issuanceMonthFilter { width: 100% !important; }
+    /* Search wrap div also full width */
+    .admin-header > div:not(:first-child) > div {
+        width: 100% !important;
+        position: relative !important;
+    }
+
+    /* ─ Stats grid: 5-col → 2-col ─ */
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 0.75rem !important;
+        margin-bottom: 1rem !important;
+    }
+
+    /* ─ Dashboard chart rows → single column ─ */
+    .dash-row-1,
+    .dash-row-2 {
+        grid-template-columns: 1fr !important;
+        gap: 0.85rem !important;
+    }
+
+    /* ─ Chart cards ─ */
+    .dash-chart-card { padding: 1rem !important; }
+
+    /* ─ Donut chart: stack label list below chart ─ */
+    .dash-donut-inner {
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 0.75rem !important;
+    }
+
+    /* ─ Data tables: horizontal scroll ─ */
+    .data-table {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    /* ─ Issuance/txn section stat rows → 2-col ─ */
+    #issuance .stats-grid,
+    #inventory-transactions .stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+/* ─── Small phones (<=480px) ─── */
+@media (max-width: 480px) {
+    .admin-header { padding: 0.7rem 0.85rem !important; }
+    .admin-header-title { font-size: 1rem !important; }
+    .admin-content { padding: 0.75rem !important; }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 0.6rem !important;
+    }
+    .stat-card { padding: 0.85rem 0.7rem !important; }
+    .stat-number { font-size: 1.5rem !important; }
+    .stat-label { font-size: 0.71rem !important; }
+    .stat-icon {
+        width: 40px !important;
+        height: 40px !important;
+        margin-bottom: 0.6rem !important;
+    }
+
+    .dash-chart-card { padding: 0.85rem !important; }
+    .dash-chart-title { font-size: 0.82rem !important; }
+    .dash-chart-sub { font-size: 0.68rem !important; }
+
+    /* Modals become bottom sheets */
+    .modal {
+        align-items: flex-end !important;
+        padding: 0 !important;
+    }
+    .modal-content {
+        border-radius: 20px 20px 0 0 !important;
+        max-height: 92vh !important;
+        overflow-y: auto !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 1.25rem !important;
+    }
+
+    .btn-primary, .btn-secondary, .btn-success,
+    .btn-danger, .btn-icon {
+        font-size: 0.8rem !important;
+        padding: 0.5rem 0.8rem !important;
+    }
+    .table-row { font-size: 0.78rem !important; padding: 0.55rem 0.7rem !important; }
+    .search-bar { font-size: 0.82rem !important; }
+}
+
+/* ─── Very small (<=360px) ─── */
+@media (max-width: 360px) {
+    .admin-content { padding: 0.5rem !important; }
+    .stat-card { padding: 0.7rem 0.5rem !important; }
+    .stat-number { font-size: 1.3rem !important; }
+    .dash-chart-card { padding: 0.65rem !important; }
+    .admin-header-title { font-size: 0.92rem !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TABLE RESPONSIVE — All Admin Pages
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Normalize ALL btn-small so they're equal height/size ── */
+.btn-small {
+    box-sizing: border-box !important;
+    height: 30px !important;
+    padding: 0 0.5rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+.btn-small.btn-secondary {
+    /* border adds to size — compensate */
+    padding: 0 calc(0.5rem - 1.5px) !important;
+}
+
+/* ── Action button grid container ── */
+div[style*="display:grid"][style*="repeat(3,1fr)"],
+div[style*="display:grid"][style*="repeat(2,1fr)"] {
+    align-items: stretch !important;
+}
+div[style*="display:grid"][style*="repeat(3,1fr)"] .btn-small,
+div[style*="display:grid"][style*="repeat(2,1fr)"] .btn-small {
+    width: 100% !important;
+    height: 30px !important;
+    box-sizing: border-box !important;
+}
+
+@media (max-width: 900px) {
+    .data-table {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+    .data-table .table-row { min-width: 560px !important; }
+}
+
+@media (max-width: 600px) {
+    .data-table .table-row {
+        font-size: 0.78rem !important;
+        padding: 0.55rem 0.75rem !important;
+    }
+    .btn-small {
+        height: 28px !important;
+        font-size: 0.72rem !important;
+    }
+}
+
+@media (max-width: 400px) {
+    .data-table .table-row {
+        font-size: 0.72rem !important;
+        padding: 0.45rem 0.6rem !important;
+    }
+    .btn-small { height: 26px !important; }
+}

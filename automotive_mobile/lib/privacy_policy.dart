@@ -63,7 +63,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
 
           _section('8. Contact Us',
               'If you have questions about this Privacy Policy, please contact us at:\n\n'
-              'JA Noble Enterprise INC\nEmail: support@janoblecaltex.com\nPhone: (02) 8-XXX-XXXX'),
+              'JA Noble Enterprise INC\nEmail: janobleenterprisesinc@gmail.com\nPhone: (02) 8-XXX-XXXX'),
 
           const SizedBox(height: 32),
           Center(child: Text('© 2026 JA Noble Enterprise INC. All rights reserved.',

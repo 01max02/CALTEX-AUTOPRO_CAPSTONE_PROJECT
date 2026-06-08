@@ -98,6 +98,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             'otp_code':       otp,
             'otp':            otp,
             'expiry_minutes': '5',
+            // Purpose: Password Reset
+            'email_title':   'Password Reset OTP — Caltex AutoPro',
+            'email_heading': 'Password Reset OTP',
+            'email_intro':   'You requested to reset your Caltex AutoPro account password.\nUse the code below to verify your identity.',
+            'steps_heading': 'How to reset your password:',
+            'step1_icon':  '📲', 'step1_title': 'Enter the OTP',      'step1_desc': 'Open the AutoPro app and enter the code above in the OTP field.',
+            'step2_icon':  '🔑', 'step2_title': 'Set a new password',  'step2_desc': 'Enter and confirm your new password when prompted.',
+            'step3_icon':  '✅', 'step3_title': 'Sign in',             'step3_desc': 'Log in with your new password and you\'re all set.',
+            'footer_note': 'If you did not request a password reset, ignore this email. Your account remains secure.',
           },
         }),
       );
