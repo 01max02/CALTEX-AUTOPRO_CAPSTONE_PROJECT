@@ -9,6 +9,7 @@ import 'customer_mybookings.dart';
 import 'profile.dart';
 import 'notifications.dart';
 import 'customer_bottomnavbar.dart';
+import 'customer_calendar_floating.dart';
 
 class CustomerDashboard extends StatefulWidget {
   const CustomerDashboard({super.key});
@@ -57,23 +58,33 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
     return Scaffold(
       backgroundColor: _bg,
       appBar: _buildTopBar(),
-      body: _buildBody(),
-      floatingActionButton: _currentIndex == 0
-          ? FloatingActionButton(
-              onPressed: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const CustomerSmartAI())),
-              backgroundColor: _red,
-              shape: const CircleBorder(),
-              elevation: 6,
-              child: const Icon(Icons.question_answer_rounded, color: Colors.white, size: 26),
-            )
-          : null,
+      body: Stack(children: [
+        _buildBody(),
+        // ── Floating calendar overlay (always visible) ──
+        const CustomerCalendarFloating(),
+      ]),
       bottomNavigationBar: CustomerBottomNavBar(
         currentIndex: _currentIndex,
-        vehiclesIcon: _fleetNavIcon,
         onTap: (i) {
           if (i == 1) {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerMyBookings()));
+            // My Bookings opens as a full separate screen (no dashboard bottom nav)
+            Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const CustomerMyBookings()));
+          } else if (i == 2) {
+            // Smart AI opens as a full separate screen (no app header / bottom nav)
+            Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const CustomerSmartAI()));
+          } else if (i == 3) {
+            // PMS History opens as a full separate screen (no bottom nav)
+            Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const CustomerPmsScreen()));
+          } else if (i == 4) {
+            // Profile opens as a full screen then refreshes initials
+            Navigator.push(context,
+                MaterialPageRoute(
+                    builder: (_) =>
+                        const UserProfile(role: UserRole.customer)))
+                .then((_) => _loadInitials());
           } else {
             setState(() => _currentIndex = i);
           }
@@ -124,8 +135,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
   Widget _buildBody() {
     switch (_currentIndex) {
       case 0: return _buildVehicles();
-      case 1: return _buildSmartReports();   // center raised button
-      case 2: return const CustomerPms();
+      // cases 1, 2, 3, 4 all handled via Navigator.push
       default: return _buildVehicles();
     }
   }

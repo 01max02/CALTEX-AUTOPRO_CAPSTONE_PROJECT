@@ -7,41 +7,47 @@
     <link rel="icon" type="image/png" href="../static/img/LOGO_CALTEX.png" />
     <link rel="stylesheet" href="../static/css/customer_dashboard.css">
     <style>
-        .mb-page { max-width:900px; margin:0 auto; padding:28px 40px 40px; }
-        .mb-header { margin-bottom:28px; display:flex; align-items:center; justify-content:space-between; }
+        .mb-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:16px; align-items:start; }
+        @media (max-width:480px) { .mb-grid { grid-template-columns:1fr; } }
+
+        .mb-page { padding:20px; }
+        .mb-header { margin-bottom:28px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
         .mb-header-left h2 { font-size:22px; font-weight:800; color:#1a202c; margin:0 0 4px; }
-        .mb-header-left p { font-size:13px; color:#718096; margin:0; }
+        .mb-header-left p  { font-size:13px; color:#718096; margin:0; }
         .mb-book-btn { display:inline-flex; align-items:center; gap:6px; padding:10px 18px; background:#E8001C; color:white; border:none; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; text-decoration:none; transition:all .15s; box-shadow:0 3px 12px rgba(232,0,28,0.25); }
-        .mb-book-btn:hover { opacity:0.9; transform:translateY(-1px); box-shadow:0 5px 18px rgba(232,0,28,0.35); }
+        .mb-book-btn:hover { opacity:.9; transform:translateY(-1px); }
 
-        .mb-card { background:white; border-radius:16px; border:1.5px solid #e2e8f0; padding:0; margin-bottom:16px; transition:all .15s; overflow:hidden; }
-        .mb-card:hover { box-shadow:0 6px 20px rgba(0,0,0,0.07); border-color:#cbd5e0; transform:translateY(-1px); }
-        .mb-card-body { padding:18px 20px; }
-        .mb-card-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
-        .mb-plate { font-size:16px; font-weight:700; color:#1a202c; }
-        .mb-badge { font-size:10px; font-weight:700; padding:4px 12px; border-radius:20px; text-transform:uppercase; letter-spacing:0.4px; }
-        .mb-badge.approved { background:rgba(56,161,105,0.1); color:#38a169; }
-        .mb-badge.rescheduled { background:rgba(0,48,135,0.1); color:#003087; }
-        .mb-badge.dismissed { background:rgba(113,128,150,0.1); color:#718096; }
-        .mb-services { font-size:13px; color:#4a5568; margin-bottom:12px; line-height:1.5; }
-        .mb-meta { display:flex; flex-wrap:wrap; gap:18px; font-size:12px; color:#718096; }
-        .mb-meta-item { display:flex; align-items:center; gap:6px; }
-        .mb-reschedule-note { margin:12px 20px 16px; padding:10px 14px; background:#fffbeb; border:1.5px solid #fbd38d; border-radius:10px; font-size:12px; color:#92400e; display:flex; align-items:center; gap:8px; line-height:1.5; }
+        /* ── Card ── */
+        .mb-card { background:white; border-radius:14px; border:1px solid #e2e8f0; box-shadow:0 2px 8px rgba(0,0,0,0.05); overflow:hidden; transition:transform .2s, box-shadow .2s; display:flex; flex-direction:column; cursor:pointer; }
+        .mb-card:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.09); }
+        .mb-card-header { padding:16px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #f0f4f8; }
+        .mb-plate { font-size:14px; font-weight:700; color:#1a202c; }
+        .mb-desc  { font-size:11px; color:#718096; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .mb-badge { font-size:10px; font-weight:700; padding:4px 10px; border-radius:20px; white-space:nowrap; flex-shrink:0; text-transform:uppercase; letter-spacing:.4px; }
+        .mb-badge.approved    { background:rgba(56,161,105,0.1);  color:#38a169; }
+        .mb-badge.pending     { background:rgba(237,137,54,0.1);   color:#c05621; }
+        .mb-badge.rescheduled { background:rgba(0,48,135,0.1);     color:#003087; }
+        .mb-badge.cancelled   { background:rgba(113,128,150,0.1);  color:#718096; }
+        .mb-badge.completed   { background:rgba(0,48,135,0.08);    color:#003087; }
+        .mb-card-body { padding:12px 16px; flex:1; }
 
-        .mb-empty { text-align:center; padding:80px 20px; color:#718096; }
-        .mb-empty svg { margin-bottom:16px; opacity:0.3; }
-        .mb-empty p { font-size:14px; margin:0 0 16px; }
-        .mb-empty a { color:#E8001C; font-weight:600; text-decoration:none; }
-        .mb-empty a:hover { text-decoration:underline; }
-
-        @media (max-width: 768px) {
-            .mb-page { padding:16px 16px 32px; }
-            .mb-header { flex-direction:column; align-items:flex-start; gap:12px; }
-            .mb-card-body { padding:14px 16px; }
-            .mb-card-top { flex-direction:column; align-items:flex-start; gap:8px; }
-            .mb-meta { gap:10px; }
-            .mb-reschedule-note { margin:10px 16px 14px; }
-        }
+        /* ── Modal ── */
+        .mb-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); z-index:800; align-items:center; justify-content:center; padding:20px; }
+        .mb-modal-overlay.active { display:flex; }
+        .mb-modal { background:white; border-radius:20px; width:100%; max-width:500px; max-height:90vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.2); animation:mbFadeIn .2s ease; }
+        @keyframes mbFadeIn { from{opacity:0;transform:scale(.96) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }
+        .mb-modal-hd { background:#E8001C; padding:20px; display:flex; align-items:center; gap:14px; flex-shrink:0; }
+        .mb-modal-hd-plate { font-size:17px; font-weight:800; color:white; }
+        .mb-modal-hd-desc  { font-size:12px; color:rgba(255,255,255,.75); margin-top:2px; }
+        .mb-modal-close { margin-left:auto; background:rgba(255,255,255,.2); border:none; color:white; width:32px; height:32px; border-radius:50%; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .mb-modal-close:hover { background:rgba(255,255,255,.3); }
+        .mb-modal-body { padding:20px; overflow-y:auto; }
+        .mb-detail-card { background:white; border-radius:14px; border:1px solid #e2e8f0; overflow:hidden; }
+        .mb-detail-row { display:flex; align-items:center; gap:12px; padding:12px; }
+        .mb-detail-row + .mb-detail-row { border-top:1px solid #f7f8fa; }
+        .mb-detail-icon { width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .mb-detail-label { font-size:11px; color:#718096; }
+        .mb-detail-value { font-size:13px; font-weight:600; color:#1a202c; margin-top:2px; }
     </style>
 </head>
 <body data-page="my-bookings">
@@ -60,12 +66,27 @@
         Book Service
       </a>
     </div>
-
-    <div id="mbList">
-      <div style="text-align:center;padding:40px;color:#718096;font-size:13px;">Loading bookings...</div>
+    <div id="mbList" class="mb-grid">
+      <div style="grid-column:1/-1;text-align:center;padding:40px;color:#718096;font-size:13px;">Loading bookings...</div>
     </div>
   </div>
 </main>
+
+<!-- ── Booking Detail Modal ── -->
+<div class="mb-modal-overlay" id="mbModal" onclick="if(event.target===this)mbCloseModal()">
+  <div class="mb-modal">
+    <div class="mb-modal-hd">
+      <div style="flex:1;min-width:0;">
+        <div class="mb-modal-hd-plate" id="mbModalPlate">—</div>
+        <div class="mb-modal-hd-desc"  id="mbModalDesc">—</div>
+      </div>
+      <button class="mb-modal-close" onclick="mbCloseModal()">&times;</button>
+    </div>
+    <div class="mb-modal-body">
+      <div class="mb-detail-card" id="mbModalDetails"></div>
+    </div>
+  </div>
+</div>
 
 <div id="cuToast"></div>
 
@@ -85,107 +106,180 @@
 </script>
 <script src="../static/js/customer_shared.js"></script>
 <script>
-// Load header
+// ── Load header ──────────────────────────────────────────────
 fetch('customer_header.html').then(function(r){return r.text();}).then(function(html){
   document.getElementById('customerHeader').innerHTML = html;
   var sess = JSON.parse(sessionStorage.getItem('cpUser') || '{}');
   if (sess.name) {
     var parts = sess.name.trim().split(' ').filter(Boolean);
     var ini = parts.length >= 2 ? (parts[0][0]+parts[1][0]).toUpperCase() : (parts[0]?parts[0][0].toUpperCase():'CU');
-    var av = document.getElementById('cuAvatar'); if(av) av.textContent = ini;
+    var av = document.getElementById('cuAvatar');    if(av) av.textContent = ini;
     var hn = document.getElementById('cuHeaderName'); if(hn) hn.textContent = sess.name;
     var mn = document.getElementById('cuAvatarName'); if(mn) mn.textContent = sess.name;
   }
 });
 
+// ── Helpers ──────────────────────────────────────────────────
 var _MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-function _formatDate(dateStr) {
-  if (!dateStr) return '—';
-  var parts = dateStr.split('-');
-  if (parts.length !== 3) return dateStr;
-  var y = parseInt(parts[0]);
-  var m = parseInt(parts[1]) - 1;
-  var d = parseInt(parts[2]);
-  if (isNaN(y) || isNaN(m) || isNaN(d)) return dateStr;
+function _formatDate(s) {
+  if (!s) return '—';
+  var p = s.split('-');
+  if (p.length !== 3) return s;
+  var y=parseInt(p[0]), m=parseInt(p[1])-1, d=parseInt(p[2]);
+  if (isNaN(y)||isNaN(m)||isNaN(d)) return s;
   return _MONTHS[m] + ' ' + d + ', ' + y;
 }
-
 function _esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// ── Booking store ─────────────────────────────────────────────
+var _bookings = {};
+
+// ── Modal ─────────────────────────────────────────────────────
+window.mbOpenModal = function(docId) {
+  var d = _bookings[docId];
+  if (!d) return;
+
+  document.getElementById('mbModalPlate').textContent = d.plate || '—';
+  document.getElementById('mbModalDesc').textContent  = d.vehicleDesc || (d.services||[]).join(', ') || '—';
+
+  var status        = (d.status || 'Approved');
+  var isRescheduled = d.previousDate && d.previousDate !== d.preferredDate;
+  var displayStatus = isRescheduled && status.toLowerCase() === 'approved' ? 'Rescheduled' : status;
+
+  var statusColors = {
+    approved:    {bg:'rgba(56,161,105,0.08)',  color:'#38a169'},
+    completed:   {bg:'rgba(0,48,135,0.08)',    color:'#003087'},
+    cancelled:   {bg:'rgba(113,128,150,0.1)',  color:'#718096'},
+    rejected:    {bg:'rgba(113,128,150,0.1)',  color:'#718096'},
+    pending:     {bg:'rgba(237,137,54,0.1)',   color:'#c05621'},
+    rescheduled: {bg:'rgba(0,48,135,0.1)',     color:'#003087'},
+  };
+  var sc = statusColors[(isRescheduled ? 'rescheduled' : status.toLowerCase())] || statusColors.pending;
+
+  function row(iconPath, label, value, colorBg, colorFg) {
+    return '<div class="mb-detail-row">'
+      + '<div class="mb-detail-icon" style="background:' + colorBg + ';color:' + colorFg + ';">'
+      +   '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + iconPath + '</svg>'
+      + '</div>'
+      + '<div><div class="mb-detail-label">' + _esc(label) + '</div><div class="mb-detail-value">' + _esc(value) + '</div></div>'
+      + '</div>';
+  }
+
+  var services = (d.services||[]).join(', ') || '—';
+  var notes    = (d.notes || '').trim();
+
+  var details = ''
+    + row('<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+          'Preferred Date', _formatDate(d.preferredDate), 'rgba(0,48,135,0.08)', '#003087')
+    + row('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+          'Preferred Time', d.preferredTime || '—', 'rgba(0,48,135,0.08)', '#003087')
+    + row('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+          'Services', services, 'rgba(232,0,28,0.08)', '#E8001C')
+    + row('<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+          'Status', displayStatus, sc.bg, sc.color);
+
+  if (isRescheduled) {
+    details += row('<path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
+      'Rescheduled From', _formatDate(d.previousDate) + ' → ' + _formatDate(d.preferredDate),
+      'rgba(251,211,61,0.15)', '#92400e');
+  }
+  if (notes) {
+    details += row('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+      'Notes', notes, 'rgba(113,128,150,0.08)', '#718096');
+  }
+
+  document.getElementById('mbModalDetails').innerHTML = details;
+  document.getElementById('mbModal').classList.add('active');
+};
+
+window.mbCloseModal = function() {
+  document.getElementById('mbModal').classList.remove('active');
+};
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') mbCloseModal();
+});
+
+// ── Load bookings ─────────────────────────────────────────────
 firebase.auth().onAuthStateChanged(function(user) {
   if (!user) { window.location.href = 'login.html'; return; }
 
-  var db = firebase.firestore();
-  db.collection('service_bookings')
+  firebase.firestore()
+    .collection('service_bookings')
     .where('customerId', '==', user.uid)
     .get()
     .then(function(snap) {
       var list = document.getElementById('mbList');
+
       if (snap.empty) {
-        list.innerHTML = '<div class="mb-empty">'
+        list.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:80px 20px;">'
           + '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'
-          + '<p>You have no bookings yet.</p>'
-          + '<a href="customer_book_service.html">Book a Service →</a>'
+          + '<p style="font-size:14px;color:#718096;margin:12px 0;">You have no bookings yet.</p>'
+          + '<a href="customer_book_service.html" style="color:#E8001C;font-weight:600;text-decoration:none;">Book a Service →</a>'
           + '</div>';
         return;
       }
 
-      // Sort by createdAt descending (client-side to avoid index requirement)
-      var docs = snap.docs.sort(function(a, b) {
-        var aTime = a.data().createdAt ? a.data().createdAt.toMillis() : 0;
-        var bTime = b.data().createdAt ? b.data().createdAt.toMillis() : 0;
-        return bTime - aTime;
+      var docs = snap.docs.sort(function(a,b) {
+        var at = a.data().createdAt ? a.data().createdAt.toMillis() : 0;
+        var bt = b.data().createdAt ? b.data().createdAt.toMillis() : 0;
+        return bt - at;
       });
 
       var html = '';
       docs.forEach(function(doc) {
-        var d = doc.data();
-        if ((d.status || '').toLowerCase() === 'pending') return; // skip pending
-        var status = (d.status || 'Approved').toLowerCase();
+        var d   = doc.data();
+        var id  = doc.id;
+        _bookings[id] = d;
+
+        var status        = (d.status || 'Approved').toLowerCase();
         var isRescheduled = d.previousDate && d.previousDate !== d.preferredDate;
         var badgeClass, badgeLabel;
+
         if (isRescheduled && status === 'approved') {
-          badgeClass = 'rescheduled';
-          badgeLabel = 'Rescheduled';
+          badgeClass = 'rescheduled'; badgeLabel = 'Rescheduled';
         } else if (status === 'approved') {
-          badgeClass = 'approved';
-          badgeLabel = 'Approved';
+          badgeClass = 'approved';    badgeLabel = 'Approved';
+        } else if (status === 'completed') {
+          badgeClass = 'completed';   badgeLabel = 'Completed';
+        } else if (status === 'pending') {
+          badgeClass = 'pending';     badgeLabel = 'Pending';
         } else {
-          badgeClass = 'dismissed';
-          badgeLabel = 'Cancelled';
+          badgeClass = 'cancelled';   badgeLabel = 'Cancelled';
         }
+
         var services = (d.services || []).join(', ') || '—';
-        var rescheduleNote = '';
 
-        if (isRescheduled) {
-          rescheduleNote = '<div class="mb-reschedule-note">'
-            + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>'
-            + 'Rescheduled from <strong>' + _formatDate(d.previousDate) + '</strong> to <strong>' + _formatDate(d.preferredDate) + '</strong>'
-            + '</div>';
-        }
-
-        html += '<div class="mb-card">'
+        html += '<div class="mb-card" onclick="mbOpenModal(\'' + id + '\')">'
+          + '<div class="mb-card-header">'
+          +   '<div style="flex:1;min-width:0;">'
+          +     '<div class="mb-plate">' + _esc(d.plate || '—') + '</div>'
+          +     '<div class="mb-desc">' + _esc(services !== '—' ? services : (d.vehicleDesc || '—')) + '</div>'
+          +   '</div>'
+          +   '<span class="mb-badge ' + badgeClass + '">' + _esc(badgeLabel) + '</span>'
+          + '</div>'
           + '<div class="mb-card-body">'
-          + '<div class="mb-card-top">'
-          + '<span class="mb-plate">' + _esc(d.plate || '—') + '</span>'
-          + '<span class="mb-badge ' + badgeClass + '">' + _esc(badgeLabel) + '</span>'
+          +   '<div class="cu-vehicle-meta-row">'
+          +     '<div class="cu-vehicle-meta-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>' + _formatDate(d.preferredDate) + '</span></div>'
+          +     '<div class="cu-vehicle-meta-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>' + _esc(d.preferredTime || '—') + '</span></div>'
+          +   '</div>'
           + '</div>'
-          + '<div class="mb-services">' + _esc(services) + '</div>'
-          + '<div class="mb-meta">'
-          + '<span class="mb-meta-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' + _formatDate(d.preferredDate) + '</span>'
-          + '<span class="mb-meta-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' + _esc(d.preferredTime || '—') + '</span>'
-          + '</div>'
-          + '</div>'
-          + rescheduleNote
+          + '<div class="cu-vehicle-card-footer"><span>View details</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>'
           + '</div>';
       });
 
       list.innerHTML = html;
-    }).catch(function(err) {
-      document.getElementById('mbList').innerHTML = '<div style="text-align:center;padding:40px;color:#e53e3e;font-size:13px;">Error loading bookings: ' + err.message + '</div>';
+    })
+    .catch(function(err) {
+      document.getElementById('mbList').innerHTML =
+        '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#e53e3e;font-size:13px;">Error: ' + err.message + '</div>';
     });
 });
 </script>
+
+<!-- ── Floating Calendar Widget ── -->
+{% include 'customer_calendar_widget.html' %}
+
 </body>
 </html>

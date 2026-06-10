@@ -258,6 +258,8 @@
                 // Pre-fill avatar menu name
                 var nameEl = document.getElementById('cuAvatarName');
                 if (nameEl) nameEl.textContent = name;
+                // Update page title
+                if (window._cuUpdateTitleWithName) window._cuUpdateTitleWithName(name);
             }
         }).catch(function () {});
 
@@ -293,5 +295,21 @@
         var obs = new MutationObserver(function () { setActiveTab(); });
         obs.observe(headerEl, { childList: true, subtree: true });
     });
+
+    // ── Dynamic page title: "Welcome, Full Name" ────────────
+    function _updateTitle() {
+        var sess = JSON.parse(
+            sessionStorage.getItem('cpUser') ||
+            sessionStorage.getItem('spUser') ||
+            sessionStorage.getItem('apUser') || '{}'
+        );
+        var name = (sess.name || '').trim();
+        if (name) document.title = 'Welcome, ' + name;
+    }
+    ready(_updateTitle);
+    // Also update once Firebase loads the name (may arrive after page load)
+    window._cuUpdateTitleWithName = function(name) {
+        if (name) document.title = 'Welcome, ' + name;
+    };
 
 })();

@@ -294,6 +294,7 @@ class _PmsCalendarFloatingState extends State<PmsCalendarFloating>
             _legendItem(const Color(0xFF003087), 'Upcoming'),
             _legendItem(const Color(0xFF0d9488), 'Today'),
             _legendItem(const Color(0xFF7c3aed), 'Booked'),
+            _legendItem(const Color(0xFFcbd5e0), 'Past'),
           ]),
         ),
       ]),
@@ -407,7 +408,7 @@ class _PmsCalendarFloatingState extends State<PmsCalendarFloating>
     final m = int.parse(parts[1]);
     final d = int.parse(parts[2]);
     final y = int.parse(parts[0]);
-    final title = '${_months[m - 1]} $d, $y — ${events.length} vehicle${events.length > 1 ? 's' : ''}';
+    final title = '${_months[m - 1]} $d, $y';
 
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),

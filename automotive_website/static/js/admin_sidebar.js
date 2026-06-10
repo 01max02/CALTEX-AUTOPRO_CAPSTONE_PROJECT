@@ -264,3 +264,34 @@ window.addEventListener('pageshow', function(e) {
         });
     }
 });
+
+// ── Dynamic page title: "Welcome, Full Name" ────────────────
+(function _initAdminTitle() {
+    function _setTitle(name) {
+        if (name) document.title = 'Welcome, ' + name;
+    }
+
+    // Immediately try sessionStorage (instant, no flicker)
+    var sess = JSON.parse(
+        sessionStorage.getItem('apUser') ||
+        sessionStorage.getItem('spUser') ||
+        sessionStorage.getItem('cpUser') || '{}'
+    );
+    if (sess.name) { _setTitle(sess.name); return; }
+
+    // Fallback: wait for Firebase and fetch from Firestore
+    function _tryFirebase() {
+        if (typeof firebase === 'undefined') {
+            setTimeout(_tryFirebase, 200); return;
+        }
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (!user) return;
+            firebase.firestore().collection('users').doc(user.uid).get()
+                .then(function(doc) {
+                    var name = doc.exists ? (doc.data().name || '') : '';
+                    _setTitle(name);
+                }).catch(function() {});
+        });
+    }
+    _tryFirebase();
+})();

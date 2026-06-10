@@ -491,9 +491,6 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
         border: Border.all(color: const Color(0xFFe2e8f0)),
       ),
       child: Row(children: [
-        Icon(isService ? Icons.build_outlined : Icons.inventory_2_outlined,
-          size: 16, color: isService ? const Color(0xFF003087) : _red),
-        const SizedBox(width: 8),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
           Text('$qty $uom  -  $cost / unit', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),

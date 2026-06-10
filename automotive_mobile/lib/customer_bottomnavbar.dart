@@ -2,22 +2,22 @@ import 'package:flutter/material.dart';
 
 /// Reusable bottom navigation bar for the Customer Dashboard.
 /// Indices:
-///   0 → My Vehicles
-///   1 → My Bookings (navigates to CustomerMyBookings screen)
-///   2 → PMS Log
+///   0 → Home (My Vehicles)
+///   1 → My Bookings
+///   2 → Smart AI  (center raised FAB)
+///   3 → PMS History
+///   4 → Profile
 class CustomerBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
-  final IconData vehiclesIcon;
 
-  static const _red   = Color(0xFFE8001C);
-  static const _grey  = Color(0xFF718096);
+  static const _red  = Color(0xFFE8001C);
+  static const _grey = Color(0xFF718096);
 
   const CustomerBottomNavBar({
     super.key,
     required this.currentIndex,
     required this.onTap,
-    this.vehiclesIcon = Icons.directions_car_outlined,
   });
 
   @override
@@ -26,7 +26,7 @@ class CustomerBottomNavBar extends StatelessWidget {
       decoration: const BoxDecoration(
         color: Colors.white,
         boxShadow: [BoxShadow(
-          color: Color(0x18000000), blurRadius: 12, offset: Offset(0, -2))],
+            color: Color(0x18000000), blurRadius: 12, offset: Offset(0, -2))],
       ),
       child: SafeArea(
         child: SizedBox(
@@ -34,35 +34,43 @@ class CustomerBottomNavBar extends StatelessWidget {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              // ── Left + placeholder + Right ──
+              // ── 2 left tabs | placeholder | 2 right tabs ──
               Row(children: [
-                _tab(index: 0, icon: vehiclesIcon, label: 'My Vehicles'),
-                const Expanded(child: SizedBox()), // center placeholder
-                _tab(index: 2, icon: Icons.history,   label: 'PMS History'),
+                _tab(index: 0, icon: Icons.home_outlined,      label: 'Home'),
+                _tab(index: 1, icon: Icons.list_alt_outlined,  label: 'Bookings'),
+                const Expanded(child: SizedBox()),              // space for center FAB
+                _tab(index: 3, icon: Icons.history,            label: 'PMS History'),
+                _tab(index: 4, icon: Icons.person_outline,     label: 'Profile'),
               ]),
 
-              // ── Center raised Bookings button ──
+              // ── Center raised Smart AI FAB ──
               Positioned(
                 top: -20, left: 0, right: 0,
                 child: Center(
                   child: GestureDetector(
-                    onTap: () => onTap(1),
+                    onTap: () => onTap(2),
                     child: Container(
                       width: 56, height: 56,
                       decoration: BoxDecoration(
-                        color: _red,
+                        color: currentIndex == 2
+                            ? const Color(0xFFc0001a)
+                            : _red,
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 3),
                         boxShadow: [BoxShadow(
-                          color: _red.withOpacity(0.4),
-                          blurRadius: 12, offset: const Offset(0, 4))],
+                            color: _red.withOpacity(0.4),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4))],
                       ),
                       child: const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.calendar_month, color: Colors.white, size: 20),
-                          Text('Book', style: TextStyle(
-                            color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                          Icon(Icons.smart_toy, color: Colors.white, size: 20),
+                          Text('Smart AI',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 7,
+                                  fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -82,14 +90,18 @@ class CustomerBottomNavBar extends StatelessWidget {
       child: GestureDetector(
         onTap: () => onTap(index),
         behavior: HitTestBehavior.opaque,
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 22, color: active ? _red : _grey),
-          const SizedBox(height: 2),
-          Text(label, style: TextStyle(
-            fontSize: 10,
-            color: active ? _red : _grey,
-            fontWeight: active ? FontWeight.w600 : FontWeight.normal)),
-        ]),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 22, color: active ? _red : _grey),
+            const SizedBox(height: 2),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 10,
+                    color: active ? _red : _grey,
+                    fontWeight: active ? FontWeight.w600 : FontWeight.normal)),
+          ],
+        ),
       ),
     );
   }

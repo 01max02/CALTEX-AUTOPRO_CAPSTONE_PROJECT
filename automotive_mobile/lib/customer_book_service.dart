@@ -3,7 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class CustomerBookService extends StatefulWidget {
-  const CustomerBookService({super.key});
+  /// When [embedded] is true (inside a TabBarView), the AppBar is hidden.
+  final bool embedded;
+  const CustomerBookService({super.key, this.embedded = false});
 
   @override
   State<CustomerBookService> createState() => _CustomerBookServiceState();
@@ -329,7 +331,7 @@ class _CustomerBookServiceState extends State<CustomerBookService> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
-      appBar: AppBar(
+      appBar: widget.embedded ? null : AppBar(
         backgroundColor: _red,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),

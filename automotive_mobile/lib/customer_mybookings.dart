@@ -4,7 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'customer_book_service.dart';
 
 class CustomerMyBookings extends StatefulWidget {
-  const CustomerMyBookings({super.key});
+  /// When [embedded] is true (inside a TabBarView), the AppBar is hidden
+  /// because the parent scaffold already provides one.
+  final bool embedded;
+  const CustomerMyBookings({super.key, this.embedded = false});
 
   @override
   State<CustomerMyBookings> createState() => _CustomerMyBookingsState();
@@ -22,7 +25,13 @@ class _CustomerMyBookingsState extends State<CustomerMyBookings> {
       appBar: AppBar(
         backgroundColor: _red,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        leading: Navigator.canPop(context)
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              )
+            : null,
+        automaticallyImplyLeading: false,
         title: const Text('My Bookings',
             style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
         actions: [
@@ -123,27 +132,30 @@ class _CustomerMyBookingsState extends State<CustomerMyBookings> {
     IconData statusIcon;
     String displayStatus = status;
 
+    // All booking cards use purple to match the calendar dot color
+    const bookingPurple = Color(0xFF7c3aed);
+
     if (isRescheduled && status.toLowerCase() == 'approved') {
-      statusColor = const Color(0xFF003087);
+      statusColor = bookingPurple;
       statusIcon = Icons.update;
       displayStatus = 'Rescheduled';
     } else {
       switch (status.toLowerCase()) {
         case 'approved':
-          statusColor = Colors.green;
+          statusColor = bookingPurple;
           statusIcon = Icons.check_circle_outline;
           break;
         case 'completed':
-          statusColor = const Color(0xFF003087);
+          statusColor = bookingPurple;
           statusIcon = Icons.task_alt;
           break;
         case 'cancelled':
         case 'rejected':
-          statusColor = Colors.red;
+          statusColor = bookingPurple;
           statusIcon = Icons.cancel_outlined;
           break;
         default: // Pending
-          statusColor = Colors.orange;
+          statusColor = bookingPurple;
           statusIcon = Icons.schedule_outlined;
       }
     }

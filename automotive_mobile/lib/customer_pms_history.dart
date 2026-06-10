@@ -3,6 +3,88 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'pms_history_details.dart';
 
+/// Full-screen wrapper pushed via Navigator — no dashboard chrome.
+/// AppBar: back button (left) + title + search icon (right).
+class CustomerPmsScreen extends StatefulWidget {
+  const CustomerPmsScreen({super.key});
+
+  @override
+  State<CustomerPmsScreen> createState() => _CustomerPmsScreenState();
+}
+
+class _CustomerPmsScreenState extends State<CustomerPmsScreen> {
+  static const _red = Color(0xFFE8001C);
+  bool _searchOpen = false;
+  final _searchCtrl     = TextEditingController();
+  final _searchNotifier = ValueNotifier<String>('');
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _searchNotifier.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F8FA),
+      appBar: AppBar(
+        backgroundColor: _red,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: _searchOpen
+            ? TextField(
+                controller: _searchCtrl,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                cursorColor: Colors.white,
+                onChanged: (v) => _searchNotifier.value = v,
+                decoration: InputDecoration(
+                  hintText: 'Search plate or description...',
+                  hintStyle: const TextStyle(color: Colors.white60, fontSize: 13),
+                  border: InputBorder.none,
+                  suffixIcon: _searchCtrl.text.isNotEmpty
+                      ? GestureDetector(
+                          onTap: () {
+                            _searchCtrl.clear();
+                            _searchNotifier.value = '';
+                          },
+                          child: const Icon(Icons.close, color: Colors.white70, size: 18),
+                        )
+                      : null,
+                ),
+              )
+            : const Text('PMS History',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold)),
+        actions: [
+          if (_searchOpen)
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white, size: 20),
+              onPressed: () {
+                setState(() { _searchOpen = false; });
+                _searchCtrl.clear();
+                _searchNotifier.value = '';
+              },
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.search, color: Colors.white, size: 22),
+              onPressed: () => setState(() => _searchOpen = true),
+            ),
+        ],
+      ),
+      body: _CustomerPmsBody(searchNotifier: _searchNotifier),
+    );
+  }
+}
+
 class CustomerPms extends StatefulWidget {
   const CustomerPms({super.key});
 
@@ -115,63 +197,7 @@ class _CustomerPmsState extends State<CustomerPms> {
 
         // ── Vehicle list — rebuilt only by stream + search ────
         Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('vehicles').snapshots(),
-            builder: (context, vSnap) {
-              if (vSnap.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              final allVehicles = (vSnap.data?.docs ?? [])
-                  .where((d) => (d['owner'] as String? ?? '').toLowerCase() == _userName.toLowerCase())
-                  .toList();
-
-              // Use ValueListenableBuilder so only the list rebuilds on search change
-              return ValueListenableBuilder<String>(
-                valueListenable: _searchNotifier,
-                builder: (_, q, __) {
-                  final query = q.toLowerCase().trim();
-                  final filtered = query.isEmpty
-                      ? allVehicles
-                      : allVehicles.where((d) {
-                          final data  = d.data() as Map<String, dynamic>;
-                          final plate = (data['plate'] as String? ?? '').toLowerCase();
-                          final desc  = (data['desc']  as String? ?? '').toLowerCase();
-                          return plate.contains(query) || desc.contains(query);
-                        }).toList();
-
-                  if (filtered.isEmpty) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Text(
-                          query.isNotEmpty
-                              ? 'No vehicles match "$q".'
-                              : 'No vehicles registered under your name.',
-                          style: const TextStyle(color: Color(0xFF718096)),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    );
-                  }
-
-                  return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    itemCount: filtered.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (ctx, i) {
-                      final vData = filtered[i].data() as Map<String, dynamic>;
-                      return _VehicleHistoryCard(
-                        plate: vData['plate'] as String? ?? '',
-                        desc:  vData['desc']  as String? ?? '',
-                        type:  vData['type']  as String? ?? '',
-                      );
-                    },
-                  );
-                },
-              );
-            },
-          ),
+          child: _CustomerPmsBody(searchNotifier: _searchNotifier),
         ),
       ]),
     );
@@ -250,6 +276,98 @@ class _VehicleHistoryCard extends StatelessWidget {
               ]),
             ]),
           ),
+        );
+      },
+    );
+  }
+}
+
+// ── Shared body widget — used by both CustomerPms and CustomerPmsScreen ──────
+class _CustomerPmsBody extends StatefulWidget {
+  final ValueNotifier<String> searchNotifier;
+  const _CustomerPmsBody({required this.searchNotifier});
+
+  @override
+  State<_CustomerPmsBody> createState() => _CustomerPmsBodyState();
+}
+
+class _CustomerPmsBodyState extends State<_CustomerPmsBody> {
+  String _userName = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserName();
+  }
+
+  Future<void> _loadUserName() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    if (mounted) setState(() => _userName = doc['name'] as String? ?? '');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_userName.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('vehicles').snapshots(),
+      builder: (context, vSnap) {
+        if (vSnap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final allVehicles = (vSnap.data?.docs ?? [])
+            .where((d) =>
+                (d['owner'] as String? ?? '').toLowerCase() ==
+                _userName.toLowerCase())
+            .toList();
+
+        return ValueListenableBuilder<String>(
+          valueListenable: widget.searchNotifier,
+          builder: (_, q, __) {
+            final query    = q.toLowerCase().trim();
+            final filtered = query.isEmpty
+                ? allVehicles
+                : allVehicles.where((d) {
+                    final data  = d.data() as Map<String, dynamic>;
+                    final plate = (data['plate'] as String? ?? '').toLowerCase();
+                    final desc  = (data['desc']  as String? ?? '').toLowerCase();
+                    return plate.contains(query) || desc.contains(query);
+                  }).toList();
+
+            if (filtered.isEmpty) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Text(
+                    query.isNotEmpty
+                        ? 'No vehicles match "$q".'
+                        : 'No vehicles registered under your name.',
+                    style: const TextStyle(color: Color(0xFF718096)),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              );
+            }
+
+            return ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              itemCount: filtered.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (ctx, i) {
+                final vData = filtered[i].data() as Map<String, dynamic>;
+                return _VehicleHistoryCard(
+                  plate: vData['plate'] as String? ?? '',
+                  desc:  vData['desc']  as String? ?? '',
+                  type:  vData['type']  as String? ?? '',
+                );
+              },
+            );
+          },
         );
       },
     );

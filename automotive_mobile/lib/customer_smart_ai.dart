@@ -170,26 +170,7 @@ class _CustomerSmartAIState extends State<CustomerSmartAI> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
-      appBar: AppBar(
-        backgroundColor: _red,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text('Smart Reports AI',
-            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-        actions: [
-          if (_messages.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.delete_outline, color: Colors.white),
-              tooltip: 'Clear chat',
-              onPressed: () => setState(() => _messages.clear()),
-            ),
-        ],
-      ),
       body: Column(children: [
-        // ── Messages ──
         Expanded(
           child: !_dataLoaded
               ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [

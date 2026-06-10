@@ -9,6 +9,7 @@ import 'staff_vehicle_list.dart';
 import 'notifications.dart';
 import 'barcode_scanner_screen.dart';
 import 'staff_bottomnavbar.dart';
+import 'staff_calendar_widget.dart';
 
 class StaffDashboard extends StatefulWidget {
   const StaffDashboard({super.key});
@@ -54,7 +55,13 @@ class _StaffDashboardState extends State<StaffDashboard> {
     return Scaffold(
       backgroundColor: _bg,
       appBar: _buildTopBar(),
-      body: _buildBody(),
+      body: Stack(
+        children: [
+          _buildBody(),
+          // Floating calendar — only shown on the dashboard tab
+          if (_currentIndex == 0) const StaffCalendarFloating(),
+        ],
+      ),
       bottomNavigationBar: _buildBottomNav(),
     );
   }
@@ -319,10 +326,14 @@ class _StaffDashboardState extends State<StaffDashboard> {
               return date == todayFormatted;
             }).toList();
 
-            // Low stock count
+            // Low stock count — matches StaffInventory: stock <= min is Low
             final stockDocs = stockSnap.data?.docs ?? [];
             final lowStock = stockDocs.where((d) {
               final data = d.data() as Map<String, dynamic>;
+              final stock = (data['stock'] as num?)?.toInt() ?? 0;
+              final min   = (data['min']   as num?)?.toInt() ?? 0;
+              // Mirror StaffInventory logic: stock > min = OK, stock <= min = Low
+              if (min > 0) return stock <= min;
               return (data['status'] as String? ?? '') == 'Low';
             }).length;
 
