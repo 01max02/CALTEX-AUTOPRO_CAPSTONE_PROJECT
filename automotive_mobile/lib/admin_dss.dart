@@ -1031,7 +1031,7 @@ class _AdminDSSState extends State<AdminDSS> {
           Row(children: [
             _kpiChip('Overdue', '${assets.where((a) => a['priority'] == 'Overdue').length}', _red, Icons.error_outline),
             const SizedBox(width: 8),
-            _kpiChip('Due Today', '${assets.where((a) => a['priority'] == 'Due Today').length}', const Color(0xFFc05621), Icons.schedule_outlined),
+            _kpiChip('Due Today', '${assets.where((a) => a['priority'] == 'Due Today').length}', const Color(0xFF0033A0), Icons.schedule_outlined),
           ]),
           const SizedBox(height: 8),
           Row(children: [
@@ -1051,7 +1051,7 @@ class _AdminDSSState extends State<AdminDSS> {
           itemBuilder: (_, i) {
             final a = assets[i];
             final color = a['priority'] == 'Overdue' ? _red
-                : a['priority'] == 'Due Today' ? const Color(0xFFc05621)
+                : a['priority'] == 'Due Today' ? const Color(0xFF0033A0)
                 : a['priority'] == 'Due This Week' ? const Color(0xFFdd6b20)
                 : a['priority'] == 'Due Soon' ? const Color(0xFFb7791f)
                 : const Color(0xFF276749); // Active
@@ -1097,7 +1097,7 @@ class _AdminDSSState extends State<AdminDSS> {
 
   void _showPMSDetails(Map<String, String> a) {
     final color = a['priority'] == 'Overdue' ? _red
-        : a['priority'] == 'Due Today' ? const Color(0xFFc05621)
+        : a['priority'] == 'Due Today' ? const Color(0xFF0033A0)
         : a['priority'] == 'Due This Week' ? const Color(0xFFdd6b20)
         : a['priority'] == 'Due Soon' ? const Color(0xFFb7791f)
         : const Color(0xFF276749); // Active

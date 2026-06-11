@@ -128,7 +128,7 @@ class _CustomerCalendarFloatingState extends State<CustomerCalendarFloating>
         final key       =
             '${next.year}-${next.month.toString().padLeft(2, '0')}-${next.day.toString().padLeft(2, '0')}';
         final urgency =
-            daysUntil < 0 ? 'overdue' : daysUntil <= 7 ? 'week' : 'upcoming';
+            daysUntil < 0 ? 'overdue' : daysUntil == 0 ? 'today' : daysUntil <= 7 ? 'week' : 'upcoming';
         if (urgency != 'upcoming') urgent++;
 
         events.putIfAbsent(key, () => []);
@@ -153,6 +153,7 @@ class _CustomerCalendarFloatingState extends State<CustomerCalendarFloating>
   Color _urgencyColor(String urgency) {
     switch (urgency) {
       case 'overdue' : return const Color(0xFFE8001C);
+      case 'today'   : return const Color(0xFF0033A0);
       case 'week'    : return const Color(0xFFed8936);
       case 'booking' : return const Color(0xFF7c3aed);
       default        : return const Color(0xFF003087);
@@ -344,9 +345,8 @@ class _CustomerCalendarFloatingState extends State<CustomerCalendarFloating>
             _legendItem(const Color(0xFFE8001C), 'Overdue'),
             _legendItem(const Color(0xFFed8936), 'This Week'),
             _legendItem(const Color(0xFF003087), 'Upcoming'),
-            _legendItem(const Color(0xFF0d9488), 'Today'),
+            _legendItem(const Color(0xFF0033A0), 'Today'),
             _legendItem(const Color(0xFF7c3aed), 'Booked'),
-            _legendItem(const Color(0xFFcbd5e0), 'Past'),
           ]),
         ),
       ]),
@@ -430,7 +430,7 @@ class _CustomerCalendarFloatingState extends State<CustomerCalendarFloating>
               color: isSelected
                   ? const Color(0xFF003087)
                   : isToday
-                      ? const Color(0xFF0d9488)
+                      ? const Color(0xFF0033A0)
                       : Colors.transparent,
               width: 1.5,
             ),
@@ -443,7 +443,7 @@ class _CustomerCalendarFloatingState extends State<CustomerCalendarFloating>
                     fontWeight:
                         isToday ? FontWeight.w800 : FontWeight.w600,
                     color: isToday
-                        ? const Color(0xFF0d9488)
+                        ? const Color(0xFF0033A0)
                         : const Color(0xFF4a5568))),
             if (evts.isNotEmpty) ...[
               const SizedBox(height: 1),
@@ -541,7 +541,7 @@ class _CustomerCalendarFloatingState extends State<CustomerCalendarFloating>
                 label = daysUntil < 0
                     ? '${-daysUntil} day${-daysUntil != 1 ? 's' : ''} overdue'
                     : daysUntil == 0
-                        ? 'Due today'
+                        ? 'Due Today'
                         : 'Due in $daysUntil day${daysUntil != 1 ? 's' : ''}';
               }
               return Container(

@@ -188,11 +188,11 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                   };
                 }).toList();
 
-            final maint     = vehicles.where((v) => v['status'] == 'Under Maintenance').length;
-            final overdue   = vehicles.where((v) => v['status'] == 'Overdue').length;
-            final dueWeek   = vehicles.where((v) => v['status'] == 'Due This Week').length;
-            final dueSoon   = vehicles.where((v) => v['status'] == 'Due Soon').length;
-            final active    = vehicles.where((v) => v['status'] == 'On Track' || v['status'] == 'Scheduled').length;
+            final maint    = vehicles.where((v) => v['status'] == 'Under Maintenance').length;
+            final overdue  = vehicles.where((v) => v['status'] == 'Overdue').length;
+            final dueWeek  = vehicles.where((v) => v['status'] == 'Due This Week').length;
+            final dueToday = vehicles.where((v) => v['status'] == 'Due Today').length;
+            final active   = vehicles.where((v) => v['status'] == 'On Track' || v['status'] == 'Scheduled').length;
 
             // Update nav icon based on fleet type (only once when vehicles first load)
             if (!_iconComputed && vehicles.isNotEmpty) {
@@ -213,7 +213,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                     _miniStat('Maintenance',      '$maint',             Icons.build_outlined,           Colors.orange),
                     _miniStat('PMS Overdue',      '$overdue',           Icons.warning_amber_outlined,   Colors.red),
                     _miniStat('Due This Week',    '$dueWeek',           Icons.event_available_outlined, const Color(0xFFdd6b20)),
-                    _miniStat('Due Soon',         '$dueSoon',           Icons.schedule_outlined,        Colors.amber),
+                    _miniStat('Due Today',        '$dueToday',          Icons.today_outlined,           const Color(0xFF0033A0)),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -280,16 +280,19 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
   Widget _vehicleCard(Map<String, String> v) {
     final status = v['status'] ?? 'On Track';
     final statusColor = status == 'Overdue'           ? _red
+        : status == 'Due Today'                       ? const Color(0xFF0033A0)
         : status == 'Due This Week'                   ? const Color(0xFFdd6b20)
         : status == 'Due Soon'                        ? Colors.orange
         : status == 'Under Maintenance'               ? Colors.orange
         : Colors.green; // On Track + Scheduled → Active
     final statusBg = status == 'Overdue'              ? const Color(0xFFFFF5F5)
+        : status == 'Due Today'                       ? const Color(0xFFEEF2FF)
         : status == 'Due This Week'                   ? const Color(0xFFFFFBEB)
         : status == 'Due Soon'                        ? const Color(0xFFFFF8E1)
         : status == 'Under Maintenance'               ? const Color(0xFFFFF8E1)
         : const Color(0xFFF0FFF4);
     final statusLabel = status == 'Overdue'           ? 'Overdue'
+        : status == 'Due Today'                       ? 'Due Today'
         : status == 'Due This Week'                   ? 'Due This Week'
         : status == 'Due Soon'                        ? 'Due Soon'
         : status == 'Under Maintenance'               ? 'Under Maintenance'
@@ -390,6 +393,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
   void _showVehicleHistory(Map<String, String> v) {
     final status = v['status'] ?? 'On Track';
     final statusColor = status == 'Overdue'           ? _red
+        : status == 'Due Today'                       ? const Color(0xFF0033A0)
         : status == 'Due This Week'                   ? const Color(0xFFdd6b20)
         : status == 'Due Soon'                        ? Colors.orange
         : status == 'Under Maintenance'               ? Colors.orange
@@ -459,10 +463,6 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                     Text(v['plate']!, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                     Text(v['desc']!, style: const TextStyle(color: Colors.white70, fontSize: 12)),
                   ])),
-                  GestureDetector(onTap: () => Navigator.pop(context),
-                    child: Container(width: 32, height: 32,
-                      decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(16)),
-                      child: const Icon(Icons.close, color: Colors.white, size: 16))),
                 ]),
               ]),
             ),
@@ -492,12 +492,6 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                     _RescheduleWidget(vehicleId: v['id']!, plate: v['plate']!),
                     const SizedBox(height: 12),
                   ],
-                  SizedBox(width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close, size: 16),
-                      label: const Text('Close'),
-                    )),
                 ]),
               ),
             ),
@@ -563,6 +557,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
     final nextMidnight = DateTime(nextPms.year, nextPms.month, nextPms.day);
     final daysUntil = nextMidnight.difference(today).inDays;
     if (daysUntil < 0)   return 'Overdue';
+    if (daysUntil == 0)  return 'Due Today';
     if (daysUntil <= 7)  return 'Due This Week';
     if (daysUntil <= 14) return 'Due Soon';
     if (daysUntil <= 30) return 'Scheduled';

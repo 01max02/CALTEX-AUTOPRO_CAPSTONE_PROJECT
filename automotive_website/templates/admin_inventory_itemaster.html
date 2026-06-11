@@ -74,9 +74,7 @@
     <div class="modal-content" style="max-width:560px;padding:0;border-radius:20px;overflow:hidden;display:flex;flex-direction:column;max-height:90vh;">
         <!-- Header -->
         <div id="imModalHeader" style="background:linear-gradient(135deg,#E31E24,#C41E3A);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:0.85rem;flex-shrink:0;">
-            <div id="imModalIconWrap" style="background:rgba(255,255,255,0.2);width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                <svg id="imModalIcon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            </div>
+            <div id="imModalIconWrap" style="display:none;"></div>
             <div style="flex:1;">
                 <div id="itemMasterModalTitle" style="color:white;font-size:1rem;font-weight:700;">Add Item</div>
             </div>
@@ -87,10 +85,6 @@
             <div class="form-group" style="margin:0;">
                 <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Item Number</label>
                 <input type="text" name="itemNum" id="itemMasterItemNum" readonly style="background:#f7fafc;margin-top:0.3rem;">
-            </div>
-            <div class="form-group" style="margin:0;" id="imSkuRow">
-                <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">SKU</label>
-                <input type="number" name="sku" placeholder="e.g. 10001" min="0" step="1" style="margin-top:0.3rem;">
             </div>
             <div class="form-group" style="margin:0;">
                 <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Item Name *</label>
@@ -121,6 +115,11 @@
                         <option value="Service">Service</option>
                     </select>
                 </div>
+            </div>
+            <!-- SKU — only for Material -->
+            <div class="form-group" style="margin:0;" id="imSkuRow">
+                <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">SKU</label>
+                <input type="number" name="sku" placeholder="e.g. 10001" min="0" step="1" style="margin-top:0.3rem;">
             </div>
             <!-- Barcode/QR — only for Material -->
             <div id="imBarcodeQRRow" style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
@@ -158,9 +157,7 @@
         <div id="imDetailHeader" style="background:linear-gradient(135deg,#E31E24,#C41E3A);padding:1.25rem 1.5rem;position:relative;overflow:hidden;flex-shrink:0;">
             <button onclick="closeModal('itemMasterDetailsModal')" style="position:absolute;top:0.85rem;right:0.85rem;background:rgba(255,255,255,0.2);border:none;color:white;width:30px;height:30px;border-radius:50%;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;">&times;</button>
             <div style="display:flex;align-items:center;gap:0.85rem;position:relative;z-index:1;">
-                <div id="imDetailIconWrap" style="background:rgba(255,255,255,0.2);width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                    <svg id="imDetailIcon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-                </div>
+                <div id="imDetailIconWrap" style="display:none;"></div>
                 <div>
                     <div id="imItemName" style="font-size:1.05rem;font-weight:800;color:white;line-height:1.3;"></div>
                     <div id="imGroupBadge" style="font-size:0.78rem;color:rgba(255,255,255,0.75);margin-top:0.2rem;"></div>

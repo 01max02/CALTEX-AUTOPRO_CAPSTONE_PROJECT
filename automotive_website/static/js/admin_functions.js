@@ -1463,8 +1463,6 @@ function openAddItemMasterModal() {
     document.getElementById('itemMasterModalTitle').textContent = 'Add Item';
     var submitBtn = document.getElementById('imSubmitBtn');
     if (submitBtn) submitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save';
-    var icon = document.getElementById('imModalIcon');
-    if (icon) icon.innerHTML = '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>';
     document.getElementById('addItemMasterForm').reset();
     populateItemMasterDropdowns();
     var itemMaster = window.itemMaster || [];
@@ -1487,18 +1485,19 @@ function editItemMaster(itemNum) {
     document.getElementById('itemMasterModalTitle').textContent = 'Edit Item';
     var submitBtn = document.getElementById('imSubmitBtn');
     if (submitBtn) submitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Update';
-    var icon = document.getElementById('imModalIcon');
-    if (icon) icon.innerHTML = '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>';
 
     var form = document.getElementById('addItemMasterForm');
     form.elements.itemNum.value = item.itemNum;
-    form.elements.itemName.value = item.itemName;
+    form.elements.itemName.value = item.itemName || '';
     form.elements.description.value = item.description || '';
     form.elements.sku.value = item.sku || '';
     form.elements.cost.value = item.cost || '';
     form.elements.itemType.value = item.itemType || '';
     form.elements.barcode.value = item.barcode || '';
     form.elements.qrcode.value = item.qrcode || '';
+
+    // Show/hide SKU + Barcode/QR rows based on type
+    if (typeof onItemTypeChange === 'function') onItemTypeChange(item.itemType || '');
 
     // Populate dropdowns from Firestore then set saved values
     var db = firebase.firestore();

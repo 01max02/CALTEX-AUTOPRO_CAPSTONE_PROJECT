@@ -85,7 +85,7 @@ class _StaffCalendarFloatingState extends State<StaffCalendarFloating>
 
       final key =
           '${next.year}-${next.month.toString().padLeft(2, '0')}-${next.day.toString().padLeft(2, '0')}';
-      final urgency = daysUntil < 0 ? 'overdue' : daysUntil <= 7 ? 'week' : 'upcoming';
+      final urgency = daysUntil < 0 ? 'overdue' : daysUntil == 0 ? 'today' : daysUntil <= 7 ? 'week' : 'upcoming';
       if (urgency != 'upcoming') urgent++;
 
       events.putIfAbsent(key, () => []);
@@ -137,6 +137,8 @@ class _StaffCalendarFloatingState extends State<StaffCalendarFloating>
     switch (urgency) {
       case 'overdue':
         return const Color(0xFFE8001C);
+      case 'today':
+        return const Color(0xFF0033A0);
       case 'week':
         return const Color(0xFFed8936);
       case 'booking':
@@ -368,9 +370,8 @@ class _StaffCalendarFloatingState extends State<StaffCalendarFloating>
             _legendItem(const Color(0xFFE8001C), 'Overdue'),
             _legendItem(const Color(0xFFed8936), 'This Week'),
             _legendItem(_blue, 'Upcoming'),
-            _legendItem(const Color(0xFF0d9488), 'Today'),
+            _legendItem(const Color(0xFF0033A0), 'Today'),
             _legendItem(const Color(0xFF7c3aed), 'Booked'),
-            _legendItem(const Color(0xFFcbd5e0), 'Past'),
           ]),
         ),
       ]),
@@ -445,14 +446,14 @@ class _StaffCalendarFloatingState extends State<StaffCalendarFloating>
             color: isSelected
                 ? const Color(0xFFebf8ff)
                 : isToday
-                    ? const Color(0xFFf0fdfa)
+                    ? const Color(0xFFEEF2FF)
                     : const Color(0xFFF7F8FA),
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
               color: isSelected
                   ? _blue
                   : isToday
-                      ? const Color(0xFF0d9488)
+                      ? const Color(0xFF0033A0)
                       : Colors.transparent,
               width: 1.5,
             ),
@@ -465,7 +466,7 @@ class _StaffCalendarFloatingState extends State<StaffCalendarFloating>
                   fontWeight:
                       isToday ? FontWeight.w800 : FontWeight.w600,
                   color: isToday
-                      ? const Color(0xFF0d9488)
+                      ? const Color(0xFF0033A0)
                       : const Color(0xFF4a5568),
                 )),
             if (dayEvents.isNotEmpty) ...[
@@ -562,7 +563,7 @@ class _StaffCalendarFloatingState extends State<StaffCalendarFloating>
                 label = daysUntil < 0
                     ? '${(-daysUntil)} day${(-daysUntil) != 1 ? 's' : ''} overdue'
                     : daysUntil == 0
-                        ? 'Due today'
+                        ? 'Due Today'
                         : 'Due in $daysUntil day${daysUntil != 1 ? 's' : ''}';
               }
               return Container(

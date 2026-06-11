@@ -146,6 +146,7 @@
     const nextMidnight = new Date(next.getFullYear(), next.getMonth(), next.getDate());
     const days = Math.round((nextMidnight - today) / 86400000);
     if (days < 0)   return 'Overdue';
+    if (days === 0) return 'Due Today';
     if (days <= 7)  return 'Due This Week';
     if (days <= 14) return 'Due Soon';
     if (days <= 30) return 'Scheduled';
@@ -160,12 +161,13 @@
     document.getElementById('cuMaintenance').textContent  = statuses.filter(s => s === 'Under Maintenance').length;
     document.getElementById('cuOverdue').textContent      = statuses.filter(s => s === 'Overdue').length;
     document.getElementById('cuDueThisWeek').textContent  = statuses.filter(s => s === 'Due This Week').length;
-    document.getElementById('cuDueSoon').textContent      = statuses.filter(s => s === 'Due Soon').length;
+    document.getElementById('cuDueSoon').textContent      = statuses.filter(s => s === 'Due Today').length;
   }
 
   function statusStyle(status) {
     switch (status) {
       case 'Overdue':           return { color: '#E8001C',  bg: 'rgba(232,0,28,0.08)',   label: 'Overdue' };
+      case 'Due Today':         return { color: '#0033A0',  bg: 'rgba(0,51,160,0.08)',    label: 'Due Today' };
       case 'Due This Week':     return { color: '#dd6b20',  bg: 'rgba(221,107,32,0.08)', label: 'Due This Week' };
       case 'Due Soon':          return { color: '#d97706',  bg: 'rgba(217,119,6,0.08)',  label: 'Due Soon' };
       case 'Under Maintenance': return { color: '#ea580c',  bg: 'rgba(234,88,12,0.08)',  label: 'Under Maintenance' };

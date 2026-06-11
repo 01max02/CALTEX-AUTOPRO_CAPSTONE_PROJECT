@@ -132,6 +132,7 @@ body {
 .cu-stat-icon.amber  { background: #fef3c7; color: #d97706; }
 .cu-stat-icon.green  { background: #f0fdf4; color: #16a34a; }
 .cu-stat-icon.purple { background: rgba(221,107,32,0.08); color: #dd6b20; }
+.cu-stat-icon.blue   { background: rgba(0,51,160,0.08); color: #0033A0; }
 
 .cu-stat-value { font-size: 22px; font-weight: 800; color: var(--dark); line-height: 1; margin-bottom: 4px; }
 .cu-stat-label { font-size: 10px; color: var(--light); font-weight: 500; }

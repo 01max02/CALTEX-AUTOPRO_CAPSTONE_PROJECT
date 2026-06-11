@@ -101,7 +101,7 @@
       <span style="width:8px;height:8px;border-radius:2px;background:#003087;display:inline-block;"></span>Upcoming
     </span>
     <span style="display:flex;align-items:center;gap:4px;font-size:0.68rem;color:#4a5568;">
-      <span style="width:8px;height:8px;border-radius:2px;background:#0d9488;display:inline-block;"></span>Today
+      <span style="width:8px;height:8px;border-radius:2px;background:#0033A0;display:inline-block;"></span>Today
     </span>
     <span style="display:flex;align-items:center;gap:4px;font-size:0.68rem;color:#4a5568;">
       <span style="width:8px;height:8px;border-radius:2px;background:#7c3aed;display:inline-block;"></span>Booked
@@ -125,7 +125,7 @@
   background: #f7f8fa;
 }
 .pms-cal-day.other-month { opacity: 0.35; }
-.pms-cal-day.today-cell  { border-color: #0d9488 !important; background: #f0fdfa; }
+.pms-cal-day.today-cell  { border-color: #0033A0 !important; background: #EEF2FF; }
 .pms-cal-day.has-pms     { cursor: pointer; }
 .pms-cal-day.has-pms:hover { border-color: #cbd5e0; background: #fff; }
 .pms-cal-day.selected    { border-color: #003087 !important; background: #ebf8ff; }
@@ -135,7 +135,7 @@
   color: #4a5568;
   line-height: 1;
 }
-.pms-cal-day.today-cell .pms-cal-day-num { color: #0d9488; font-weight: 800; }
+.pms-cal-day.today-cell .pms-cal-day-num { color: #0033A0; font-weight: 800; }
 .pms-cal-dots {
   display: flex;
   flex-wrap: wrap;
@@ -259,7 +259,7 @@
         + String(due.getDate()).padStart(2,'0');
 
       const daysUntil = Math.round((due - today) / 86400000);
-      const urgency   = daysUntil < 0 ? 'overdue' : daysUntil <= 7 ? 'week' : 'upcoming';
+      const urgency   = daysUntil < 0 ? 'overdue' : daysUntil === 0 ? 'today' : daysUntil <= 7 ? 'week' : 'upcoming';
       if (urgency !== 'upcoming') urgentCount++;
 
       if (!_pmsEvents[key]) _pmsEvents[key] = [];
@@ -288,6 +288,7 @@
 
   function _urgencyColor(u) {
     if (u === 'overdue') return '#E8001C';
+    if (u === 'today')   return '#0033A0';
     if (u === 'week')    return '#ed8936';
     if (u === 'booking') return '#7c3aed';
     return '#003087';
@@ -385,7 +386,7 @@
         ? (e.daysUntil < 0 ? 'Past' : e.daysUntil === 0 ? 'Today' : 'In ' + e.daysUntil + ' day' + (e.daysUntil !== 1 ? 's' : ''))
         : e.daysUntil < 0
         ? Math.abs(e.daysUntil) + ' day' + (Math.abs(e.daysUntil) !== 1 ? 's' : '') + ' overdue'
-        : e.daysUntil === 0 ? 'Due today'
+        : e.daysUntil === 0 ? 'Due Today'
         : 'Due in ' + e.daysUntil + ' day' + (e.daysUntil !== 1 ? 's' : '');
       return '<div class="pms-detail-row">'
         + '<div style="width:10px;height:10px;border-radius:3px;background:' + color + ';flex-shrink:0;"></div>'

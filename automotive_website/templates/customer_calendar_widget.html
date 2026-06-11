@@ -101,10 +101,7 @@
       <span style="width:8px;height:8px;border-radius:2px;background:#7c3aed;display:inline-block;"></span>Booked
     </span>
     <span style="display:flex;align-items:center;gap:4px;font-size:0.68rem;color:#4a5568;">
-      <span style="width:8px;height:8px;border-radius:50%;background:#0d9488;display:inline-block;"></span>Today
-    </span>
-    <span style="display:flex;align-items:center;gap:4px;font-size:0.68rem;color:#4a5568;">
-      <span style="width:8px;height:8px;border-radius:2px;background:#cbd5e0;display:inline-block;"></span>Past / Closed
+      <span style="width:8px;height:8px;border-radius:50%;background:#0033A0;display:inline-block;"></span>Today
     </span>
   </div>
 </div>
@@ -122,13 +119,13 @@
   background:#f7f8fa;
 }
 .cu-cal-day.other-month { opacity:0.35; }
-.cu-cal-day.today-cell  { border-color:#0d9488 !important; background:#f0fdfa; }
+.cu-cal-day.today-cell  { border-color:#0033A0 !important; background:#EEF2FF; }
 .cu-cal-day.past-cell   { background:#f1f5f9; }
 .cu-cal-day.has-evt     { cursor:pointer; }
 .cu-cal-day.has-evt:hover { border-color:#cbd5e0; background:#fff; }
 .cu-cal-day.selected    { border-color:#003087 !important; background:#ebf8ff; }
 .cu-cal-day-num { font-size:0.78rem; font-weight:600; color:#4a5568; line-height:1; }
-.cu-cal-day.today-cell .cu-cal-day-num { color:#0d9488; font-weight:800; }
+.cu-cal-day.today-cell .cu-cal-day-num { color:#0033A0; font-weight:800; }
 .cu-cal-day.past-cell  .cu-cal-day-num { color:#c4cad4; }
 .cu-cal-dots { display:flex; flex-wrap:wrap; gap:2px; margin-top:4px; }
 .cu-cal-dot  { width:7px; height:7px; border-radius:2px; flex-shrink:0; }
@@ -156,6 +153,7 @@
 
   function _urgencyColor(u) {
     if (u === 'overdue') return '#E8001C';
+    if (u === 'today')   return '#0033A0';
     if (u === 'week')    return '#ed8936';
     if (u === 'booking') return '#7c3aed';
     return '#003087';
@@ -250,7 +248,7 @@
               var key  = next.getFullYear() + '-'
                 + String(next.getMonth()+1).padStart(2,'0') + '-'
                 + String(next.getDate()).padStart(2,'0');
-              var urgency = days < 0 ? 'overdue' : days <= 7 ? 'week' : 'upcoming';
+              var urgency = days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 7 ? 'week' : 'upcoming';
               if (urgency !== 'upcoming') urgentCount++;
               if (!events[key]) events[key] = [];
               events[key].push({ type:'pms', label:plate, daysUntil:days, urgency:urgency });
@@ -359,7 +357,7 @@
           ? (e.daysUntil < 0 ? 'Past' : e.daysUntil === 0 ? 'Today' : 'In ' + e.daysUntil + 'd')
           : (e.daysUntil < 0
               ? Math.abs(e.daysUntil) + 'd overdue'
-              : e.daysUntil === 0 ? 'Due today'
+              : e.daysUntil === 0 ? 'Due Today'
               : 'Due in ' + e.daysUntil + 'd');
         var sub = isBook && e.services ? e.services : isBook && e.time ? e.time : isBook ? '' : 'PMS Due';
         return '<div class="cu-detail-row">'

@@ -110,9 +110,6 @@
 <div class="modal" id="addUserModal">
     <div class="modal-content" style="max-width:480px;padding:0;border-radius:20px;overflow:hidden;">
         <div style="background:linear-gradient(135deg,#E31E24,#C41E3A);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:0.85rem;">
-            <div style="background:rgba(255,255,255,0.2);width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;">
-                <svg id="userModalIcon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            </div>
             <div style="flex:1;">
                 <div id="userModalTitle" style="color:white;font-size:1rem;font-weight:700;">Add User</div>
             </div>
@@ -392,7 +389,6 @@ function renderPendingCards(pending) {
 function openAddUserModal() {
     _editingUserId = null;
     document.getElementById('userModalTitle').textContent = 'Add User';
-    document.getElementById('userModalIcon').innerHTML = '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>';
     document.getElementById('addUserForm').reset();
     // Reset button to Save state
     var c = document.getElementById('userSubmitContent');
@@ -437,7 +433,6 @@ function editUser(userId) {
     if (!u) return;
     _editingUserId = userId;
     document.getElementById('userModalTitle').textContent = 'Edit User';
-    document.getElementById('userModalIcon').innerHTML = '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>';
     var form = document.getElementById('addUserForm');
     // Split name into first/last
     var nameParts = (u.name || '').split(' ');

@@ -255,7 +255,7 @@ firebase.auth().onAuthStateChanged(function(user) {
           + '<div class="mb-card-header">'
           +   '<div style="flex:1;min-width:0;">'
           +     '<div class="mb-plate">' + _esc(d.plate || '—') + '</div>'
-          +     '<div class="mb-desc">' + _esc(services !== '—' ? services : (d.vehicleDesc || '—')) + '</div>'
+          +     '<div class="mb-desc">' + _esc(d.vehicleDesc || '—') + '</div>'
           +   '</div>'
           +   '<span class="mb-badge ' + badgeClass + '">' + _esc(badgeLabel) + '</span>'
           + '</div>'

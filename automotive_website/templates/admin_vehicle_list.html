@@ -72,9 +72,6 @@
 <div class="modal" id="assetDetailsModal">
     <div class="modal-content" style="max-width:520px;padding:0;border-radius:20px;overflow:hidden;display:flex;flex-direction:column;max-height:90vh;">
         <div style="background:linear-gradient(135deg,#E31E24,#C41E3A);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:0.85rem;flex-shrink:0;">
-            <div style="background:rgba(255,255,255,0.2);width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-            </div>
             <div style="flex:1;">
                 <div id="adPlate" style="color:white;font-size:1rem;font-weight:700;"></div>
                 <div id="adAssetDesc" style="color:rgba(255,255,255,0.75);font-size:0.78rem;margin-top:0.1rem;"></div>
@@ -97,9 +94,7 @@
 <div class="modal" id="addAssetModal">
     <div class="modal-content" style="max-width:520px;padding:0;border-radius:20px;overflow:hidden;display:flex;flex-direction:column;max-height:90vh;">
         <div style="background:linear-gradient(135deg,#E31E24,#C41E3A);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:0.85rem;flex-shrink:0;">
-            <div id="assetModalIconWrap" style="background:rgba(255,255,255,0.2);width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                <svg id="assetModalIcon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            </div>
+            <div id="assetModalIconWrap" style="display:none;"></div>
             <div style="flex:1;">
                 <div id="assetModalTitle" style="color:white;font-size:1rem;font-weight:700;">Add Vehicle</div>
             </div>
@@ -254,7 +249,6 @@
     _editingVehicleId = null;
     document.getElementById('assetModalTitle').textContent = 'Add Vehicle';
     document.getElementById('assetSubmitBtn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save';
-    document.getElementById('assetModalIcon').innerHTML = '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>';
     document.getElementById('addAssetForm').reset();
     populateVehicleTypeDropdown('assetTypeSelect', '');
     document.getElementById('addAssetModal').classList.add('active');
@@ -267,17 +261,13 @@
     _editingVehicleId = asset.id;
     document.getElementById('assetModalTitle').textContent = 'Edit Vehicle';
     document.getElementById('assetSubmitBtn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Update';
-    document.getElementById('assetModalIcon').innerHTML = '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>';
     var form = document.getElementById('addAssetForm');
     form.elements.plateNumber.value = asset.plateNumber || asset.plate || '';
     form.elements.assetDescription.value = asset.assetDescription || asset.desc || '';
     form.elements.ownerName.value = asset.owner || '';
-    // Also sync the visible input with id
     var ownerInput = document.getElementById('ownerNameInput');
     if (ownerInput) ownerInput.value = asset.owner || '';
     form.elements.currentOdometer.value = asset.odometer ? String(asset.odometer).replace(/[^0-9]/g, '') : '';
-    form.elements.lastServiceOdometer.value = asset.lastSvcOdo || asset.lastServiceOdometer || '';
-    form.elements.lastServiceDate.value = asset.lastServiceDate || asset.lastSvcDate || '';
     form.elements.serviceFrequency.value = asset.svcFreq || asset.serviceFrequency || '';
     populateVehicleTypeDropdown('assetTypeSelect', asset.type || '');
     document.getElementById('addAssetModal').classList.add('active');
@@ -301,7 +291,7 @@
       e.preventDefault();
       var plate = form.elements.plateNumber.value.trim().toUpperCase();
       if (!plate) return;
-      var lastSvcDate = form.elements.lastServiceDate ? form.elements.lastServiceDate.value : '';
+      var lastSvcDate = '';
       var svcFreq = form.elements.serviceFrequency.value;
       var ownerName = form.elements.ownerName.value.trim();
       var data = {
@@ -310,7 +300,6 @@
         type: form.elements.assetType.value,
         owner: ownerName,
         odo: form.elements.currentOdometer.value ? form.elements.currentOdometer.value + ' km' : '',
-        lastSvcOdo: form.elements.lastServiceOdometer.value,
         lastSvcDate: lastSvcDate,
         svcFreq: svcFreq,
       };

@@ -355,7 +355,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
                 ),
                 const SizedBox(height: 20),
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  _sectionTitle("Today's Service Schedule"),
+                  _sectionTitle("Today's Services"),
                   TextButton(
                     onPressed: () => setState(() => _currentIndex = 2),
                     child: const Text('See all', style: TextStyle(fontSize: 12, color: Color(0xFF003087)))),
@@ -371,7 +371,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
                       boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
-                    child: const Center(child: Text('No services scheduled today.',
+                    child: const Center(child: Text('No services for today.',
                       style: TextStyle(color: Color(0xFF718096), fontSize: 13))),
                   )
                 else

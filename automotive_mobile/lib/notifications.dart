@@ -377,6 +377,15 @@ class _AppNotificationsState extends State<AppNotifications> {
             pushTo: adminIds,
             prefKey: 'pmsOverdue',
           );
+        } else if (daysUntil == 0) {
+          await _notify(
+            title: '📅 PMS Due Today',
+            message: '$plate is due for maintenance today.',
+            type: 'warning',
+            targetRole: 'admin',
+            pushTo: adminIds,
+            prefKey: 'pmsDueThisWeek',
+          );
         } else if (daysUntil <= 7) {
           await _notify(
             title: '📅 PMS Due This Week',
@@ -444,6 +453,15 @@ class _AppNotificationsState extends State<AppNotifications> {
               targetUid: ownerId,
               pushTo: [ownerId],
               prefKey: 'pmsOverdue',
+            );
+          } else if (daysUntil == 0) {
+            await _notify(
+              title: '📅 Your PMS is Due Today',
+              message: 'Your $plate is due for maintenance today.',
+              type: 'warning',
+              targetUid: ownerId,
+              pushTo: [ownerId],
+              prefKey: 'pmsDueThisWeek',
             );
           } else if (daysUntil <= 7) {
             await _notify(

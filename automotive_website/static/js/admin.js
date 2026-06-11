@@ -764,7 +764,7 @@ function dssAnalyzePMS() {
         } else if (daysUntil !== null && daysUntil === 0) {
             urgency = 2;
             priorityLabel = 'DUE TODAY';
-            priorityColor = '#c05621';
+            priorityColor = '#0033A0';
             statusKey = 'due-today';
         } else if (daysUntil !== null && daysUntil <= 7) {
             urgency = 3;
@@ -842,7 +842,7 @@ function renderDSSPMSKpis() {
         { svg: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
           label: 'Overdue PMS', val: overdue, color: '#e53e3e', bg: 'rgba(229,62,62,0.10)' },
         { svg: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
-          label: 'Due Today', val: dueToday, color: '#c05621', bg: 'rgba(192,86,33,0.10)' },
+          label: 'Due Today', val: dueToday, color: '#0033A0', bg: 'rgba(0,51,160,0.10)' },
         { svg: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
           label: 'Due This Week', val: thisWeek, color: '#dd6b20', bg: 'rgba(221,107,32,0.10)' },
         { svg: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
