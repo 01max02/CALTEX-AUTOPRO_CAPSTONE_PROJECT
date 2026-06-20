@@ -341,9 +341,9 @@ function dssAnalyze() {
         // Days of stock remaining
         const daysLeft = dailyRate > 0 ? Math.floor(item.stock / dailyRate) : (item.stock > 0 ? 999 : 0);
 
-        // Recommended order qty: fill to maxLevel, at least reorderQty
+        // Recommended order qty: fill to maxLevel (deficit to reach max)
         const deficit      = Math.max(0, item.maxLevel - item.stock);
-        const recommendQty = Math.max(deficit, item.reorderQty || 0);
+        const recommendQty = deficit;
 
         // Lead time buffer (assume 7 days lead time)
         const leadTimeDemand = Math.ceil(dailyRate * 7);
@@ -433,7 +433,7 @@ function renderDSSTable() {
 
     if (_dssFilter !== 'all') {
         rows = rows.filter(function (x) {
-            if (_dssFilter === 'critical')  return x.priority <= 1;
+            if (_dssFilter === 'critical')  return x.priority === 0;
             if (_dssFilter === 'low-stock') return x.priority === 1;
             if (_dssFilter === 'ok')        return x.priority === 2;
             return true;

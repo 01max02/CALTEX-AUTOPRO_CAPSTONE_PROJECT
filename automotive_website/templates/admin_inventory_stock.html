@@ -29,21 +29,21 @@
 
         <div class="admin-content">
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
-                <div class="stat-card">
+                <div class="stat-card" onclick="invSetFilter('all',document.getElementById('invPill_all'))" style="cursor:pointer;">
                     <div class="stat-icon blue">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14a2 2 0 0 1 2 2v3H3V6a2 2 0 0 1 2-2z"/><path d="M3 9h18v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z"/><path d="M10 13h4"/></svg>
                     </div>
                     <div class="stat-number" id="totalInventoryItems">0</div>
                     <div class="stat-label">Total Items</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" onclick="invSetFilter('low',document.getElementById('invPill_low'))" style="cursor:pointer;">
                     <div class="stat-icon red">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                     </div>
                     <div class="stat-number" id="lowStockCount">0</div>
                     <div class="stat-label">Low Stock Items</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" onclick="invSetFilter('ok',document.getElementById('invPill_ok'))" style="cursor:pointer;">
                     <div class="stat-icon green">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                     </div>
@@ -52,6 +52,13 @@
                 </div>
             </div>
 
+            <!-- Filter pills -->
+            <div style="display:flex;gap:8px;margin-bottom:1.25rem;flex-wrap:wrap;">
+                <button id="invPill_all" style="padding:6px 16px;border-radius:20px;border:1.5px solid #E31E24;background:#E31E24;font-size:12px;font-weight:600;color:white;cursor:pointer;transition:all .15s;" onclick="invSetFilter('all',this)">All</button>
+                <button id="invPill_out" style="padding:6px 16px;border-radius:20px;border:1.5px solid #e2e8f0;background:white;font-size:12px;font-weight:600;color:#4a5568;cursor:pointer;transition:all .15s;" onclick="invSetFilter('out',this)">🔴 Out of Stock</button>
+                <button id="invPill_low" style="padding:6px 16px;border-radius:20px;border:1.5px solid #e2e8f0;background:white;font-size:12px;font-weight:600;color:#4a5568;cursor:pointer;transition:all .15s;" onclick="invSetFilter('low',this)">🟡 Low Stock</button>
+                <button id="invPill_ok" style="padding:6px 16px;border-radius:20px;border:1.5px solid #e2e8f0;background:white;font-size:12px;font-weight:600;color:#4a5568;cursor:pointer;transition:all .15s;" onclick="invSetFilter('ok',this)">🟢 In Stock</button>
+            </div>
             <div class="data-table">
                 <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:100px 1.5fr 1fr 80px 80px 90px 90px 90px 110px 110px;">
                     <div>Item No.</div><div>Item Name</div><div>Commodity Group</div><div>UOM</div><div>Current Qty</div>
@@ -195,7 +202,7 @@
 </script>
 <script src="../static/js/admin_firebase.js"></script>
 
-<script src="../static/js/admin_functions.js?v=202606080021"></script>
+<script src="../static/js/admin_functions.js?v=202606150001"></script>
 <script src="../static/js/admin.js"></script>
 <script src="../static/js/admin_sidebar.js"></script>
 
@@ -304,6 +311,22 @@
 function openStockActionModal() {
     document.getElementById('stockActionModal').classList.add('active');
 }
+
+// ── Inventory filter ──
+window._invFilter = 'all';
+window.invSetFilter = function(filter, btn) {
+    window._invFilter = filter;
+    ['all','out','low','ok'].forEach(function(f) {
+        var el = document.getElementById('invPill_' + f);
+        if (!el) return;
+        if (f === filter) {
+            el.style.background = '#E31E24'; el.style.color = 'white'; el.style.borderColor = '#E31E24';
+        } else {
+            el.style.background = 'white'; el.style.color = '#4a5568'; el.style.borderColor = '#e2e8f0';
+        }
+    });
+    if (typeof renderInventoryList === 'function') renderInventoryList();
+};
 
 // Auto-open Add Stock modal if navigated from Item Master with item data
 (function() {

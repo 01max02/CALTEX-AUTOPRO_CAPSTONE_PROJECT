@@ -237,7 +237,7 @@
 </script>
 <script src="../static/js/admin_firebase.js"></script>
 
-<script src="../static/js/admin_functions.js?v=202606080021"></script>
+<script src="../static/js/admin_functions.js?v=202606150003"></script>
 <script src="../static/js/admin.js"></script>
 <script src="../static/js/admin_sidebar.js"></script>
 <script>
@@ -586,10 +586,10 @@ function svcAddMatRow(name, qty, uom, cost) {
     + '</div>'
     + '<button type="button" onclick="svcMatClear(this)" style="background:none;border:none;color:#718096;cursor:pointer;font-size:0.8rem;padding:0;">✕ Clear</button>'
     + '</div>'
-    + '<div class="svc-mat-stock" style="font-size:0.75rem;font-weight:600;margin-top:4px;"></div>'
+    + '<div class="svc-mat-stock" style="font-size:0.75rem;font-weight:700;margin-top:6px;padding:3px 8px;border-radius:20px;display:inline-block;"></div>'
     + '<div style="margin-top:0.5rem;">'
     + '<label class="svc-mat-qty-label" style="font-size:0.75rem;font-weight:600;color:#4a5568;">Quantity *</label>'
-    + '<input type="number" class="svc-row-qty" min="1" value="' + (qty||1) + '" style="width:100%;margin-top:0.2rem;padding:0.45rem 0.65rem;border:1px solid #bee3f8;border-radius:6px;font-size:0.83rem;" oninput="svcMatQtyCheck(this)">'
+    + '<input type="number" class="svc-row-qty" min="1" value="' + (qty||1) + '" style="width:100%;margin-top:0.2rem;padding:0.45rem 0.65rem;border:1px solid #bee3f8;border-radius:6px;font-size:0.83rem;" oninput="svcMatQtyCheck(this)" onkeydown="svcMatQtyKeyDown(event,this)">'
     + '</div>'
     + '<input type="hidden" class="svc-row-name" value="">'
     + '<input type="hidden" class="svc-row-uom" value="' + (uom||'') + '">'
@@ -641,45 +641,126 @@ function svcMatApply(row, name, uom, cost, maxStock) {
   row.querySelector('.svc-mat-name-display').textContent = name;
   row.querySelector('.svc-row-meta').textContent = 'UOM: ' + (uom||'—') + '  •  Unit Cost: ₱' + costNum.toLocaleString('en-PH',{minimumFractionDigits:2});
   row.querySelector('.svc-mat-suggestions').style.display = 'none';
-
-  // Fetch stock
-  firebase.firestore().collection('stock_inventory').where('name','==',name).limit(1).get().then(function(snap){
-    var available = snap.empty ? 99999 : ((snap.docs[0].data().stock || 0));
-    row.querySelector('.svc-mat-max').value = available;
-    var stockEl = row.querySelector('.svc-mat-stock');
-    if (available === 99999) {
-      stockEl.textContent = '';
-    } else if (available === 0) {
-      stockEl.style.color = '#e53e3e';
-      stockEl.textContent = '⚠ Out of stock';
-    } else if (available <= 5) {
-      stockEl.style.color = '#d69e2e';
-      stockEl.textContent = 'Available stock: ' + available;
-    } else {
-      stockEl.style.color = '#38a169';
-      stockEl.textContent = 'Available stock: ' + available;
-    }
-    var qtyLabel = row.querySelector('.svc-mat-qty-label');
-    qtyLabel.textContent = available === 99999 ? 'Quantity *' : 'Quantity * (max ' + available + ')';
-    var qtyInput = row.querySelector('.svc-row-qty');
-    qtyInput.disabled = available === 0;
-    if (maxStock === null && available !== 99999) {
-      var cur = parseInt(qtyInput.value) || 1;
-      if (cur > available) qtyInput.value = available;
-    }
-    svcCalcTotal();
-  });
-
   row.querySelector('.svc-row-detail').style.display = 'block';
   if (!row.querySelector('.svc-row-qty').value) row.querySelector('.svc-row-qty').value = 1;
+
+  var stockEl  = row.querySelector('.svc-mat-stock');
+  var qtyInput = row.querySelector('.svc-row-qty');
+  var qtyLabel = row.querySelector('.svc-mat-qty-label');
+
+  function _applyStockDisplay(available, minLvl) {
+    row.querySelector('.svc-mat-max').value = available;
+    if (available >= 99999) {
+      // No stock record — no restriction
+      stockEl.textContent = '';
+      stockEl.style.cssText = '';
+      qtyInput.removeAttribute('max');
+      qtyInput.disabled = false;
+      qtyLabel.textContent = 'Quantity *';
+    } else if (available === 0) {
+      stockEl.textContent = '⚠ Out of stock — cannot add';
+      stockEl.style.cssText = 'font-size:0.75rem;font-weight:700;margin-top:6px;padding:3px 8px;border-radius:20px;display:inline-block;color:#e53e3e;background:rgba(229,62,62,0.12);';
+      qtyInput.setAttribute('max', '0');
+      qtyInput.value = 0;
+      qtyInput.disabled = true;
+      qtyLabel.textContent = 'Quantity *';
+    } else {
+      var isLow = (minLvl > 0) ? available <= minLvl : available <= 5;
+      stockEl.textContent = 'Available stock: ' + available;
+      stockEl.style.cssText = 'font-size:0.75rem;font-weight:700;margin-top:6px;padding:3px 8px;border-radius:20px;display:inline-block;'
+        + (isLow ? 'color:#d69e2e;background:rgba(214,158,46,0.12);' : 'color:#38a169;background:rgba(56,161,105,0.12);');
+      qtyInput.setAttribute('max', available);
+      qtyInput.disabled = false;
+      qtyLabel.textContent = 'Quantity * (max ' + available + ')';
+      // Clamp existing value
+      var cur = parseInt(qtyInput.value) || 1;
+      if (maxStock === null && cur > available) {
+        qtyInput.value = available;
+      }
+    }
+    svcCalcTotal();
+  }
+
+  // Step 1: try from already-loaded window.inventory first (instant)
+  var invList = window.inventory || [];
+  var invItem = invList.find(function(i) {
+    return (i.itemName || '').toLowerCase() === name.toLowerCase()
+        || (i.name   || '').toLowerCase() === name.toLowerCase();
+  });
+
+  if (invItem !== undefined) {
+    _applyStockDisplay(parseInt(invItem.stock) || 0, parseInt(invItem.minLevel || invItem.min) || 0);
+  } else {
+    // Not loaded yet — show loading state then fetch
+    stockEl.textContent = 'Checking stock...';
+    stockEl.style.cssText = 'font-size:0.75rem;font-weight:600;margin-top:6px;padding:3px 8px;border-radius:20px;display:inline-block;color:#718096;background:rgba(113,128,150,0.10);';
+  }
+
+  // Step 2: always verify with Firestore (same as mobile's stockSnap query)
+  firebase.firestore().collection('stock_inventory')
+    .where('name', '==', name).limit(1).get()
+    .then(function(snap) {
+      if (snap.empty) {
+        // Also try by itemName field
+        return firebase.firestore().collection('stock_inventory')
+          .where('itemName', '==', name).limit(1).get();
+      }
+      return snap;
+    })
+    .then(function(snap) {
+      if (snap.empty) {
+        // No stock record — no restriction
+        _applyStockDisplay(99999, 0);
+        return;
+      }
+      var data = snap.docs[0].data();
+      var fresh = parseInt(data.stock) || 0;
+      var minLvl = parseInt(data.min) || 0;
+      _applyStockDisplay(fresh, minLvl);
+    })
+    .catch(function() {
+      // On error, don't restrict
+      _applyStockDisplay(99999, 0);
+    });
+
   svcCalcTotal();
 }
 
 function svcMatQtyCheck(input) {
   var row = input.closest('.svc-row');
   var max = parseInt(row.querySelector('.svc-mat-max').value) || 99999;
-  if (max < 99999 && parseInt(input.value) > max) input.value = max;
+  var val = parseInt(input.value) || 1;
+  if (val < 1) { input.value = 1; }
+  if (max < 99999 && val > max) {
+    input.value = max;
+    input.style.borderColor = '#e53e3e';
+    setTimeout(function(){ input.style.borderColor = '#bee3f8'; }, 1500);
+  }
   svcCalcTotal();
+}
+
+// Block keypresses that would push qty above max — fires before value changes
+function svcMatQtyKeyDown(e, input) {
+  // Allow: backspace, delete, tab, arrows, home, end
+  var allowed = ['Backspace','Delete','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'];
+  if (allowed.indexOf(e.key) !== -1) return;
+  // Only allow digits
+  if (!/^\d$/.test(e.key)) { e.preventDefault(); return; }
+  var row = input.closest('.svc-row');
+  var max = parseInt(row.querySelector('.svc-mat-max').value) || 99999;
+  if (max >= 99999) return; // no limit
+  // Compute what the value would be after this keypress
+  var start = input.selectionStart;
+  var end   = input.selectionEnd;
+  var cur   = input.value;
+  var next  = cur.substring(0, start) + e.key + cur.substring(end);
+  if (parseInt(next) > max) {
+    e.preventDefault();
+    input.value = max;
+    input.style.borderColor = '#e53e3e';
+    setTimeout(function(){ input.style.borderColor = '#bee3f8'; }, 1500);
+    svcCalcTotal();
+  }
 }
 
 function svcMatClear(btn) {
@@ -700,7 +781,6 @@ function svcOpenAddModal() {
   _svcEditingId = null;
   document.getElementById('svcModalTitle').textContent = 'New Service';
   document.getElementById('svcSubmitBtn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save';
-  document.getElementById('svcModalIcon').innerHTML = '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>';
   document.getElementById('svcPlateInput').value = '';
   document.getElementById('svcPlateSelect').value = '';
   document.getElementById('svcPlateSuggestions').style.display = 'none';

@@ -258,7 +258,7 @@ function renderAssetsList() {
     var rows = filtered.map(function(asset) {
         return '<div class="table-row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 120px;">'
             + '<div>' + asset.plateNumber + '</div>'
-            + '<div>' + (asset.icon||'') + ' ' + (asset.type||'-') + '</div>'
+            + '<div>' + (asset.type||'-') + '</div>'
             + '<div>' + (asset.owner||'-') + '</div>'
             + '<div>' + (asset.odometer ? asset.odometer.toLocaleString() + ' km' : '-') + '</div>'
             + '<div>' + (asset.lastServiceDate ? new Date(asset.lastServiceDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '-') + '</div>'
@@ -709,7 +709,6 @@ function editService(docId) {
         window._svcEditingId = doc.id;
         document.getElementById('svcModalTitle').textContent = 'Edit Service';
         document.getElementById('svcSubmitBtn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Update';
-        document.getElementById('svcModalIcon').innerHTML = '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>';
 
         var plate = s.plate || '';
         var inp = document.getElementById('svcPlateInput');
@@ -1055,6 +1054,16 @@ function renderInventoryList() {
         filtered = inventory.filter(function(i){ return (i.itemName||'').toLowerCase().includes(q) || (i.itemNum||'').toLowerCase().includes(q); });
     }
 
+    // Apply status filter from pills
+    var invFilter = window._invFilter || 'all';
+    if (invFilter === 'out') {
+        filtered = filtered.filter(function(item){ return item.stock === 0; });
+    } else if (invFilter === 'low') {
+        filtered = filtered.filter(function(item){ return item.stock > 0 && item.stock <= item.minLevel; });
+    } else if (invFilter === 'ok') {
+        filtered = filtered.filter(function(item){ return item.stock > item.minLevel; });
+    }
+
     // Update stats
     var s = function(id,val){ var el=document.getElementById(id); if(el) el.textContent=val; };
     s('totalInventoryItems', inventory.length);
@@ -1067,16 +1076,19 @@ function renderInventoryList() {
     }
 
     var rows = filtered.map(function(item) {
-        var isLow = item.stock <= item.minLevel;
-        var statusBadge = isLow
-            ? '<span class="status-badge status-overdue">Low Stock</span>'
+        var isOut = item.stock === 0;
+        var isLow = !isOut && item.stock <= item.minLevel;
+        var statusBadge = isOut
+            ? '<span class="status-badge status-overdue">Out of Stock</span>'
+            : isLow
+            ? '<span class="status-badge status-pending">Low Stock</span>'
             : '<span class="status-badge status-active">In Stock</span>';
         return '<div class="table-row" style="grid-template-columns:100px 1.5fr 1fr 80px 80px 90px 90px 90px 110px 110px;">'
             + '<div><strong>' + item.itemNum + '</strong></div>'
             + '<div>' + item.itemName + '</div>'
             + '<div>' + (item.commodityGroup||'-') + '</div>'
             + '<div>' + (item.unit||'-') + '</div>'
-            + '<div style="font-weight:700;color:'+(isLow?'#e53e3e':'#1a202c')+';">' + item.stock + '</div>'
+            + '<div style="font-weight:700;color:'+(isOut?'#e53e3e':isLow?'#d69e2e':'#1a202c')+';">' + item.stock + '</div>'
             + '<div>' + (item.minLevel||0) + '</div>'
             + '<div>' + (item.maxLevel||0) + '</div>'
             + '<div>' + (item.reorderQty || item.reorderLevel || '—') + '</div>'
@@ -1314,15 +1326,56 @@ function renderInventoryTransactions(filter) {
 
     // Use Firebase transactions data
     var txns = (window._fbTransactions || []).map(function(t) {
-        return {
-            date: t.date || '',
-            item: t.item || t.name || '—',
-            description: (t.desc || t.description || '—')
+        var rawDesc = (t.desc || t.description || '');
+        var type = (t.type || 'IN').toUpperCase();
+
+        var description = (function(raw) {
+            var d = (raw || '—')
                 .replace(/for maintenance SVC-\d+\s*[—\-]\s*/gi, 'for ')
                 .replace(/for maintenance SVC-\d+/gi, '')
                 .replace(/\s*SVC-\d+\s*/gi, '')
-                .trim() || '—',
-            type: (t.type || 'IN').toUpperCase(),
+                .replace(/^(Stock received|Initial stock received)\s*[—\-]\s*.+$/i, function(m, base) { return base; })
+                .trim();
+            return d || '—';
+        })(rawDesc);
+
+        // For OUT (issued) transactions, show the asset description as a sub-line
+        var assetLine = '';
+        if (type === 'OUT') {
+            // Pattern: "Issued to ASSET-001 — Toyota Hi-Ace" → extract "Toyota Hi-Ace"
+            var issuedMatch = description.match(/^Issued to\s+\S+\s*[—\-]\s*(.+)$/i);
+            if (issuedMatch && issuedMatch[1].trim()) {
+                assetLine = issuedMatch[1].trim();
+                // Shorten main description to just "Issued to ASSET-001"
+                description = description.replace(/\s*[—\-]\s*.+$/, '').trim();
+            } else {
+                // Fallback: look up from window.assets by assetNum/plate stored on transaction
+                var assetDesc = t.assetDescription || t.assetDesc || '';
+                if (!assetDesc) {
+                    var assets = window.assets || [];
+                    var assetNum = t.assetNum || t.plateNumber || t.plate || '';
+                    if (!assetNum) {
+                        var m = description.match(/(?:Issued to|for)\s+([A-Z0-9\-]+)/i);
+                        if (m) assetNum = m[1];
+                    }
+                    if (assetNum) {
+                        var found = assets.find(function(a) {
+                            return (a.plateNumber||'').toUpperCase() === assetNum.toUpperCase()
+                                || (a.assetNum||'').toUpperCase() === assetNum.toUpperCase();
+                        });
+                        if (found) assetDesc = found.assetDescription || found.type || '';
+                    }
+                }
+                if (assetDesc) assetLine = assetDesc;
+            }
+        }
+
+        return {
+            date: t.date || '',
+            item: t.item || t.name || '—',
+            description: description,
+            assetLine: assetLine,
+            type: type,
             qty: t.qty || t.quantity || 0,
             by: t.by || t.performedBy || '—'
         };
@@ -1342,6 +1395,35 @@ function renderInventoryTransactions(filter) {
         });
     }
 
+    // Apply type filter from pills
+    var txnFilter = window._txnFilter || 'all';
+    if (txnFilter !== 'all') {
+        filtered = filtered.filter(function(t){ return t.type === txnFilter; });
+    }
+
+    // Apply date range filter
+    var txnFrom = ((document.getElementById('txnDateFrom') || {}).value || '').trim();
+    var txnTo   = ((document.getElementById('txnDateTo')   || {}).value || '').trim();
+    if (txnFrom || txnTo) {
+        filtered = filtered.filter(function(t) {
+            var d = t.date;
+            if (!d) return false;
+            // Parse "Jan 5, 2025" or "2025-01-05"
+            var dt = new Date(d);
+            if (isNaN(dt)) {
+                var parts = d.split(' ');
+                var MONTHS_ARR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                var m = MONTHS_ARR.indexOf(parts[0]);
+                if (m !== -1) dt = new Date(parseInt(parts[2]), m, parseInt(parts[1]));
+            }
+            if (isNaN(dt)) return true;
+            var ds = dt.toISOString().split('T')[0];
+            if (txnFrom && ds < txnFrom) return false;
+            if (txnTo   && ds > txnTo)   return false;
+            return true;
+        });
+    }
+
     var list = document.getElementById('txnList');
     if (!list) return;
     if (filtered.length === 0) {
@@ -1356,7 +1438,7 @@ function renderInventoryTransactions(filter) {
         return '<div class="table-row" style="grid-template-columns:120px 1fr 1.5fr 80px 80px 100px;">'
             + '<div>' + dateStr + '</div>'
             + '<div><strong>' + t.item + '</strong></div>'
-            + '<div>' + t.description + '</div>'
+            + '<div>' + t.description + (t.assetLine ? '<div style="font-size:0.75rem;color:#718096;margin-top:2px;">' + t.assetLine + '</div>' : '') + '</div>'
             + '<div><span style="background:' + typeBg + ';color:' + typeColor + ';padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">' + t.type + '</span></div>'
             + '<div>' + t.qty + '</div>'
             + '<div>' + t.by + '</div>'
@@ -1380,6 +1462,14 @@ function renderItemMasterList() {
     if (search.trim()) {
         var q = search.toLowerCase();
         filtered = itemMaster.filter(function(i){ return (i.itemName||'').toLowerCase().includes(q) || (i.itemNum||'').toLowerCase().includes(q); });
+    }
+
+    // Apply type filter from filter pills
+    var imFilter = window._imFilter || 'all';
+    if (imFilter !== 'all') {
+        filtered = filtered.filter(function(i){
+            return (i.itemType || '').toLowerCase() === imFilter.toLowerCase();
+        });
     }
 
     // Sort by item number descending (newest first — ITM-003, ITM-002, ITM-001)
@@ -1454,8 +1544,11 @@ function onItemMasterCommodityGroupChange(select) {
     } else if (val) {
         if (typeEl) typeEl.value = 'Material';
     }
+    var skuRow = document.getElementById('imSkuRow');
     var barcodeRow = document.getElementById('imBarcodeQRRow');
-    if (barcodeRow) barcodeRow.style.display = (val === 'AutoService') ? 'none' : 'grid';
+    var isService = (val === 'AutoService') || (typeEl && typeEl.value === 'Service');
+    if (skuRow) skuRow.style.display = isService ? 'none' : '';
+    if (barcodeRow) barcodeRow.style.display = isService ? 'none' : 'grid';
 }
 
 function openAddItemMasterModal() {
@@ -1540,11 +1633,9 @@ function viewItemMasterDetails(itemNum) {
     if (!item) return;
     var isSvc = item.itemType === 'Service';
 
-    // Header color — red for Material, blue for Service
+    // Header always red
     var header = document.getElementById('imDetailHeader');
-    if (header) header.style.background = isSvc
-        ? 'linear-gradient(135deg,#003087,#00205b)'
-        : 'linear-gradient(135deg,#E31E24,#C41E3A)';
+    if (header) header.style.background = 'linear-gradient(135deg,#E31E24,#C41E3A)';
 
     var iconWrap = document.getElementById('imDetailIconWrap');
     if (iconWrap) {
@@ -1806,6 +1897,12 @@ function renderIssuancesList() {
             || (i.commodityGroup||'').toLowerCase().includes(q)
             || (i.date||'').toLowerCase().includes(q);
     }) : afterMonth;
+
+    // Apply item type filter from pills
+    var issFilter = window._issFilter || 'all';
+    if (issFilter !== 'all') {
+        filtered = filtered.filter(function(i){ return (i.itemType||'') === issFilter; });
+    }
 
     if (filtered.length === 0) {
         list.innerHTML = '<div style="text-align:center;color:#718096;padding:2rem;">No issuances found.</div>';

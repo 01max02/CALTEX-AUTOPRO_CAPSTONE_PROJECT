@@ -376,27 +376,40 @@
 
                 <!-- Issuances Section -->
                 <div class="admin-section" id="issuance">
-                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:2rem;">
-                        <div class="stat-card">
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.25rem;">
+                        <div class="stat-card" onclick="issSetFilter('all',document.getElementById('issPill_all'))" style="cursor:pointer;">
                             <div class="stat-icon" style="background:rgba(59,130,246,0.10);color:#3b82f6;">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                             </div>
                             <div class="stat-number" id="totalIssuances" style="color:#3b82f6;">0</div>
                             <div class="stat-label">Total Issuances</div>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card" onclick="issSetFilter('Service',document.getElementById('issPill_Service'))" style="cursor:pointer;">
                             <div class="stat-icon" style="background:rgba(0,48,135,0.10);color:#003087;">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
                             </div>
                             <div class="stat-number" id="totalIssuanceServices" style="color:#003087;">0</div>
                             <div class="stat-label">Services</div>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card" onclick="issSetFilter('Material',document.getElementById('issPill_Material'))" style="cursor:pointer;">
                             <div class="stat-icon red">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
                             </div>
                             <div class="stat-number" id="totalMaterials">0</div>
                             <div class="stat-label">Materials</div>
+                        </div>
+                    </div>
+                    <!-- Filter pills — Issuances -->
+                    <div style="display:flex;gap:8px;margin-bottom:1.25rem;flex-wrap:wrap;align-items:center;">
+                        <button id="issPill_all" style="padding:6px 16px;border-radius:20px;border:1.5px solid #E31E24;background:#E31E24;font-size:12px;font-weight:600;color:white;cursor:pointer;transition:all .15s;" onclick="issSetFilter('all',this)">All</button>
+                        <button id="issPill_Service" style="padding:6px 16px;border-radius:20px;border:1.5px solid #e2e8f0;background:white;font-size:12px;font-weight:600;color:#4a5568;cursor:pointer;transition:all .15s;" onclick="issSetFilter('Service',this)">🔧 Services</button>
+                        <button id="issPill_Material" style="padding:6px 16px;border-radius:20px;border:1.5px solid #e2e8f0;background:white;font-size:12px;font-weight:600;color:#4a5568;cursor:pointer;transition:all .15s;" onclick="issSetFilter('Material',this)">📦 Materials</button>
+                        <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#718096" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                            <input type="date" id="issDateFrom" style="padding:4px 8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:11px;font-family:inherit;outline:none;color:#4a5568;" onchange="renderIssuancesList()" title="From date">
+                            <span style="font-size:11px;color:#718096;">–</span>
+                            <input type="date" id="issDateTo" style="padding:4px 8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:11px;font-family:inherit;outline:none;color:#4a5568;" onchange="renderIssuancesList()" title="To date">
+                            <button onclick="document.getElementById('issDateFrom').value='';document.getElementById('issDateTo').value='';renderIssuancesList();" style="padding:4px 8px;border:1.5px solid #e2e8f0;border-radius:8px;background:white;font-size:11px;color:#718096;cursor:pointer;">✕</button>
                         </div>
                     </div>
                     <div class="data-table">
@@ -413,28 +426,34 @@
 
                 <!-- Inventory Transactions Section -->
                 <div class="admin-section" id="inventory-transactions">
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem;">
-                        <div class="stat-card">
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.25rem;">
+                        <div class="stat-card" onclick="txnSetFilter('all',document.getElementById('txnPill_all'))" style="cursor:pointer;">
                             <div class="stat-icon blue">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
                             </div>
                             <div class="stat-number" id="txnTotal">0</div>
                             <div class="stat-label">Total Transactions</div>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card" onclick="txnSetFilter('IN',document.getElementById('txnPill_IN'))" style="cursor:pointer;">
                             <div class="stat-icon" style="background:rgba(0,48,135,0.10);color:#003087;">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                             </div>
                             <div class="stat-number" id="txnIn" style="color:#003087;">0</div>
                             <div class="stat-label">Stock In (Receives)</div>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card" onclick="txnSetFilter('OUT',document.getElementById('txnPill_OUT'))" style="cursor:pointer;">
                             <div class="stat-icon red">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                             </div>
                             <div class="stat-number" id="txnOut">0</div>
                             <div class="stat-label">Stock Out (Issuances)</div>
                         </div>
+                    </div>
+                    <!-- Filter pills — Inventory Transactions -->
+                    <div style="display:flex;gap:8px;margin-bottom:1.25rem;flex-wrap:wrap;">
+                        <button id="txnPill_all" style="padding:6px 16px;border-radius:20px;border:1.5px solid #E31E24;background:#E31E24;font-size:12px;font-weight:600;color:white;cursor:pointer;transition:all .15s;" onclick="txnSetFilter('all',this)">All</button>
+                        <button id="txnPill_IN" style="padding:6px 16px;border-radius:20px;border:1.5px solid #e2e8f0;background:white;font-size:12px;font-weight:600;color:#4a5568;cursor:pointer;transition:all .15s;" onclick="txnSetFilter('IN',this)">📥 Stock In</button>
+                        <button id="txnPill_OUT" style="padding:6px 16px;border-radius:20px;border:1.5px solid #e2e8f0;background:white;font-size:12px;font-weight:600;color:#4a5568;cursor:pointer;transition:all .15s;" onclick="txnSetFilter('OUT',this)">📤 Stock Out</button>
                     </div>
                     <div class="data-table">
                         <div class="table-row" style="background: #f7fafc; font-weight: bold; border-bottom: 2px solid #e2e8f0; grid-template-columns: 120px 1fr 1.5fr 80px 80px 100px;">
@@ -551,7 +570,7 @@
       }
     </script>
     <script src="../static/js/admin_firebase.js"></script>
-    <script src="../static/js/admin_functions.js?v=202606080021"></script>
+    <script src="../static/js/admin_functions.js?v=202606150001"></script>
     <script src="../static/js/admin.js"></script>
     <script src="../static/js/admin_sidebar.js"></script>
     <script>
@@ -1323,11 +1342,16 @@
           return {
             date: t.date || '',
             item: t.item || t.name || '—',
-            description: (t.desc || t.description || '—')
-              .replace(/for maintenance SVC-\d+\s*[—\-]\s*/gi, 'for ')
-              .replace(/for maintenance SVC-\d+/gi, '')
-              .replace(/\s*SVC-\d+\s*/gi, '')
-              .trim() || '—',
+            description: (function(raw) {
+                var d = (raw || '—')
+                    .replace(/for maintenance SVC-\d+\s*[—\-]\s*/gi, 'for ')
+                    .replace(/for maintenance SVC-\d+/gi, '')
+                    .replace(/\s*SVC-\d+\s*/gi, '')
+                    .replace(/^(Stock received|Initial stock received)\s*[—\-]\s*.+$/i, function(m, base) { return base; })
+                    .replace(/\s*[—\-]\s*[^—\-]+$/gi, '')
+                    .trim();
+                return d || '—';
+            })(t.desc || t.description),
             type: (t.type || 'IN').toUpperCase(),
             qty: t.qty || t.quantity || 0,
             by: t.by || t.performedBy || '—'
@@ -1427,6 +1451,34 @@
           rows
         );
       }
+    </script>
+
+    <script>
+      // ── Inventory Transactions filter ──
+      window._txnFilter = 'all';
+      window.txnSetFilter = function(filter, btn) {
+        window._txnFilter = filter;
+        ['all','IN','OUT'].forEach(function(f) {
+          var el = document.getElementById('txnPill_' + f);
+          if (!el) return;
+          if (f === filter) { el.style.background='#E31E24'; el.style.color='white'; el.style.borderColor='#E31E24'; }
+          else { el.style.background='white'; el.style.color='#4a5568'; el.style.borderColor='#e2e8f0'; }
+        });
+        if (typeof renderInventoryTransactions === 'function') renderInventoryTransactions();
+      };
+
+      // ── Issuances filter ──
+      window._issFilter = 'all';
+      window.issSetFilter = function(filter, btn) {
+        window._issFilter = filter;
+        ['all','Service','Material'].forEach(function(f) {
+          var el = document.getElementById('issPill_' + f);
+          if (!el) return;
+          if (f === filter) { el.style.background='#E31E24'; el.style.color='white'; el.style.borderColor='#E31E24'; }
+          else { el.style.background='white'; el.style.color='#4a5568'; el.style.borderColor='#e2e8f0'; }
+        });
+        if (typeof renderIssuancesList === 'function') renderIssuancesList();
+      };
     </script>
 
     <!-- Smart Reports AI floating widget -->

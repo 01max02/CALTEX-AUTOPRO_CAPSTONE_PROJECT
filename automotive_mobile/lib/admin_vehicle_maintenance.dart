@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'barcode_scanner_screen.dart';
@@ -23,6 +24,7 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
   // Cached lookups
   Map<String, Map<String, dynamic>> _vehicleMap = {};   // plate -> data
   Map<String, Map<String, dynamic>> _itemMasterMap = {}; // name -> data
+  Map<String, int> _stockMap = {};  // item name -> current stock qty
   List<String> _serviceItems = [];
   List<String> _materialItems = [];
   List<String> _mechanicNames = []; // staff + admin names
@@ -1078,11 +1080,11 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
       final stockSnap = await FirebaseFirestore.instance
           .collection('stock_inventory').where('name', isEqualTo: name).limit(1).get();
       final available = stockSnap.docs.isNotEmpty
-          ? (stockSnap.docs.first['stock'] as num?)?.toInt() ?? 99999
-          : 99999;
+          ? (stockSnap.docs.first['stock'] as num?)?.toInt() ?? 0
+          : -1; // -1 means no stock record found
       row['maxStock']!.text = '$available';
       final currentQty = int.tryParse(row['qty']!.text) ?? 1;
-      if (currentQty > available) row['qty']!.text = '$available';
+      if (available >= 0 && currentQty > available) row['qty']!.text = '$available';
       setModal(() {});
     }
 
@@ -1122,27 +1124,55 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                     const SizedBox(height: 4),
                     Text('UOM: ${row['uom']!.text}  •  Unit Cost: ₱${row['cost']!.text}',
                       style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
-                    if (maxStock < 99999) ...[
-                      const SizedBox(height: 4),
-                      Text('Available stock: $maxStock',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                          color: maxStock == 0 ? Colors.red : maxStock <= 5 ? Colors.orange : Colors.green)),
-                    ],
+                    const SizedBox(height: 4),
+                    // Always show stock badge once material is selected
+                    Builder(builder: (_) {
+                      final ms = int.tryParse(row['maxStock']!.text) ?? 99999;
+                      if (ms == 99999) {
+                        // Still loading
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(color: const Color(0xFFF7F8FA), borderRadius: BorderRadius.circular(20)),
+                          child: const Text('Checking stock...', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF718096))),
+                        );
+                      }
+                      if (ms < 0) {
+                        // No stock record in inventory
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(color: const Color(0xFFF7F8FA), borderRadius: BorderRadius.circular(20)),
+                          child: const Text('No stock record', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF718096))),
+                        );
+                      }
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: ms == 0 ? const Color(0xFFFFF5F5) : ms <= 5 ? const Color(0xFFFFFBEB) : const Color(0xFFF0FFF4),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          ms == 0 ? '⚠ Out of stock' : 'Available stock: $ms',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                            color: ms == 0 ? Colors.red : ms <= 5 ? Colors.orange : Colors.green),
+                        ),
+                      );
+                    }),
                     const SizedBox(height: 8),
                     TextField(
                       controller: row['qty'],
                       keyboardType: TextInputType.number,
-                      enabled: maxStock > 0,
-                      onChanged: (v) {
-                        final entered = int.tryParse(v) ?? 0;
-                        if (maxStock < 99999 && entered > maxStock) {
-                          row['qty']!.text = '$maxStock';
-                          row['qty']!.selection = TextSelection.collapsed(offset: '$maxStock'.length);
-                        }
-                        setModal(() {});
-                      },
+                      enabled: maxStock != 0,
+                      inputFormatters: (maxStock > 0 && maxStock < 99999)
+                          ? [
+                              FilteringTextInputFormatter.digitsOnly,
+                              _MaxValueFormatter(maxStock),
+                            ]
+                          : [FilteringTextInputFormatter.digitsOnly],
+                      onChanged: (_) => setModal(() {}),
                       decoration: InputDecoration(
-                        labelText: maxStock == 99999 ? 'Quantity *' : 'Quantity * (max $maxStock)',
+                        labelText: (maxStock > 0 && maxStock < 99999)
+                            ? 'Quantity * (max $maxStock)'
+                            : 'Quantity *',
                         border: const OutlineInputBorder(),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                         isDense: true,
@@ -1279,5 +1309,23 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
         ],
       ),
     );
+  }
+}
+
+/// Blocks input that would result in a value exceeding [max].
+class _MaxValueFormatter extends TextInputFormatter {
+  final int max;
+  const _MaxValueFormatter(this.max);
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) return newValue;
+    final entered = int.tryParse(newValue.text);
+    if (entered == null) return oldValue;
+    if (entered > max) return oldValue; // block — don't apply the new value
+    return newValue;
   }
 }
