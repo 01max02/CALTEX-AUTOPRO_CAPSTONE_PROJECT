@@ -24,8 +24,8 @@
                 <div class="admin-header-title">Item Master</div>
             </div>
             <div style="margin-left:auto;position:relative;display:flex;align-items:center;">
-                <svg style="position:absolute;left:0.65rem;pointer-events:none;color:#a0aec0;" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input type="text" class="search-bar" placeholder="Search items..." id="itemMasterSearch" style="width:220px;padding-left:2rem;" oninput="renderItemMasterList()">
+                    <svg style="position:absolute;left:0.65rem;pointer-events:none;color:#a0aec0;" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" class="search-bar" placeholder="Search items..." id="itemMasterSearch" style="width:220px;padding-left:2rem;" oninput="renderItemMasterList()">
             </div>
         </div>
 
@@ -53,18 +53,10 @@
                     <div class="stat-label">Services</div>
                 </div>
             </div>
-            <!-- Filter pills + Commodity Group filter -->
             <div style="display:flex;gap:8px;margin-bottom:1.25rem;flex-wrap:wrap;align-items:center;">
                 <button id="imPill_all" class="rcv-pill active" onclick="imSetFilter('all',this)">All</button>
                 <button id="imPill_Material" class="rcv-pill" onclick="imSetFilter('Material',this)">📦 Materials</button>
-                <button id="imPill_Service" class="rcv-pill" onclick="imSetFilter('Service',this)">🔧 Services</button>
-                <div style="margin-left:auto;display:flex;align-items:center;gap:0.5rem;">
-                    <label style="font-size:0.78rem;font-weight:600;color:#4a5568;white-space:nowrap;">Commodity Group:</label>
-                    <select id="imCommodityGroupFilter" onchange="imSetCommodityFilter(this.value)"
-                        style="border:1.5px solid #e2e8f0;border-radius:20px;padding:5px 14px;font-size:0.78rem;font-weight:600;color:#4a5568;background:white;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234a5568' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;">
-                        <option value="">All Groups</option>
-                    </select>
-                </div>
+                <button id="imPill_Service" class="rcv-pill" onclick="imSetFilter('Service',this)">🔧 Services</button>     
             </div>
             <div class="data-table">
                 <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:1fr 1fr 1.5fr 1fr 1fr 1fr 1fr 120px;">
