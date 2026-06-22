@@ -22,18 +22,69 @@
                 <div class="admin-header-title">Service Bookings</div>
             </div>
             <div style="margin-left:auto;display:flex;align-items:center;gap:0.75rem;">
+                <div style="position:relative;display:flex;align-items:center;">
+                    <svg style="position:absolute;left:0.65rem;pointer-events:none;color:#a0aec0;" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" class="search-bar" placeholder="Search bookings..." id="sbSearch" style="width:220px;padding-left:2rem;" oninput="sbApplySearch()">
+                </div>
             </div>
         </div>
 
         <div class="admin-content">
-            <!-- Tabs -->
-            <div style="display:flex;gap:0;border-bottom:2px solid #e2e8f0;margin-bottom:1.25rem;">
-                <button class="sb-tab active" data-filter="Approved" onclick="sbSwitchTab(this,'Approved')" style="padding:0.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:0.88rem;font-weight:700;color:#38a169;border-bottom:2px solid #38a169;margin-bottom:-2px;transition:all 0.2s;">
-                    Approved
-                </button>
-                <button class="sb-tab" data-filter="Dismissed" onclick="sbSwitchTab(this,'Dismissed')" style="padding:0.6rem 1.25rem;border:none;background:none;cursor:pointer;font-size:0.88rem;font-weight:700;color:#718096;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s;">
-                    Cancelled
-                </button>
+            <!-- Stats cards -->
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;">
+                <div class="stat-card" onclick="sbSetFilter('all',document.querySelector('#sbFilterPills .dss-pill:first-child'))" style="cursor:pointer;">
+                    <div class="stat-icon" style="background:rgba(0,48,135,0.10);color:#003087;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    </div>
+                    <div class="stat-number" id="sbStatTotal" style="color:#003087;">0</div>
+                    <div class="stat-label">Total Bookings</div>
+                </div>
+                <div class="stat-card" onclick="sbSetFilter('Approved',document.querySelectorAll('#sbFilterPills .dss-pill')[1])" style="cursor:pointer;">
+                    <div class="stat-icon green">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </div>
+                    <div class="stat-number" id="sbStatApproved">0</div>
+                    <div class="stat-label">Approved</div>
+                </div>
+                <div class="stat-card" onclick="sbSetFilter('Rescheduled',document.querySelectorAll('#sbFilterPills .dss-pill')[2])" style="cursor:pointer;">
+                    <div class="stat-icon" style="background:rgba(0,48,135,0.10);color:#003087;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                    </div>
+                    <div class="stat-number" id="sbStatRescheduled" style="color:#003087;">0</div>
+                    <div class="stat-label">Rescheduled</div>
+                </div>
+                <div class="stat-card" onclick="sbSetFilter('Dismissed',document.querySelectorAll('#sbFilterPills .dss-pill')[3])" style="cursor:pointer;">
+                    <div class="stat-icon red">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                    </div>
+                    <div class="stat-number" id="sbStatCancelled">0</div>
+                    <div class="stat-label">Cancelled</div>
+                </div>
+            </div>
+
+            <!-- Filter pills -->
+            <div class="dss-filter-bar">
+                <div class="dss-filter-group">
+                    <label class="dss-filter-label">Filter by Status</label>
+                    <div class="dss-filter-pills" id="sbFilterPills">
+                        <button class="dss-pill active" onclick="sbSetFilter('all',this)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                            All
+                        </button>
+                        <button class="dss-pill dss-pill--ontrack" onclick="sbSetFilter('Approved',this)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            Approved
+                        </button>
+                        <button class="dss-pill dss-pill--duetoday" onclick="sbSetFilter('Rescheduled',this)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                            Rescheduled
+                        </button>
+                        <button class="dss-pill dss-pill--overdue" onclick="sbSetFilter('Dismissed',this)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                            Cancelled
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <!-- Table -->
@@ -169,30 +220,46 @@
     return _MONTHS[m] + ' ' + d + ', ' + y;
   }
 
-  var _currentFilter = 'Approved';
+  var _currentFilter = 'all';
 
-  window.sbSwitchTab = function(btn, filter) {
+  window.sbSetFilter = function(filter, btn) {
     _currentFilter = filter;
-    document.querySelectorAll('.sb-tab').forEach(function(t) {
-      t.style.color = '#718096';
-      t.style.borderBottom = '2px solid transparent';
-      t.classList.remove('active');
-    });
-    var colors = { 'Pending':'#d69e2e', 'Approved':'#38a169', 'Dismissed':'#718096', 'all':'#003087' };
-    btn.style.color = colors[filter] || '#003087';
-    btn.style.borderBottom = '2px solid ' + (colors[filter] || '#003087');
-    btn.classList.add('active');
+    document.querySelectorAll('#sbFilterPills .dss-pill').forEach(function(p){ p.classList.remove('active'); });
+    if (btn) btn.classList.add('active');
     renderRescheduleList();
   };
+
+  window.sbApplySearch = function() { renderRescheduleList(); };
+
+  // Keep old sbSwitchTab as alias for backward compat
+  window.sbSwitchTab = function(btn, filter) { sbSetFilter(filter, btn); };
 
   window.renderRescheduleList = function () {
     var filter = _currentFilter;
     var body = document.getElementById('rescheduleTableBody');
     if (!body) return;
 
-    var docs = filter === 'all'
-      ? _allDocs.filter(function(d) { return d.status !== 'Pending'; })
-      : _allDocs.filter(function(d) { return d.status === filter; });
+    var docs;
+    if (filter === 'all') {
+      docs = _allDocs.filter(function(d) { return d.status === 'Approved' || d.status === 'Dismissed'; });
+    } else if (filter === 'Rescheduled') {
+      docs = _allDocs.filter(function(d) { return d.status === 'Approved' && d.previousDate && d.previousDate !== d.preferredDate; });
+    } else if (filter === 'Approved') {
+      docs = _allDocs.filter(function(d) { return d.status === 'Approved' && !(d.previousDate && d.previousDate !== d.preferredDate); });
+    } else {
+      docs = _allDocs.filter(function(d) { return d.status === filter; });
+    }
+
+    // Apply search
+    var sbQ = ((document.getElementById('sbSearch') || {}).value || '').trim().toLowerCase();
+    if (sbQ) {
+      docs = docs.filter(function(r) {
+        return (r.plate || '').toLowerCase().includes(sbQ)
+          || (r.customerName || '').toLowerCase().includes(sbQ)
+          || (r.services || []).join(' ').toLowerCase().includes(sbQ)
+          || (r.preferredDate || '').toLowerCase().includes(sbQ);
+      });
+    }
 
     if (docs.length === 0) {
       body.innerHTML = '<div style="padding:3rem;text-align:center;color:#718096;font-size:13px;">No bookings found.</div>';
@@ -421,9 +488,14 @@
   };
 
   function _updateStats() {
-    // Stats removed — using tabs only
-    var badge = document.getElementById('tabBadgePending');
-    if (badge) badge.style.display = 'none';
+    var s = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+    var rescheduled = _allDocs.filter(function(d){ return d.status === 'Approved' && d.previousDate && d.previousDate !== d.preferredDate; }).length;
+    var approved = _allDocs.filter(function(d){ return d.status === 'Approved' && !(d.previousDate && d.previousDate !== d.preferredDate); }).length;
+    var cancelled = _allDocs.filter(function(d){ return d.status === 'Dismissed'; }).length;
+    s('sbStatTotal', approved + rescheduled + cancelled);
+    s('sbStatApproved', approved);
+    s('sbStatRescheduled', rescheduled);
+    s('sbStatCancelled', cancelled);
   }
 
   // Real-time listener on service_bookings

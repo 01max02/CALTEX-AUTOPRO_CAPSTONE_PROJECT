@@ -475,12 +475,16 @@
 .dss-pill--duetoday  { color: #0033A0; border-color: #0033A0; background: rgba(0,51,160,0.07); }
 .dss-pill--duesoon   { color: #b7791f; border-color: #b7791f; background: rgba(183,121,31,0.07); }
 .dss-pill--active    { color: #276749; border-color: #276749; background: rgba(39,103,73,0.07); }
+.dss-pill--ontrack   { color: #38a169; border-color: #38a169; background: rgba(56,161,105,0.07); }
+.dss-pill--pending   { color: #718096; border-color: #718096; background: rgba(113,128,150,0.07); }
 
 .dss-pill--overdue.active   { background: #e53e3e; color: white; border-color: #e53e3e; }
 .dss-pill--thisweek.active  { background: #dd6b20; color: white; border-color: #dd6b20; }
 .dss-pill--duetoday.active  { background: #0033A0; color: white; border-color: #0033A0; }
 .dss-pill--duesoon.active   { background: #b7791f; color: white; border-color: #b7791f; }
 .dss-pill--active.active    { background: #276749; color: white; border-color: #276749; }
+.dss-pill--ontrack.active  { background: #38a169; color: white; border-color: #38a169; }
+.dss-pill--pending.active  { background: #718096; color: white; border-color: #718096; }
 
 .dss-search {
     padding: 0.55rem 1rem;

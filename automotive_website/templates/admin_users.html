@@ -32,33 +32,58 @@
 
         <div class="admin-content">
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1.25rem;margin-bottom:2rem;">
-                <div class="stat-card">
+                <div class="stat-card" onclick="userSetFilter('all',document.querySelector('#userFilterPills .dss-pill:first-child'))" style="cursor:pointer;">
                     <div class="stat-icon" style="background:rgba(59,130,246,0.10);color:#3b82f6;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     </div>
                     <div class="stat-number" id="userStatTotal" style="color:#3b82f6;">0</div>
                     <div class="stat-label">Total Users</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" onclick="userSetFilter('admin',document.querySelectorAll('#userFilterPills .dss-pill')[1])" style="cursor:pointer;">
                     <div class="stat-icon red">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     </div>
                     <div class="stat-number" id="userStatAdmin">0</div>
                     <div class="stat-label">Admin</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" onclick="userSetFilter('customer',document.querySelectorAll('#userFilterPills .dss-pill')[3])" style="cursor:pointer;">
                     <div class="stat-icon green">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     </div>
                     <div class="stat-number" id="userStatCustomer">0</div>
                     <div class="stat-label">Customer</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" onclick="userSetFilter('staff',document.querySelectorAll('#userFilterPills .dss-pill')[2])" style="cursor:pointer;">
                     <div class="stat-icon" style="background:rgba(0,48,135,0.10);color:#003087;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     </div>
                     <div class="stat-number" id="userStatStaff" style="color:#003087;">0</div>
                     <div class="stat-label">Staff</div>
+                </div>
+            </div>
+
+            <!-- Role filter pills -->
+            <div class="dss-filter-bar">
+                <div class="dss-filter-group">
+                    <label class="dss-filter-label">Filter by Role</label>
+                    <div class="dss-filter-pills" id="userFilterPills">
+                        <button class="dss-pill active" onclick="userSetFilter('all',this)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                            All
+                        </button>
+                        <button class="dss-pill dss-pill--overdue" onclick="userSetFilter('admin',this)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            Admin
+                        </button>
+                        <button class="dss-pill dss-pill--duetoday" onclick="userSetFilter('staff',this)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            Staff
+                        </button>
+                        <button class="dss-pill dss-pill--ontrack" onclick="userSetFilter('customer',this)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            Customer
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -202,6 +227,15 @@
 <script>
 var _editingUserId = null;
 var _currentTab = 'all';
+
+// ── User role filter ──
+window._userFilter = 'all';
+window.userSetFilter = function(filter, btn) {
+  window._userFilter = filter;
+  document.querySelectorAll('#userFilterPills .dss-pill').forEach(function(p){ p.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  if (typeof renderUsersList === 'function') renderUsersList();
+};
 
 function switchTab(tab) {
     _currentTab = tab;

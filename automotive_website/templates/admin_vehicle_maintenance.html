@@ -32,33 +32,58 @@
 
         <div class="admin-content">
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem;">
-                <div class="stat-card">
+                <div class="stat-card" onclick="svcSetFilter('all',document.querySelector('#svcFilterPills .dss-pill:first-child'))" style="cursor:pointer;">
                     <div class="stat-icon" style="background:rgba(0,48,135,0.10);color:#003087;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/><circle cx="12" cy="12" r="3"/></svg>
                     </div>
                     <div class="stat-number" id="totalServices" style="color:#003087;">0</div>
                     <div class="stat-label">Total Services</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" onclick="svcSetFilter('Ongoing',document.querySelectorAll('#svcFilterPills .dss-pill')[2])" style="cursor:pointer;">
                     <div class="stat-icon orange">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                     </div>
                     <div class="stat-number" id="ongoingServices">0</div>
                     <div class="stat-label">Ongoing</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" onclick="svcSetFilter('Completed',document.querySelectorAll('#svcFilterPills .dss-pill')[3])" style="cursor:pointer;">
                     <div class="stat-icon green">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                     </div>
                     <div class="stat-number" id="completedServices">0</div>
                     <div class="stat-label">Completed</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" onclick="svcSetFilter('Pending',document.querySelectorAll('#svcFilterPills .dss-pill')[1])" style="cursor:pointer;">
                     <div class="stat-icon" style="background:rgba(113,128,150,0.10);color:#718096;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                     </div>
                     <div class="stat-number" id="pendingServices" style="color:#718096;">0</div>
                     <div class="stat-label">Pending</div>
+                </div>
+            </div>
+
+            <!-- Status filter pills -->
+            <div class="dss-filter-bar">
+                <div class="dss-filter-group">
+                    <label class="dss-filter-label">Filter by Status</label>
+                    <div class="dss-filter-pills" id="svcFilterPills">
+                        <button class="dss-pill active" onclick="svcSetFilter('all',this)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                            All
+                        </button>
+                        <button class="dss-pill dss-pill--pending" onclick="svcSetFilter('Pending',this)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            Pending
+                        </button>
+                        <button class="dss-pill dss-pill--thisweek" onclick="svcSetFilter('Ongoing',this)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                            Ongoing
+                        </button>
+                        <button class="dss-pill dss-pill--ontrack" onclick="svcSetFilter('Completed',this)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            Completed
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -170,6 +195,12 @@
                         onchange="svcFormatDateDisplay(this.value)">
                 </div>
             </div>
+            <!-- Odometer Reading -->
+            <div class="form-group" style="margin:0;">
+                <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Odometer Reading (km) *</label>
+                <input type="number" id="svcOdometer" placeholder="e.g. 45000" min="0" style="margin-top:0.3rem;width:100%;padding:0.55rem 0.75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.83rem;box-sizing:border-box;" oninput="svcOdometerInput(this)">
+                <div id="svcOdometerNote" style="display:none;margin-top:0.3rem;font-size:0.75rem;"></div>
+            </div>
             <!-- Vehicle Issues -->
             <div>
                 <label style="font-size:0.78rem;font-weight:600;color:#4a5568;display:block;margin-bottom:0.4rem;">Vehicle Issues <span style="font-weight:400;color:#a0aec0;">(optional — select all that apply)</span></label>
@@ -245,6 +276,15 @@ var _svcEditingId = null;
 var _svcServiceItems = [];
 var _svcMaterialItems = [];
 var _svcVehicles = [];
+
+// ── Service status filter ──
+window._svcStatusFilter = 'all';
+window.svcSetFilter = function(filter, btn) {
+  window._svcStatusFilter = filter;
+  document.querySelectorAll('#svcFilterPills .dss-pill').forEach(function(p){ p.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  if (typeof renderServicesList === 'function') renderServicesList();
+};
 
 // ── Vehicle Issue Tags ──────────────────────────────────────
 var _SVC_PRESET_ISSUES = [
@@ -482,6 +522,13 @@ function svcPlateSelect(plate) {
       + '<div><div style="font-weight:600;font-size:0.85rem;color:#1a202c;">' + (v.desc || v.assetDescription || plate) + '</div>'
       + (v.owner ? '<div style="font-size:0.75rem;color:#718096;">' + v.owner + '</div>' : '')
       + '</div>';
+    // Auto-fill odometer with vehicle's current value
+    var odoInput = document.getElementById('svcOdometer');
+    var curOdo = parseInt(String(v.odometer || v.odo || '0').replace(/[^0-9]/g, '')) || 0;
+    if (odoInput && curOdo > 0) {
+      odoInput.value = curOdo;
+      svcOdometerInput(odoInput);
+    }
   } else {
     info.style.display = 'none';
   }
@@ -489,6 +536,29 @@ function svcPlateSelect(plate) {
 
 // Keep backward compat for editService which calls svcOnPlateChange
 function svcOnPlateChange(sel) { svcPlateSelect(sel.value || sel); }
+
+// ── Odometer input helper ──
+function svcOdometerInput(input) {
+  var val = parseInt(input.value) || 0;
+  var note = document.getElementById('svcOdometerNote');
+  var plate = document.getElementById('svcPlateSelect').value;
+  if (!note) return;
+  if (!val) { note.style.display = 'none'; return; }
+  var v = _svcVehicles.find(function(x){ return (x.plate || x.plateNumber) === plate; });
+  if (!v) { note.style.display = 'none'; return; }
+  var curOdo = parseInt(String(v.odometer || v.odo || '0').replace(/[^0-9]/g, '')) || 0;
+  if (curOdo > 0 && val < curOdo) {
+    note.style.display = 'block';
+    note.textContent = '⚠ Current vehicle odometer is ' + curOdo.toLocaleString() + ' km. Are you sure?';
+    note.style.color = '#d69e2e';
+  } else if (curOdo > 0 && val >= curOdo) {
+    note.style.display = 'block';
+    note.textContent = '✓ Odometer will update from ' + curOdo.toLocaleString() + ' → ' + val.toLocaleString() + ' km';
+    note.style.color = '#38a169';
+  } else {
+    note.style.display = 'none';
+  }
+}
 
 function svcParseToInputDate(dateStr) {
   if (!dateStr) return '';
@@ -792,6 +862,9 @@ function svcOpenAddModal() {
   document.getElementById('svcSvcRows').innerHTML = '';
   document.getElementById('svcMatRows').innerHTML = '';
   document.getElementById('svcTotalDisplay').textContent = '₱0.00';
+  document.getElementById('svcOdometer').value = '';
+  var _odoNote = document.getElementById('svcOdometerNote');
+  if (_odoNote) _odoNote.style.display = 'none';
   _svcSelectedIssues = [];
   svcRenderIssueTiles();
   svcAddSvcRow(); svcAddMatRow();
@@ -832,6 +905,7 @@ window._svcViewDetails = function(docId) {
       ['Plate Number', s.plate || '—'],
       ['Mechanic', s.mechanic || '—'],
       ['Service Date', s.date || '—'],
+      ['Odometer Reading', s.odometer ? Number(s.odometer).toLocaleString() + ' km' : '—'],
       ['Total Cost', s.cost || '₱0.00'],
       ['Status', '<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:' + color + '1a;color:' + color + ';font-weight:700;font-size:0.82rem;">' + (s.status || '—') + '</span>'],
     ];
@@ -981,10 +1055,15 @@ window._svcViewDetails = function(docId) {
         });
 
         Promise.all(matPromises.concat(svcPromises)).then(function() {
-          // Update vehicle status + last service date
+          // Update vehicle status + last service date + last service odometer
           var lastSvcDate = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+          var vUpdate = { status: 'Completed', completedAt: firebase.firestore.FieldValue.serverTimestamp(), lastSvcDate: lastSvcDate };
+          if (s.odometer) {
+            vUpdate.lastSvcOdo = parseInt(s.odometer) || 0;
+            vUpdate.lastServiceOdometer = parseInt(s.odometer) || 0;
+          }
           db.collection('vehicles').where('plate', '==', plate).limit(1).get().then(function(vSnap) {
-            if (!vSnap.empty) vSnap.docs[0].ref.update({ status: 'Completed', completedAt: firebase.firestore.FieldValue.serverTimestamp(), lastSvcDate: lastSvcDate });
+            if (!vSnap.empty) vSnap.docs[0].ref.update(vUpdate);
           });
           closeModal('svcDetailsModal');
           showToast('Service marked as Completed!', 'success');
@@ -1002,7 +1081,9 @@ function svcSave() {
   var plate = document.getElementById('svcPlateSelect').value;
   var mechanic = document.getElementById('svcMechanic').value.trim();
   var date = document.getElementById('svcDateDisplay').value.trim(); // "May 14, 2026" format
+  var odometer = parseInt(document.getElementById('svcOdometer').value) || 0;
   if (!plate || !mechanic || !date) { showToast('Please fill all required fields.', 'error'); return; }
+  if (!odometer) { showToast('Please enter an odometer reading.', 'error'); return; }
 
   var svcRows = [], matRows = [];
   document.querySelectorAll('#svcSvcRows .svc-row').forEach(function(row) {
@@ -1023,6 +1104,7 @@ function svcSave() {
     desc: v ? (v.desc || v.assetDescription || '') : '',
     mechanic: mechanic,
     date: date,
+    odometer: odometer,
     cost: '₱' + total.toLocaleString('en-PH', {minimumFractionDigits:2}),
     svcRows: svcRows,
     matRows: matRows,
@@ -1030,6 +1112,19 @@ function svcSave() {
   };
 
   var db = firebase.firestore();
+
+  // Update vehicle's current odometer on save (if higher than stored)
+  function _updateVehicleOdometer() {
+    db.collection('vehicles').where('plate', '==', plate).limit(1).get().then(function(vSnap) {
+      if (!vSnap.empty) {
+        var vDoc = vSnap.docs[0];
+        var curOdo = parseInt(String(vDoc.data().odometer || vDoc.data().odo || '0').replace(/[^0-9]/g, '')) || 0;
+        if (odometer > curOdo) {
+          vDoc.ref.update({ odometer: odometer, odo: odometer + ' km' });
+        }
+      }
+    }).catch(function() {});
+  }
   var sBtn = document.getElementById('svcSubmitBtn');
   var sBtnOrigHtml = sBtn ? sBtn.innerHTML : '';
   var spinSave = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 0.8s linear infinite"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.49"/></svg> Saving…';
@@ -1037,7 +1132,7 @@ function svcSave() {
   if (sBtn) { sBtn.disabled = true; sBtn.innerHTML = window._svcEditingId ? spinUpdate : spinSave; }
   if (window._svcEditingId) {
     db.collection('maintenance').doc(window._svcEditingId).update(data)
-      .then(function() { closeModal('svcAddModal'); showToast('Service updated successfully!', 'success'); })
+      .then(function() { _updateVehicleOdometer(); closeModal('svcAddModal'); showToast('Service updated successfully!', 'success'); })
       .catch(function(err) { showToast('Update failed: ' + err.message, 'error'); })
       .finally(function() { if (sBtn) { sBtn.disabled = false; sBtn.innerHTML = sBtnOrigHtml; } });
   } else {
@@ -1057,7 +1152,7 @@ function svcSave() {
         return db.collection('maintenance').add(data);
       })
       .then(function(ref) {
-        if (ref) { closeModal('svcAddModal'); showToast('Service added successfully!', 'success'); }
+        if (ref) { _updateVehicleOdometer(); closeModal('svcAddModal'); showToast('Service added successfully!', 'success'); }
       })
       .catch(function(err) { showToast('Save failed: ' + err.message, 'error'); })
       .finally(function() { if (sBtn) { sBtn.disabled = false; sBtn.innerHTML = sBtnOrigHtml; } });

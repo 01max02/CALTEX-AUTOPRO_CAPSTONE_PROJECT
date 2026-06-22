@@ -29,21 +29,21 @@
 
         <div class="admin-content">
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
-                <div class="stat-card">
+                <div class="stat-card" onclick="vehTypeFilter('all')" style="cursor:pointer;">
                     <div class="stat-icon" style="background:rgba(0,48,135,0.10);color:#003087;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
                     </div>
                     <div class="stat-number" id="vehStatTotal">0</div>
                     <div class="stat-label">Total Vehicles</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" onclick="vehTypeFilter('car')" style="cursor:pointer;">
                     <div class="stat-icon green">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3"/><rect x="9" y="11" width="14" height="10" rx="2"/><circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/></svg>
                     </div>
                     <div class="stat-number" id="vehStatCars">0</div>
                     <div class="stat-label">Cars</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" onclick="vehTypeFilter('truck')" style="cursor:pointer;">
                     <div class="stat-icon orange">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
                     </div>
@@ -52,9 +52,9 @@
                 </div>
             </div>
             <div class="data-table">
-                <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 120px;">
+                <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 1fr 120px;">
                     <div>Plate Number</div><div>Vehicle Type</div><div>Owner</div>
-                    <div>Odometer (km)</div><div>Last Service Date</div><div>Next PMS Due</div><div>Actions</div>
+                    <div>Odometer (km)</div><div>KM Since Last Service</div><div>Last Service Date</div><div>Next PMS Due</div><div>Actions</div>
                 </div>
                 <div id="assetsList"></div>
             </div>
@@ -135,7 +135,25 @@
             </div>
             <div class="form-group" style="margin:0;">
                 <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Current Odometer (km)</label>
-                <input type="number" name="currentOdometer" placeholder="e.g. 45000" min="0" style="margin-top:0.3rem;">
+                <input type="number" name="currentOdometer" id="currentOdometerInput" placeholder="e.g. 45000" min="0" style="margin-top:0.3rem;" oninput="onOdometerInput()">
+            </div>
+
+            <!-- Just Serviced Toggle -->
+            <label style="display:flex;align-items:center;gap:0.6rem;padding:0.75rem 1rem;background:#f0fff4;border:1.5px solid #9ae6b4;border-radius:10px;cursor:pointer;user-select:none;">
+                <input type="checkbox" id="justServicedCheck" onchange="onJustServicedToggle(this)" style="width:16px;height:16px;accent-color:#16a34a;cursor:pointer;flex-shrink:0;">
+                <span style="font-size:0.85rem;font-weight:700;color:#16a34a;">🔧 Vehicle was just serviced</span>
+            </label>
+
+            <!-- Last Service Fields — hidden until checkbox is ticked -->
+            <div id="lastServiceSection" style="display:none;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Last Service Date</label>
+                    <input type="date" name="lastServiceDate" id="lastServiceDateInput" readonly style="margin-top:0.3rem;background:#f7fafc;cursor:not-allowed;color:#718096;">
+                </div>
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Last Service Odometer (km)</label>
+                    <input type="number" name="lastServiceOdometer" id="lastServiceOdoInput" readonly placeholder="e.g. 44500" min="0" style="margin-top:0.3rem;background:#f7fafc;cursor:not-allowed;color:#718096;">
+                </div>
             </div>
             <div class="form-group" style="margin:0;">
                 <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Service Frequency (months)</label>
@@ -198,6 +216,40 @@
     });
   })();
 
+  // ── Vehicle type filter (from stat cards) ──
+  window._vehTypeFilter = 'all';
+  window.vehTypeFilter = function(type) {
+    window._vehTypeFilter = type;
+    if (typeof renderAssetsList === 'function') renderAssetsList();
+  };
+
+  // ── Just Serviced checkbox ──────────────────────────────
+  function onJustServicedToggle(cb) {
+    var section = document.getElementById('lastServiceSection');
+    var lsdInput = document.getElementById('lastServiceDateInput');
+    var lsoInput = document.getElementById('lastServiceOdoInput');
+    var odoInput = document.getElementById('currentOdometerInput');
+    if (cb.checked) {
+      if (section) section.style.display = 'grid';
+      var todayStr = new Date().toISOString().split('T')[0];
+      if (lsdInput) { lsdInput.value = todayStr; lsdInput.max = todayStr; }
+      if (lsoInput && odoInput && odoInput.value) lsoInput.value = odoInput.value;
+    } else {
+      if (section) section.style.display = 'none';
+      if (lsdInput) lsdInput.value = '';
+      if (lsoInput) lsoInput.value = '';
+    }
+  }
+
+  function onOdometerInput() {
+    var cb = document.getElementById('justServicedCheck');
+    if (cb && cb.checked) {
+      var lsoInput = document.getElementById('lastServiceOdoInput');
+      var odoInput = document.getElementById('currentOdometerInput');
+      if (lsoInput && odoInput) lsoInput.value = odoInput.value;
+    }
+  }
+
   // ── Vehicle modal functions ──
   var _editingVehicleId = null;
 
@@ -229,14 +281,34 @@
     var statusColors = { 'active':'#38a169','Active':'#38a169','maintenance':'#d69e2e','Under Maintenance':'#d69e2e','completed':'#003087','Completed':'#003087','inactive':'#718096','Overdue':'#e53e3e','PMS Due Soon':'#d69e2e' };
     var sc = statusColors[asset.status] || '#718096';
 
+    var lastSvcOdoVal = asset.lastSvcOdo || asset.lastServiceOdometer || '';
+    var lastSvcDateVal = asset.lastServiceDate || asset.lastSvcDate || '';
+
+    // KM Since Last Service
+    var kmSinceVal = '—';
+    var lastOdoNum = parseInt(String(lastSvcOdoVal).replace(/[^0-9]/g, '')) || 0;
+    if (asset.odometer > 0 && lastOdoNum > 0 && asset.odometer >= lastOdoNum) {
+      kmSinceVal = (asset.odometer - lastOdoNum).toLocaleString() + ' km';
+    }
+
+    function _fmtDate(d) {
+      if (!d) return '—';
+      var dt = new Date(d + 'T00:00:00'); // force local time, avoid UTC shift
+      if (isNaN(dt.getTime())) return d;
+      return dt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    }
+
     document.getElementById('adDetailRows').innerHTML =
       _vehDetailRow('Plate Number', asset.plateNumber || asset.plate)
       + _vehDetailRow('Description', asset.assetDescription || asset.desc)
-      + _vehDetailRow('Owner', asset.owner)
-      + _vehDetailRow('Odometer', asset.odometer ? asset.odometer.toLocaleString() + ' km' : (asset.odo || '—'))
       + _vehDetailRow('Vehicle Type', asset.type)
-      + _vehDetailRow('Last Service Date', asset.lastServiceDate || asset.lastSvcDate || '—')
-      + _vehDetailRow('Next PMS Due', nextPms);
+      + _vehDetailRow('Owner', asset.owner)
+      + _vehDetailRow('Current Odometer', asset.odometer ? asset.odometer.toLocaleString() + ' km' : (asset.odo || '—'))
+      + _vehDetailRow('Last Service Date', _fmtDate(lastSvcDateVal))
+      + _vehDetailRow('Last Service Odometer', lastSvcOdoVal ? Number(lastSvcOdoVal).toLocaleString() + ' km' : '—')
+      + _vehDetailRow('KM Since Last Service', kmSinceVal)
+      + _vehDetailRow('Next PMS Due', _fmtDate(nextPms))
+      + _vehDetailRow('Service Frequency', (asset.svcFreq || asset.serviceFrequency) ? (asset.svcFreq || asset.serviceFrequency) + ' month(s)' : '—');
 
     document.getElementById('adEditBtn').onclick = function() {
       closeModal('assetDetailsModal');
@@ -250,6 +322,13 @@
     document.getElementById('assetModalTitle').textContent = 'Add Vehicle';
     document.getElementById('assetSubmitBtn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save';
     document.getElementById('addAssetForm').reset();
+    var todayStr = new Date().toISOString().split('T')[0];
+    var lsdInput = document.getElementById('lastServiceDateInput');
+    if (lsdInput) lsdInput.max = todayStr;
+    var cb = document.getElementById('justServicedCheck');
+    if (cb) cb.checked = false;
+    var section = document.getElementById('lastServiceSection');
+    if (section) section.style.display = 'none';
     populateVehicleTypeDropdown('assetTypeSelect', '');
     document.getElementById('addAssetModal').classList.add('active');
   }
@@ -269,6 +348,17 @@
     if (ownerInput) ownerInput.value = asset.owner || '';
     form.elements.currentOdometer.value = asset.odometer ? String(asset.odometer).replace(/[^0-9]/g, '') : '';
     form.elements.serviceFrequency.value = asset.svcFreq || asset.serviceFrequency || '';
+    form.elements.lastServiceDate.value = asset.lastServiceDate || asset.lastSvcDate || '';
+    form.elements.lastServiceOdometer.value = asset.lastSvcOdo || asset.lastServiceOdometer || '';
+    var todayStr = new Date().toISOString().split('T')[0];
+    var lsdInput = document.getElementById('lastServiceDateInput');
+    if (lsdInput) lsdInput.max = todayStr;
+    // If existing service data — pre-check the box and show the section
+    var hasServiceData = !!(asset.lastServiceDate || asset.lastSvcDate || asset.lastSvcOdo || asset.lastServiceOdometer);
+    var cb = document.getElementById('justServicedCheck');
+    var section = document.getElementById('lastServiceSection');
+    if (cb) cb.checked = hasServiceData;
+    if (section) section.style.display = hasServiceData ? 'grid' : 'none';
     populateVehicleTypeDropdown('assetTypeSelect', asset.type || '');
     document.getElementById('addAssetModal').classList.add('active');
   }
@@ -291,8 +381,8 @@
       e.preventDefault();
       var plate = form.elements.plateNumber.value.trim().toUpperCase();
       if (!plate) return;
-      var lastSvcDate = '';
-      var svcFreq = form.elements.serviceFrequency.value;
+      var lastSvcDate = form.elements.lastServiceDate.value || '';
+      var lastSvcOdo  = form.elements.lastServiceOdometer.value ? parseInt(form.elements.lastServiceOdometer.value) : null;      var svcFreq = form.elements.serviceFrequency.value;
       var ownerName = form.elements.ownerName.value.trim();
       var data = {
         plate: plate,
@@ -301,13 +391,15 @@
         owner: ownerName,
         odo: form.elements.currentOdometer.value ? form.elements.currentOdometer.value + ' km' : '',
         lastSvcDate: lastSvcDate,
+        lastServiceDate: lastSvcDate,
+        lastSvcOdo: lastSvcOdo !== null ? lastSvcOdo : '',
+        lastServiceOdometer: lastSvcOdo !== null ? lastSvcOdo : '',
         svcFreq: svcFreq,
       };
       // Also keep legacy fields for compatibility
       data.plateNumber = data.plate;
       data.assetDescription = data.desc;
       data.odometer = parseInt(form.elements.currentOdometer.value) || 0;
-      data.lastServiceDate = lastSvcDate;
       data.serviceFrequency = parseInt(svcFreq) || null;
       if (lastSvcDate && svcFreq) {
         var d = new Date(lastSvcDate);

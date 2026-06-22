@@ -72,24 +72,37 @@
         <div class="admin-content">
             <!-- Stat cards -->
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;">
-                <div class="stat-card"><div class="stat-icon" style="background:rgba(113,128,150,0.1);color:#718096;"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><div class="stat-number" id="statPending" style="color:#718096;">0</div><div class="stat-label">Pending</div></div>
-                <div class="stat-card"><div class="stat-icon orange"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div class="stat-number" id="statAwaiting">0</div><div class="stat-label">Awaiting Check</div></div>
-                <div class="stat-card"><div class="stat-icon green"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><div class="stat-number" id="statApproved">0</div><div class="stat-label">Approved</div></div>
-                <div class="stat-card"><div class="stat-icon red"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div><div class="stat-number" id="statRejected">0</div><div class="stat-label">Rejected</div></div>
+                <div class="stat-card" onclick="setFilter('Pending',document.querySelectorAll('#rcvFilterPills .dss-pill')[1])" style="cursor:pointer;"><div class="stat-icon" style="background:rgba(113,128,150,0.1);color:#718096;"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><div class="stat-number" id="statPending" style="color:#718096;">0</div><div class="stat-label">Pending</div></div>
+                <div class="stat-card" onclick="setFilter('Awaiting Double Check',document.querySelectorAll('#rcvFilterPills .dss-pill')[2])" style="cursor:pointer;"><div class="stat-icon orange"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div class="stat-number" id="statAwaiting">0</div><div class="stat-label">Awaiting Check</div></div>
+                <div class="stat-card" onclick="setFilter('Approved',document.querySelectorAll('#rcvFilterPills .dss-pill')[3])" style="cursor:pointer;"><div class="stat-icon green"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><div class="stat-number" id="statApproved">0</div><div class="stat-label">Approved</div></div>
+                <div class="stat-card" onclick="setFilter('Rejected',document.querySelectorAll('#rcvFilterPills .dss-pill')[4])" style="cursor:pointer;"><div class="stat-icon red"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div><div class="stat-number" id="statRejected">0</div><div class="stat-label">Rejected</div></div>
             </div>
             <!-- Filter pills -->
-            <div style="display:flex;gap:8px;margin-bottom:1.25rem;flex-wrap:wrap;align-items:center;">
-                <button class="rcv-pill active" onclick="setFilter('all',this)">All</button>
-                <button class="rcv-pill" onclick="setFilter('Pending',this)">⏳ Pending</button>
-                <button class="rcv-pill" onclick="setFilter('Awaiting Double Check',this)">🔍 Awaiting Check</button>
-                <button class="rcv-pill" onclick="setFilter('Approved',this)">✅ Approved</button>
-                <button class="rcv-pill" onclick="setFilter('Rejected',this)">❌ Rejected</button>
-                <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#718096" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    <input type="date" id="rcvDateFrom" style="padding:4px 8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:11px;font-family:inherit;outline:none;color:#4a5568;" onchange="_renderList()" title="From date">
-                    <span style="font-size:11px;color:#718096;">–</span>
-                    <input type="date" id="rcvDateTo" style="padding:4px 8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:11px;font-family:inherit;outline:none;color:#4a5568;" onchange="_renderList()" title="To date">
-                    <button onclick="document.getElementById('rcvDateFrom').value='';document.getElementById('rcvDateTo').value='';_renderList();" style="padding:4px 8px;border:1.5px solid #e2e8f0;border-radius:8px;background:white;font-size:11px;color:#718096;cursor:pointer;">✕</button>
+            <div class="dss-filter-bar">
+                <div class="dss-filter-group">
+                    <label class="dss-filter-label">Filter by Status</label>
+                    <div class="dss-filter-pills" id="rcvFilterPills">
+                        <button class="dss-pill active" onclick="setFilter('all',this)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                            All
+                        </button>
+                        <button class="dss-pill dss-pill--pending" onclick="setFilter('Pending',this)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                            Pending
+                        </button>
+                        <button class="dss-pill dss-pill--duesoon" onclick="setFilter('Awaiting Double Check',this)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            Awaiting Check
+                        </button>
+                        <button class="dss-pill dss-pill--ontrack" onclick="setFilter('Approved',this)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            Approved
+                        </button>
+                        <button class="dss-pill dss-pill--overdue" onclick="setFilter('Rejected',this)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                            Rejected
+                        </button>
+                    </div>
                 </div>
             </div>
             <!-- Table -->
@@ -529,7 +542,7 @@ function _renderList() {
 
 window.setFilter = function(f, btn) {
   _currentFilter = f;
-  document.querySelectorAll('.rcv-pill').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('#rcvFilterPills .dss-pill').forEach(function(b){ b.classList.remove('active'); });
   if (btn) btn.classList.add('active');
   _renderList();
 };

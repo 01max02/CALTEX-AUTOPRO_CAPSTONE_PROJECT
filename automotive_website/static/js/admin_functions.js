@@ -223,6 +223,14 @@ function renderAssetsList() {
 
     var today = new Date(); today.setHours(0,0,0,0);
 
+    // Apply vehicle type filter from stat cards
+    var vehTypeFilter = window._vehTypeFilter || 'all';
+    if (vehTypeFilter !== 'all') {
+        filtered = filtered.filter(function(a) {
+            return (a.type || '').toLowerCase() === vehTypeFilter;
+        });
+    }
+
     function getStatusBadge(asset) {
         // Auto-reset completed → active after 1 day
         if (asset.status === 'completed' && asset.completedAt) {
@@ -256,13 +264,22 @@ function renderAssetsList() {
     });
 
     var rows = filtered.map(function(asset) {
-        return '<div class="table-row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 120px;">'
+        // KM Since Last Service = currentOdometer - lastSvcOdo
+        var kmSince = '—';
+        var lastOdo = parseInt(String(asset.lastSvcOdo || asset.lastServiceOdometer || '').replace(/[^0-9]/g, '')) || 0;
+        if (asset.odometer > 0 && lastOdo > 0 && asset.odometer >= lastOdo) {
+            var diff = asset.odometer - lastOdo;
+            var color = diff >= 5000 ? '#e53e3e' : diff >= 3000 ? '#d69e2e' : '#38a169';
+            kmSince = '<span style="font-weight:700;color:' + color + ';">' + diff.toLocaleString() + ' km</span>';
+        }
+        return '<div class="table-row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 1fr 120px;">'
             + '<div>' + asset.plateNumber + '</div>'
             + '<div>' + (asset.type||'-') + '</div>'
             + '<div>' + (asset.owner||'-') + '</div>'
             + '<div>' + (asset.odometer ? asset.odometer.toLocaleString() + ' km' : '-') + '</div>'
-            + '<div>' + (asset.lastServiceDate ? new Date(asset.lastServiceDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '-') + '</div>'
-            + '<div>' + (asset.nextPMSDue ? new Date(asset.nextPMSDue).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '-') + '</div>'
+            + '<div>' + kmSince + '</div>'
+            + '<div>' + (asset.lastServiceDate ? new Date(asset.lastServiceDate + 'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '-') + '</div>'
+            + '<div>' + (asset.nextPMSDue ? new Date(asset.nextPMSDue + 'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '-') + '</div>'
             + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.25rem;">'
             +   '<button class="btn-small btn-primary" onclick="viewAssetDetails(\'' + asset.assetNum + '\')" title="View" style="display:flex;align-items:center;justify-content:center;width:100%;padding:0.3rem 0;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>'
             +   '<button class="btn-small btn-secondary" onclick="editAsset(\'' + asset.assetNum + '\')" title="Edit" style="display:flex;align-items:center;justify-content:center;width:100%;padding:0.3rem 0;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
@@ -507,6 +524,14 @@ function renderServicesList() {
         });
     }
 
+    // Apply status filter from pills
+    var svcStatusFilter = window._svcStatusFilter || 'all';
+    if (svcStatusFilter !== 'all') {
+        filtered = filtered.filter(function(s){
+            return (s.status||'').toLowerCase() === svcStatusFilter.toLowerCase();
+        });
+    }
+
     if (filtered.length === 0) {
         list.innerHTML = '<div class="table-row" style="text-align:center;color:#718096;padding:2rem;">No services found.</div>';
         return;
@@ -736,6 +761,11 @@ function editService(docId) {
         // Load saved issues
         window._svcSelectedIssues = (s.issues || []).slice();
         if (typeof svcRenderIssueTiles === 'function') svcRenderIssueTiles();
+        // Pre-fill odometer
+        var odoInput = document.getElementById('svcOdometer');
+        var odoNote  = document.getElementById('svcOdometerNote');
+        if (odoInput) odoInput.value = s.odometer || '';
+        if (odoNote) odoNote.style.display = 'none';
         svcCalcTotal();
         document.getElementById('svcAddModal').classList.add('active');
     });
@@ -1064,10 +1094,17 @@ function renderInventoryList() {
         filtered = filtered.filter(function(item){ return item.stock > item.minLevel; });
     }
 
+    // Apply commodity group filter from header dropdown
+    var invCgFilter = window._invCommodityFilter || '';
+    if (invCgFilter) {
+        filtered = filtered.filter(function(item){ return (item.commodityGroup||'') === invCgFilter; });
+    }
+
     // Update stats
     var s = function(id,val){ var el=document.getElementById(id); if(el) el.textContent=val; };
     s('totalInventoryItems', inventory.length);
-    s('lowStockCount', inventory.filter(function(i){ return i.stock <= i.minLevel; }).length);
+    s('outOfStockCount', inventory.filter(function(i){ return i.stock === 0; }).length);
+    s('lowStockCount', inventory.filter(function(i){ return i.stock > 0 && i.stock <= i.minLevel; }).length);
     s('inStockCount', inventory.filter(function(i){ return i.stock > i.minLevel; }).length);
 
     if (filtered.length === 0) {
@@ -1377,7 +1414,24 @@ function renderInventoryTransactions(filter) {
             assetLine: assetLine,
             type: type,
             qty: t.qty || t.quantity || 0,
-            by: t.by || t.performedBy || '—'
+            by: t.by || t.performedBy || '—',
+            commodityGroup: (function() {
+                // Try direct field first, then cross-reference stock inventory
+                if (t.commodityGroup) return t.commodityGroup;
+                var itemName = (t.item || t.name || '').toLowerCase();
+                var inv = window.inventory || [];
+                var found = inv.find(function(i) {
+                    return (i.itemName || '').toLowerCase() === itemName
+                        || (i.itemNum || '').toLowerCase() === (t.itemNum || '').toLowerCase();
+                });
+                if (found && found.commodityGroup) return found.commodityGroup;
+                // Also check itemMaster
+                var master = window.itemMaster || [];
+                var mFound = master.find(function(i) {
+                    return (i.itemName || '').toLowerCase() === itemName;
+                });
+                return (mFound && mFound.commodityGroup) ? mFound.commodityGroup : '—';
+            })()
         };
     });
 
@@ -1399,6 +1453,29 @@ function renderInventoryTransactions(filter) {
     var txnFilter = window._txnFilter || 'all';
     if (txnFilter !== 'all') {
         filtered = filtered.filter(function(t){ return t.type === txnFilter; });
+    }
+
+    // Apply month filter from header dropdown
+    var MONTHS_SHORT_TXN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var selectedTxnMonth = ((document.getElementById('txnMonthFilter') || {}).value || '').trim();
+    if (selectedTxnMonth) {
+        filtered = filtered.filter(function(t) {
+            var dateStr = t.date || '';
+            if (!dateStr) return false;
+            var m1 = dateStr.match(/^([A-Za-z]+)\s+\d+,?\s+(\d{4})/);
+            if (m1) return (m1[1].slice(0,3) + ' ' + m1[2]) === selectedTxnMonth;
+            var m2 = dateStr.match(/^(\d{1,2})\/\d{1,2}\/(\d{4})/);
+            if (m2) return (MONTHS_SHORT_TXN[parseInt(m2[1]) - 1] + ' ' + m2[2]) === selectedTxnMonth;
+            var m3 = dateStr.match(/^(\d{4})-(\d{2})-\d{2}/);
+            if (m3) return (MONTHS_SHORT_TXN[parseInt(m3[2]) - 1] + ' ' + m3[1]) === selectedTxnMonth;
+            return false;
+        });
+    }
+
+    // Apply commodity group filter from header dropdown
+    var txnCgFilter = window._txnCommodityFilter || '';
+    if (txnCgFilter) {
+        filtered = filtered.filter(function(t){ return (t.commodityGroup || '—') === txnCgFilter; });
     }
 
     // Apply date range filter
@@ -1435,9 +1512,10 @@ function renderInventoryTransactions(filter) {
         var typeColor = isIn ? '#003087' : '#E8001C';
         var typeBg    = isIn ? '#ebf8ff' : '#fed7d7';
         var dateStr = t.date ? t.date : '—';
-        return '<div class="table-row" style="grid-template-columns:120px 1fr 1.5fr 80px 80px 100px;">'
+        return '<div class="table-row" style="grid-template-columns:120px 1fr 1fr 1.5fr 80px 80px 100px;">'
             + '<div>' + dateStr + '</div>'
             + '<div><strong>' + t.item + '</strong></div>'
+            + '<div>' + (t.commodityGroup || '—') + '</div>'
             + '<div>' + t.description + (t.assetLine ? '<div style="font-size:0.75rem;color:#718096;margin-top:2px;">' + t.assetLine + '</div>' : '') + '</div>'
             + '<div><span style="background:' + typeBg + ';color:' + typeColor + ';padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">' + t.type + '</span></div>'
             + '<div>' + t.qty + '</div>'
@@ -1469,6 +1547,14 @@ function renderItemMasterList() {
     if (imFilter !== 'all') {
         filtered = filtered.filter(function(i){
             return (i.itemType || '').toLowerCase() === imFilter.toLowerCase();
+        });
+    }
+
+    // Apply commodity group filter from header dropdown
+    var cgFilter = window._imCommodityFilter || '';
+    if (cgFilter) {
+        filtered = filtered.filter(function(i){
+            return (i.commodityGroup || '') === cgFilter;
         });
     }
 
@@ -1904,15 +1990,22 @@ function renderIssuancesList() {
         filtered = filtered.filter(function(i){ return (i.itemType||'') === issFilter; });
     }
 
+    // Apply commodity group filter from header dropdown
+    var issCgFilter = window._issCommodityFilter || '';
+    if (issCgFilter) {
+        filtered = filtered.filter(function(i){ return (i.commodityGroup||'') === issCgFilter; });
+    }
+
     if (filtered.length === 0) {
         list.innerHTML = '<div style="text-align:center;color:#718096;padding:2rem;">No issuances found.</div>';
         return;
     }
 
     var rows = filtered.map(function(i) {
+        var assetDesc = i.assetDescription || '';
         return '<div class="table-row" style="min-width:1100px;grid-template-columns:110px 130px 120px 1fr 100px 140px 70px 80px 110px 110px;">'
             + '<div>' + (i.date ? new Date(i.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '-') + '</div>'
-            + '<div>' + (i.assetNum||'-') + '</div>'
+            + '<div>' + (i.assetNum||'-') + (assetDesc ? '<br><span style="font-size:0.7rem;color:#718096;">' + assetDesc + '</span>' : '') + '</div>'
             + '<div>' + (i.itemNum||'-') + '</div>'
             + '<div>' + (i.itemName||'-') + '</div>'
             + '<div>' + (i.itemType||'-') + '</div>'
@@ -1960,6 +2053,12 @@ function renderUsersList() {
                 || (u.username||'').toLowerCase().includes(q)
                 || (u.email||'').toLowerCase().includes(q);
         });
+    }
+
+    // Apply role filter from pills
+    var userFilter = window._userFilter || 'all';
+    if (userFilter !== 'all') {
+        filtered = filtered.filter(function(u){ return (u.role||'').toLowerCase() === userFilter; });
     }
 
     var s = function(id,val){ var el=document.getElementById(id); if(el) el.textContent=val; };

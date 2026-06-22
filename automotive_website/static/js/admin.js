@@ -408,13 +408,13 @@ function renderDSSKpis() {
 
     el.innerHTML = [
         { svg: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
-          label: 'Out of Stock', val: outOfStock, color: '#e53e3e', bg: 'rgba(229,62,62,0.10)' },
+          label: 'Out of Stock', val: outOfStock, color: '#e53e3e', bg: 'rgba(229,62,62,0.10)', filter: 'critical' },
         { svg: '<polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/>',
-          label: 'Low Stock', val: lowStock, color: '#d69e2e', bg: 'rgba(214,158,46,0.10)' },
+          label: 'Low Stock', val: lowStock, color: '#d69e2e', bg: 'rgba(214,158,46,0.10)', filter: 'low-stock' },
         { svg: '<polyline points="20 6 9 17 4 12"/>',
-          label: 'Adequate', val: adequate, color: '#38a169', bg: 'rgba(56,161,105,0.10)' },
+          label: 'Adequate', val: adequate, color: '#38a169', bg: 'rgba(56,161,105,0.10)', filter: 'ok' },
     ].map(function (k) {
-        return '<div class="stat-card">'
+        return '<div class="stat-card" style="cursor:pointer;" onclick="dssSetFilter(\'' + k.filter + '\',document.querySelectorAll(\'#dssFilterPills .dss-pill\')[' + ({'critical':1,'low-stock':2,'ok':3}[k.filter]) + '])">'
             + '<div class="stat-icon" style="background:' + k.bg + ';color:' + k.color + ';">'
             +   '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + k.svg + '</svg>'
             + '</div>'
@@ -448,11 +448,25 @@ function renderDSSTable() {
     }
 
     if (rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="7" class="dss-empty">No items match the current filter.</td></tr>';
+        body.innerHTML = '<tr><td colspan="7" class="dss-empty">No results found.</td></tr>';
+        // Remove pagination if exists
+        var oldPag = document.getElementById('dssPagination');
+        if (oldPag) oldPag.innerHTML = '';
         return;
     }
 
-    body.innerHTML = rows.map(function (x) {
+    // Pagination logic — 10 per page
+    var perPage = 10;
+    var total = rows.length;
+    var totalPages = Math.ceil(total / perPage);
+    var page = window._dssPage || 1;
+    if (page > totalPages) page = totalPages;
+    window._dssPage = page;
+    var start = (page - 1) * perPage;
+    var end = Math.min(start + perPage, total);
+    var pageRows = rows.slice(start, end);
+
+    body.innerHTML = pageRows.map(function (x) {
         const i = x.item;
         const barColor = x.priority === 0 ? '#e53e3e'
             : x.priority === 1 ? '#d69e2e'
@@ -500,6 +514,30 @@ function renderDSSTable() {
             + '<td class="dss-td"><div class="dss-decision">' + decisionIcon + ' ' + x.decision + '</div></td>'
             + '</tr>';
     }).join('');
+
+    // Render pagination below table
+    var pagEl = document.getElementById('dssPagination');
+    if (!pagEl) {
+        pagEl = document.createElement('div');
+        pagEl.id = 'dssPagination';
+        var tableWrap = body.closest('.dss-table-wrap');
+        if (tableWrap) tableWrap.appendChild(pagEl);
+    }
+    if (totalPages > 1) {
+        var from = start + 1, to = end;
+        var info = 'Showing ' + from + '–' + to + ' of ' + total;
+        var btns = '';
+        btns += '<button class="ap-page-btn" onclick="window._dssPage=' + (page-1) + ';renderDSSTable();" ' + (page <= 1 ? 'disabled' : '') + '><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>';
+        var pS = Math.max(1, page - 2), pE = Math.min(totalPages, pS + 4);
+        if (pE - pS < 4) pS = Math.max(1, pE - 4);
+        for (var p = pS; p <= pE; p++) {
+            btns += '<button class="ap-page-btn' + (p === page ? ' active' : '') + '" onclick="window._dssPage=' + p + ';renderDSSTable();">' + p + '</button>';
+        }
+        btns += '<button class="ap-page-btn" onclick="window._dssPage=' + (page+1) + ';renderDSSTable();" ' + (page >= totalPages ? 'disabled' : '') + '><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>';
+        pagEl.innerHTML = '<div class="ap-pagination"><span class="ap-pagination-info">' + info + '</span><div class="ap-pagination-btns">' + btns + '</div></div>';
+    } else {
+        pagEl.innerHTML = '';
+    }
 }
 
 function renderDSSInsights() {
@@ -553,12 +591,13 @@ function renderDSSInsights() {
 
 window.dssSetFilter = function (filter, btn) {
     _dssFilter = filter;
+    window._dssPage = 1;
     document.querySelectorAll('.dss-pill').forEach(function (p) { p.classList.remove('active'); });
     if (btn) btn.classList.add('active');
     renderDSSTable();
 };
 
-window.dssApplySearch = function () { renderDSSTable(); };
+window.dssApplySearch = function () { window._dssPage = 1; renderDSSTable(); };
 
 window.dssPrintReport = function () {
     const rows = _dssData.filter(function (x) { return x.priority <= 3; });
@@ -840,17 +879,17 @@ function renderDSSPMSKpis() {
 
     el.innerHTML = [
         { svg: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
-          label: 'Overdue PMS', val: overdue, color: '#e53e3e', bg: 'rgba(229,62,62,0.10)' },
+          label: 'Overdue PMS', val: overdue, color: '#e53e3e', bg: 'rgba(229,62,62,0.10)', filter: 'overdue', idx: 1 },
         { svg: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
-          label: 'Due Today', val: dueToday, color: '#0033A0', bg: 'rgba(0,51,160,0.10)' },
+          label: 'Due Today', val: dueToday, color: '#0033A0', bg: 'rgba(0,51,160,0.10)', filter: 'due-today', idx: 2 },
         { svg: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
-          label: 'Due This Week', val: thisWeek, color: '#dd6b20', bg: 'rgba(221,107,32,0.10)' },
+          label: 'Due This Week', val: thisWeek, color: '#dd6b20', bg: 'rgba(221,107,32,0.10)', filter: 'this-week', idx: 3 },
         { svg: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
-          label: 'Due Soon', val: dueSoon, color: '#b7791f', bg: 'rgba(183,121,31,0.10)' },
+          label: 'Due Soon', val: dueSoon, color: '#b7791f', bg: 'rgba(183,121,31,0.10)', filter: 'due-soon', idx: 4 },
         { svg: '<polyline points="20 6 9 17 4 12"/>',
-          label: 'Active', val: active, color: '#276749', bg: 'rgba(39,103,73,0.10)' },
+          label: 'Active', val: active, color: '#276749', bg: 'rgba(39,103,73,0.10)', filter: 'active', idx: 5 },
     ].map(function (k) {
-        return '<div class="stat-card">'
+        return '<div class="stat-card" style="cursor:pointer;" onclick="dssPMSSetFilter(\'' + k.filter + '\',document.querySelectorAll(\'#dssPmsFilterPills .dss-pill\')[' + k.idx + '])">'
             + '<div class="stat-icon" style="background:' + k.bg + ';color:' + k.color + ';">'
             +   '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + k.svg + '</svg>'
             + '</div>'
@@ -881,11 +920,24 @@ function renderDSSPMSTable() {
     }
 
     if (rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="8" class="dss-empty">No assets match the current filter.</td></tr>';
+        body.innerHTML = '<tr><td colspan="8" class="dss-empty">No results found.</td></tr>';
+        var oldPag = document.getElementById('dssPmsPagination');
+        if (oldPag) oldPag.innerHTML = '';
         return;
     }
 
-    body.innerHTML = rows.map(function (x) {
+    // Pagination — 10 per page
+    var perPage = 10;
+    var total = rows.length;
+    var totalPages = Math.ceil(total / perPage);
+    var page = window._dssPmsPage || 1;
+    if (page > totalPages) page = totalPages;
+    window._dssPmsPage = page;
+    var start = (page - 1) * perPage;
+    var end = Math.min(start + perPage, total);
+    var pageRows = rows.slice(start, end);
+
+    body.innerHTML = pageRows.map(function (x) {
         var a = x.asset;
         var c = x.priorityColor;
 
@@ -924,6 +976,30 @@ function renderDSSPMSTable() {
             + '<td class="dss-td"><div class="dss-decision">' + x.recommendation + '</div></td>'
             + '</tr>';
     }).join('');
+
+    // Render pagination below PMS table
+    var pagEl = document.getElementById('dssPmsPagination');
+    if (!pagEl) {
+        pagEl = document.createElement('div');
+        pagEl.id = 'dssPmsPagination';
+        var tableWrap = body.closest('.dss-table-wrap');
+        if (tableWrap) tableWrap.appendChild(pagEl);
+    }
+    if (totalPages > 1) {
+        var from = start + 1, to = end;
+        var info = 'Showing ' + from + '–' + to + ' of ' + total;
+        var btns = '';
+        btns += '<button class="ap-page-btn" onclick="window._dssPmsPage=' + (page-1) + ';renderDSSPMSTable();" ' + (page <= 1 ? 'disabled' : '') + '><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>';
+        var pS = Math.max(1, page - 2), pE = Math.min(totalPages, pS + 4);
+        if (pE - pS < 4) pS = Math.max(1, pE - 4);
+        for (var p = pS; p <= pE; p++) {
+            btns += '<button class="ap-page-btn' + (p === page ? ' active' : '') + '" onclick="window._dssPmsPage=' + p + ';renderDSSPMSTable();">' + p + '</button>';
+        }
+        btns += '<button class="ap-page-btn" onclick="window._dssPmsPage=' + (page+1) + ';renderDSSPMSTable();" ' + (page >= totalPages ? 'disabled' : '') + '><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>';
+        pagEl.innerHTML = '<div class="ap-pagination"><span class="ap-pagination-info">' + info + '</span><div class="ap-pagination-btns">' + btns + '</div></div>';
+    } else {
+        pagEl.innerHTML = '';
+    }
 }
 
 function renderDSSPMSInsights() {
@@ -983,12 +1059,13 @@ function renderDSSPMSInsights() {
 
 window.dssPMSSetFilter = function (filter, btn) {
     _dssPmsFilter = filter;
+    window._dssPmsPage = 1;
     document.querySelectorAll('#dssPmsFilterPills .dss-pill').forEach(function (p) { p.classList.remove('active'); });
     if (btn) btn.classList.add('active');
     renderDSSPMSTable();
 };
 
-window.dssPMSApplySearch = function () { renderDSSPMSTable(); };
+window.dssPMSApplySearch = function () { window._dssPmsPage = 1; renderDSSPMSTable(); };
 
 window.dssPMSPrintReport = function () {
     var rows = _dssPmsData.filter(function (x) { return x.urgency <= 4; });
