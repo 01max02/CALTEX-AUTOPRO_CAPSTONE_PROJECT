@@ -1371,6 +1371,8 @@ function renderInventoryTransactions(filter) {
                 .replace(/for maintenance SVC-\d+\s*[—\-]\s*/gi, 'for ')
                 .replace(/for maintenance SVC-\d+/gi, '')
                 .replace(/\s*SVC-\d+\s*/gi, '')
+                .replace(/for maintenance\s+[A-Za-z0-9]{15,}\s*[—\-]\s*/gi, 'for ')
+                .replace(/for maintenance\s+[A-Za-z0-9]{15,}/gi, '')
                 .replace(/^(Stock received|Initial stock received)\s*[—\-]\s*.+$/i, function(m, base) { return base; })
                 .trim();
             return d || '—';
@@ -1379,12 +1381,13 @@ function renderInventoryTransactions(filter) {
         // For OUT (issued) transactions, show the asset description as a sub-line
         var assetLine = '';
         if (type === 'OUT') {
-            // Pattern: "Issued to ASSET-001 — Toyota Hi-Ace" → extract "Toyota Hi-Ace"
-            var issuedMatch = description.match(/^Issued to\s+\S+\s*[—\-]\s*(.+)$/i);
-            if (issuedMatch && issuedMatch[1].trim()) {
-                assetLine = issuedMatch[1].trim();
-                // Shorten main description to just "Issued to ASSET-001"
-                description = description.replace(/\s*[—\-]\s*.+$/, '').trim();
+            // Pattern: "Issued to ASSET-001 — Toyota Hi-Ace" or "Issued for PLATE-123 — Desc"
+            // Only split on em-dash (—), NOT regular hyphen (-), to preserve full plate numbers
+            var issuedMatch = description.match(/^(Issued (?:to|for)\s+\S+)\s*—\s*(.+)$/i);
+            if (issuedMatch && issuedMatch[2].trim()) {
+                assetLine = issuedMatch[2].trim();
+                // Shorten main description to just "Issued to/for PLATE"
+                description = issuedMatch[1].trim();
             } else {
                 // Fallback: look up from window.assets by assetNum/plate stored on transaction
                 var assetDesc = t.assetDescription || t.assetDesc || '';
@@ -1507,11 +1510,26 @@ function renderInventoryTransactions(filter) {
         list.innerHTML = '<div class="table-row" style="text-align:center;color:#718096;padding:2rem;">No transactions found.</div>';
         return;
     }
+    var _TXN_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function _fmtTxnDate(d) {
+        if (!d) return '—';
+        // Already in "Jun 22, 2026" format
+        var m1 = d.match(/^([A-Za-z]{3,})\s+(\d+),?\s+(\d{4})/);
+        if (m1) return m1[1].slice(0,3) + ' ' + parseInt(m1[2]) + ', ' + m1[3];
+        // "6/22/2026" or "06/22/2026"
+        var m2 = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        if (m2) return _TXN_MONTHS[parseInt(m2[1])-1] + ' ' + parseInt(m2[2]) + ', ' + m2[3];
+        // "2026-06-22"
+        var m3 = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m3) return _TXN_MONTHS[parseInt(m3[2])-1] + ' ' + parseInt(m3[3]) + ', ' + m3[1];
+        return d;
+    }
+
     var rows = filtered.map(function(t) {
         var isIn = t.type === 'IN';
         var typeColor = isIn ? '#003087' : '#E8001C';
         var typeBg    = isIn ? '#ebf8ff' : '#fed7d7';
-        var dateStr = t.date ? t.date : '—';
+        var dateStr = _fmtTxnDate(t.date);
         return '<div class="table-row" style="grid-template-columns:120px 1fr 1fr 1.5fr 80px 80px 100px;">'
             + '<div>' + dateStr + '</div>'
             + '<div><strong>' + t.item + '</strong></div>'

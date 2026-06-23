@@ -29,6 +29,8 @@ class _AdminUsersState extends State<AdminUsers> {
   bool _searching = false;
   String _searchQuery = '';
 
+  String _roleFilter = 'all'; // 'all', 'admin', 'staff', 'customer'
+
   @override
   void dispose() {
     _searchCtrl.dispose();
@@ -223,30 +225,35 @@ class _AdminUsersState extends State<AdminUsers> {
           // Split pending vs active/inactive
           final nonPending = filtered.where((u) => u['status']?.toLowerCase() != 'pending').toList();
 
+          // Apply role filter
+          final afterRoleFilter = _roleFilter == 'all'
+              ? nonPending
+              : nonPending.where((u) => u['role'] == _roleFilter).toList();
+
           return Column(children: [
               // ── Stat chips ──
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                 child: Row(children: [
-                  _statChip('Total', '$total', Colors.blue),
+                  _statChip('Total', '$total', Colors.blue, 'all'),
                   const SizedBox(width: 8),
-                  _statChip('Admin', '$admins', _red),
+                  _statChip('Admin', '$admins', _red, 'admin'),
                   const SizedBox(width: 8),
-                  _statChip('Customer', '$customers', Colors.green),
+                  _statChip('Customer', '$customers', Colors.green, 'customer'),
                   const SizedBox(width: 8),
-                  _statChip('Staff', '$staff', const Color(0xFF003087)),
+                  _statChip('Staff', '$staff', const Color(0xFF003087), 'staff'),
                 ]),
               ),
               const SizedBox(height: 8),
               // ── User list ──
               Expanded(
-                child: nonPending.isEmpty
+                child: afterRoleFilter.isEmpty
                     ? const Center(child: Text('No users found.', style: TextStyle(color: Color(0xFF718096))))
                     : ListView.separated(
                         padding: const EdgeInsets.all(16),
-                        itemCount: nonPending.length,
+                        itemCount: afterRoleFilter.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) => _userCard(nonPending[i]),
+                        itemBuilder: (_, i) => _userCard(afterRoleFilter[i]),
                       ),
               ),
             ]);
@@ -255,25 +262,32 @@ class _AdminUsersState extends State<AdminUsers> {
     );
   }
 
-  Widget _statChip(String label, String value, Color color) {
+  Widget _statChip(String label, String value, Color color, String filter) {
+    final isActive = _roleFilter == filter;
     final icon = label == 'Total'
         ? Icons.people_outline
         : Icons.person_outline;
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
-        child: Column(children: [
-          Container(
-            width: 32, height: 32,
-            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-            child: Icon(icon, color: color, size: 16),
-          ),
-          const SizedBox(height: 6),
-          Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
-          Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
-        ]),
+      child: GestureDetector(
+        onTap: () => setState(() => _roleFilter = _roleFilter == filter ? 'all' : filter),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          decoration: BoxDecoration(
+            color: isActive ? color.withOpacity(0.08) : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: isActive ? color : Colors.transparent, width: 1.5),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
+          child: Column(children: [
+            Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+              child: Icon(icon, color: color, size: 16),
+            ),
+            const SizedBox(height: 6),
+            Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
+            Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
+          ]),
+        ),
       ),
     );
   }

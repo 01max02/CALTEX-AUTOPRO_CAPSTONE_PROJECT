@@ -1,60 +1,73 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'admin_vehicle_maintenance.dart';
 
-class AdminServiceBookings extends StatefulWidget {
+class AdminServiceBookings extends StatelessWidget {
   const AdminServiceBookings({super.key});
 
   @override
-  State<AdminServiceBookings> createState() => _AdminServiceBookingsState();
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Color(0xFFF7F8FA),
+      body: AdminServiceBookingsBody(),
+    );
+  }
 }
 
-class _AdminServiceBookingsState extends State<AdminServiceBookings> {
+/// Embeddable body — can be placed inside any parent (e.g. a tab in the dashboard).
+class AdminServiceBookingsBody extends StatefulWidget {
+  final String searchQuery;
+  const AdminServiceBookingsBody({super.key, this.searchQuery = ''});
+
+  @override
+  State<AdminServiceBookingsBody> createState() => _AdminServiceBookingsBodyState();
+}
+
+class _AdminServiceBookingsBodyState extends State<AdminServiceBookingsBody> {
   static const _red = Color(0xFFE8001C);
   static const _blue = Color(0xFF003087);
   static const _months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-  String _filter = 'Approved'; // Approved or Dismissed
+  String _filter = 'all'; // 'all', 'Pending', 'Approved', 'Rescheduled', 'Dismissed'
+  final _searchCtrl = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
-      appBar: AppBar(
-        backgroundColor: _red,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text('Service Bookings',
-            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-      ),
-      body: Column(children: [
-        // Tabs
-        Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Row(children: [
-            _tabBtn('Approved', 'Approved', const Color(0xFF38a169)),
-            _tabBtn('Cancelled', 'Dismissed', const Color(0xFF718096)),
-          ]),
-        ),
-        // List
-        Expanded(child: _buildList()),
-      ]),
-    );
+    return _buildList();
   }
 
-  Widget _tabBtn(String label, String filter, Color activeColor) {
-    final active = _filter == filter;
-    return Expanded(child: GestureDetector(
-      onTap: () => setState(() => _filter = filter),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: active ? activeColor : Colors.transparent, width: 2))),
-        child: Text(label, textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 12, fontWeight: active ? FontWeight.w700 : FontWeight.normal,
-            color: active ? activeColor : const Color(0xFF718096))),
+  Widget _statChip(String label, String value, Color color, IconData icon, String filter) {
+    final isActive = _filter == filter;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _filter = _filter == filter ? 'all' : filter),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+          decoration: BoxDecoration(
+            color: isActive ? color.withOpacity(0.08) : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: isActive ? color : Colors.transparent, width: 1.5),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
+          child: Column(children: [
+            Container(
+              width: 30, height: 30,
+              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+              child: Icon(icon, color: color, size: 15),
+            ),
+            const SizedBox(height: 5),
+            Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
+            Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
+          ]),
+        ),
       ),
-    ));
+    );
   }
 
   Widget _buildList() {
@@ -68,32 +81,81 @@ class _AdminServiceBookingsState extends State<AdminServiceBookings> {
           return const Center(child: CircularProgressIndicator());
         }
         final allDocs = snapshot.data?.docs ?? [];
-        final filtered = allDocs.where((d) {
+        final allBookings = allDocs.map((d) {
           final data = d.data() as Map<String, dynamic>;
-          return data['status'] == _filter;
+          return {...data, 'docId': d.id};
+        }).where((d) {
+          final status = d['status'] as String? ?? '';
+          return status == 'Approved' || status == 'Dismissed' || status == 'Pending';
         }).toList();
 
-        if (filtered.isEmpty) {
-          return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.event_busy_outlined, size: 48, color: Colors.grey.shade300),
-            const SizedBox(height: 12),
-            Text('No ${_filter == 'Approved' ? 'approved' : 'cancelled'} bookings.',
-                style: const TextStyle(color: Color(0xFF718096), fontSize: 13)),
-          ]));
-        }
+        // Compute counts
+        final approved = allBookings.where((d) => d['status'] == 'Approved' && !_isRescheduled(d)).length;
+        final rescheduled = allBookings.where((d) => d['status'] == 'Approved' && _isRescheduled(d)).length;
+        final cancelled = allBookings.where((d) => d['status'] == 'Dismissed').length;
+        final pending = allBookings.where((d) => d['status'] == 'Pending').length;
+        final total = allBookings.length;
 
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: filtered.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
-          itemBuilder: (_, i) {
-            final doc = filtered[i];
-            final data = doc.data() as Map<String, dynamic>;
-            return _buildCard(doc.id, data);
-          },
-        );
+        // Apply filter
+        final afterFilter = _filter == 'all'
+            ? allBookings
+            : _filter == 'Rescheduled'
+                ? allBookings.where((d) => d['status'] == 'Approved' && _isRescheduled(d)).toList()
+                : _filter == 'Approved'
+                    ? allBookings.where((d) => d['status'] == 'Approved' && !_isRescheduled(d)).toList()
+                    : allBookings.where((d) => d['status'] == _filter).toList();
+
+        // Apply search — use external searchQuery prop if provided, else internal
+        final activeQuery = widget.searchQuery.isNotEmpty ? widget.searchQuery : _searchQuery;
+        final filtered = activeQuery.isEmpty
+            ? afterFilter
+            : afterFilter.where((d) {
+                final plate = (d['plate'] as String? ?? '').toLowerCase();
+                final customer = (d['customerName'] as String? ?? '').toLowerCase();
+                final svcs = ((d['services'] as List?) ?? []).join(' ').toLowerCase();
+                final date = (d['preferredDate'] as String? ?? '').toLowerCase();
+                return plate.contains(activeQuery) ||
+                    customer.contains(activeQuery) ||
+                    svcs.contains(activeQuery) ||
+                    date.contains(activeQuery);
+              }).toList();
+
+        return Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Row(children: [
+              _statChip('Total', '$total', _blue, Icons.calendar_today_outlined, 'all'),
+              const SizedBox(width: 6),
+              _statChip('Approved', '$approved', const Color(0xFF38a169), Icons.check_circle_outline, 'Approved'),
+              const SizedBox(width: 6),
+              _statChip('Resched', '$rescheduled', _blue, Icons.history, 'Rescheduled'),
+              const SizedBox(width: 6),
+              _statChip('Cancelled', '$cancelled', _red, Icons.cancel_outlined, 'Dismissed'),
+            ]),
+          ),
+          Expanded(
+            child: filtered.isEmpty
+              ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.event_busy_outlined, size: 48, color: Colors.grey.shade300),
+                  const SizedBox(height: 12),
+                  const Text('No bookings found.', style: TextStyle(color: Color(0xFF718096), fontSize: 13)),
+                ]))
+              : ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (_, i) => _buildCard(filtered[i]['docId'] as String, filtered[i]),
+                ),
+          ),
+        ]);
       },
     );
+  }
+
+  bool _isRescheduled(Map<String, dynamic> data) {
+    final previousDate = data['previousDate'] as String? ?? '';
+    final preferredDate = data['preferredDate'] as String? ?? '';
+    return previousDate.isNotEmpty && previousDate != preferredDate;
   }
 
   Widget _buildCard(String docId, Map<String, dynamic> data) {
@@ -104,13 +166,18 @@ class _AdminServiceBookingsState extends State<AdminServiceBookings> {
     final preferredTime = data['preferredTime'] as String? ?? '—';
     final previousDate = data['previousDate'] as String? ?? '';
     final isRescheduled = previousDate.isNotEmpty && previousDate != preferredDate;
-    final isApproved = data['status'] == 'Approved';
+    final status = data['status'] as String? ?? '';
+    final isApproved = status == 'Approved';
+    final isPending = status == 'Pending';
 
     Color statusColor;
     String statusLabel;
     if (isRescheduled && isApproved) {
       statusColor = _blue;
       statusLabel = 'Rescheduled';
+    } else if (isPending) {
+      statusColor = const Color(0xFFd69e2e);
+      statusLabel = 'Pending';
     } else if (isApproved) {
       statusColor = const Color(0xFF38a169);
       statusLabel = 'Approved';
@@ -174,30 +241,64 @@ class _AdminServiceBookingsState extends State<AdminServiceBookings> {
             ]),
           ),
         ],
-        // Actions for Approved bookings
-        if (isApproved) ...[
+        // Actions for Pending bookings
+        if (isPending) ...[
           const SizedBox(height: 12),
           Row(children: [
-            Expanded(child: OutlinedButton(
-              onPressed: () => _showRescheduleModal(docId, data),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _blue,
-                side: const BorderSide(color: Color(0xFF003087)),
+            Expanded(child: ElevatedButton.icon(
+              onPressed: () => _approveBooking(docId, plate),
+              icon: const Icon(Icons.check, size: 14),
+              label: const Text('Approve', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF38a169), foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: const Text('Reschedule', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
             )),
             const SizedBox(width: 10),
-            Expanded(child: OutlinedButton(
+            Expanded(child: OutlinedButton.icon(
               onPressed: () => _dismissBooking(docId, plate),
+              icon: const Icon(Icons.close, size: 14, color: Colors.red),
+              label: const Text('Dismiss', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.red)),
               style: OutlinedButton.styleFrom(
-                foregroundColor: _red,
                 side: const BorderSide(color: Color(0xFFE8001C)),
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: const Text('Cancel', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            )),
+          ]),
+        ],
+        // Actions for Approved bookings
+        if (isApproved) ...[
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: ElevatedButton.icon(
+              onPressed: () => _startService(docId, data),
+              icon: const Icon(Icons.play_arrow, size: 14),
+              label: const Text('Start Service', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF38a169), foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            )),
+            const SizedBox(width: 8),
+            SizedBox(width: 38, height: 38, child: IconButton(
+              onPressed: () => _showRescheduleModal(docId, data),
+              icon: const Icon(Icons.history, size: 18, color: Color(0xFF003087)),
+              style: IconButton.styleFrom(
+                backgroundColor: const Color(0xFFEBF8FF),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            )),
+            const SizedBox(width: 8),
+            SizedBox(width: 38, height: 38, child: IconButton(
+              onPressed: () => _dismissBooking(docId, plate),
+              icon: const Icon(Icons.close, size: 18, color: Colors.red),
+              style: IconButton.styleFrom(
+                backgroundColor: const Color(0xFFFFF5F5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
             )),
           ]),
         ],
@@ -214,6 +315,55 @@ class _AdminServiceBookingsState extends State<AdminServiceBookings> {
     final d = int.tryParse(parts[2]);
     if (y == null || m == null || d == null) return dateStr;
     return '${_months[m - 1]} $d, $y';
+  }
+
+  void _approveBooking(String docId, String plate) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Approve Booking'),
+        content: Text('Approve service booking for $plate?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await FirebaseFirestore.instance.collection('service_bookings').doc(docId).update({'status': 'Approved'});
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('Booking approved for $plate'),
+                  backgroundColor: const Color(0xFF38a169),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ));
+              }
+            },
+            child: const Text('Approve', style: TextStyle(color: Color(0xFF38a169))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _startService(String docId, Map<String, dynamic> data) async {
+    final plate = data['plate'] as String? ?? '';
+    final services = data['services'] as List? ?? [];
+    final preferredDate = data['preferredDate'] as String? ?? '';
+    
+    // Update booking status to "In Progress"
+    await FirebaseFirestore.instance.collection('service_bookings').doc(docId).update({'status': 'In Progress'});
+    
+    if (mounted) {
+      // Navigate to Vehicle Maintenance with booking data auto-filled
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => AdminVehicleMaintenance(bookingData: {
+          'bookingId': docId,
+          'plate': plate,
+          'services': services,
+          'preferredDate': preferredDate,
+        }),
+      ));
+    }
   }
 
   void _dismissBooking(String docId, String plate) {

@@ -526,7 +526,7 @@ function svcPlateSelect(plate) {
     var odoInput = document.getElementById('svcOdometer');
     var curOdo = parseInt(String(v.odometer || v.odo || '0').replace(/[^0-9]/g, '')) || 0;
     if (odoInput && curOdo > 0) {
-      odoInput.value = curOdo;
+      // Show note with current odometer but don't auto-fill — let user input manually
       svcOdometerInput(odoInput);
     }
   } else {
@@ -875,6 +875,74 @@ function svcOpenAddModal() {
 
 function openAddServiceModal() { svcOpenAddModal(); }
 
+// Auto-open service modal from booking (navigated from Service Bookings page)
+(function() {
+  var hash = window.location.hash;
+  if (hash.startsWith('#startService=')) {
+    var raw = decodeURIComponent(hash.substring('#startService='.length));
+    var params = {};
+    try { params = JSON.parse(raw); } catch(e) { return; }
+    // Wait for data to load then open modal pre-filled
+    setTimeout(function() {
+      _svcEnsureDataThen(function() {
+      _svcEnsureVehiclesThen(function() {
+        _svcLoadMechanics();
+        window._svcEditingId = null;
+        _svcEditingId = null;
+        document.getElementById('svcModalTitle').textContent = 'New Service (from Booking)';
+        document.getElementById('svcSubmitBtn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save';
+        document.getElementById('svcMechanic').value = '';
+        document.getElementById('svcSvcRows').innerHTML = '';
+        document.getElementById('svcMatRows').innerHTML = '';
+        document.getElementById('svcTotalDisplay').textContent = '₱0.00';
+        document.getElementById('svcOdometer').value = '';
+        var _odoNote = document.getElementById('svcOdometerNote');
+        if (_odoNote) _odoNote.style.display = 'none';
+        _svcSelectedIssues = [];
+        svcRenderIssueTiles();
+
+        // Auto-fill plate
+        var plate = params.plate || '';
+        if (plate) {
+          document.getElementById('svcPlateInput').value = plate;
+          document.getElementById('svcPlateSelect').value = plate;
+          svcPlateSelect(plate);
+        }
+
+        // Auto-fill date from preferred date
+        var dateStr = params.date || '';
+        if (dateStr) {
+          document.getElementById('svcDate').value = dateStr;
+          svcFormatDateDisplay(dateStr);
+        } else {
+          document.getElementById('svcDate').value = _svcTodayISO();
+          document.getElementById('svcDateDisplay').value = _svcTodayFormatted();
+        }
+
+        // Auto-fill service rows from booking services
+        var services = params.services || [];
+        if (services.length > 0) {
+          services.forEach(function(svcName) {
+            svcAddSvcRow(svcName);
+          });
+        } else {
+          svcAddSvcRow();
+        }
+        svcAddMatRow();
+
+        // Store booking ID so we can reference it on save if needed
+        window._svcFromBookingId = params.bookingId || '';
+
+        document.getElementById('svcAddModal').classList.add('active');
+
+        // Clean hash
+        history.replaceState(null, '', window.location.pathname);
+      }); // _svcEnsureVehiclesThen
+      }); // _svcEnsureDataThen
+    }, 1200);
+  }
+})();
+
 // Close plate suggestions on outside click
 document.addEventListener('click', function(e) {
   if (!e.target.closest('#svcPlateInput') && !e.target.closest('#svcPlateSuggestions')) {
@@ -1061,12 +1129,19 @@ window._svcViewDetails = function(docId) {
           if (s.odometer) {
             vUpdate.lastSvcOdo = parseInt(s.odometer) || 0;
             vUpdate.lastServiceOdometer = parseInt(s.odometer) || 0;
+            vUpdate.odometer = parseInt(s.odometer) || 0;
+            vUpdate.odo = parseInt(s.odometer) + ' km';
           }
           db.collection('vehicles').where('plate', '==', plate).limit(1).get().then(function(vSnap) {
             if (!vSnap.empty) vSnap.docs[0].ref.update(vUpdate);
           });
           closeModal('svcDetailsModal');
           showToast('Service marked as Completed!', 'success');
+
+          // Also update linked service booking to "Completed" if exists
+          if (s.bookingId) {
+            db.collection('service_bookings').doc(s.bookingId).update({ status: 'Completed' }).catch(function() {});
+          }
         });
       }).catch(function(err) { showToast('Error: ' + err.message, 'error'); });
     };
@@ -1113,15 +1188,12 @@ function svcSave() {
 
   var db = firebase.firestore();
 
-  // Update vehicle's current odometer on save (if higher than stored)
+  // Update vehicle's current odometer on save (always update to the entered value)
   function _updateVehicleOdometer() {
     db.collection('vehicles').where('plate', '==', plate).limit(1).get().then(function(vSnap) {
       if (!vSnap.empty) {
         var vDoc = vSnap.docs[0];
-        var curOdo = parseInt(String(vDoc.data().odometer || vDoc.data().odo || '0').replace(/[^0-9]/g, '')) || 0;
-        if (odometer > curOdo) {
-          vDoc.ref.update({ odometer: odometer, odo: odometer + ' km' });
-        }
+        vDoc.ref.update({ odometer: odometer, odo: odometer + ' km' });
       }
     }).catch(function() {});
   }
@@ -1138,6 +1210,10 @@ function svcSave() {
   } else {
     data.status = 'Pending';
     data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+    // Link to service booking if created from one
+    if (window._svcFromBookingId) {
+      data.bookingId = window._svcFromBookingId;
+    }
     // Check for existing Pending/Ongoing service for this plate
     db.collection('maintenance')
       .where('plate', '==', plate)

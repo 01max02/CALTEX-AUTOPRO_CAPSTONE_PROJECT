@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'admin_vehicle_maintenance.dart';
+import 'admin_service_bookings.dart';
+import 'admin_issuances.dart';
 
+/// Full-screen Vehicles hub — has its own AppBar + sub-tabs.
+/// No bottom nav bar visible. Launched via Navigator.push from the dashboard.
 class AdminVehiclesList extends StatefulWidget {
   const AdminVehiclesList({super.key});
 
@@ -11,12 +16,112 @@ class AdminVehiclesList extends StatefulWidget {
 
 class _AdminVehiclesListState extends State<AdminVehiclesList> {
   static const _red = Color(0xFFE8001C);
+
+  // 0=Vehicles, 1=Maintenance, 2=Bookings, 3=Issuances
+  int _tab = 0;
+  bool _searching = false;
+  final _searchCtrl = TextEditingController();
+
+  static const _tabs = ['Vehicles', 'Maintenance', 'Bookings', 'Issuances'];
+  static const _tabTitles = ['Vehicle List', 'Maintenance', 'Bookings', 'Issuances'];
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F8FA),
+      appBar: AppBar(
+        backgroundColor: _red,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: _searching
+            ? TextField(
+                controller: _searchCtrl,
+                autofocus: true,
+                onChanged: (_) => setState(() {}),
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  hintText: 'Search...',
+                  hintStyle: TextStyle(color: Colors.white54),
+                  border: InputBorder.none,
+                ),
+              )
+            : Text(_tabTitles[_tab],
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            icon: Icon(_searching ? Icons.close : Icons.search, color: Colors.white),
+            onPressed: () => setState(() {
+              _searching = !_searching;
+              if (!_searching) _searchCtrl.clear();
+            }),
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Container(
+            color: Colors.white,
+            child: Row(
+              children: List.generate(_tabs.length, (i) {
+                final active = _tab == i;
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() { _tab = i; _searching = false; _searchCtrl.clear(); }),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: active ? _red : Colors.transparent, width: 2),
+                        ),
+                      ),
+                      child: Text(_tabs[i],
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: active ? FontWeight.w700 : FontWeight.normal,
+                          color: active ? _red : const Color(0xFF718096),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ),
+      ),
+      body: IndexedStack(
+        index: _tab,
+        children: [
+          AdminVehiclesListBody(searchQuery: _tab == 0 && _searching ? _searchCtrl.text.toLowerCase() : ''),
+          AdminVehicleMaintenanceBody(searchQuery: _tab == 1 && _searching ? _searchCtrl.text.toLowerCase() : ''),
+          AdminServiceBookingsBody(searchQuery: _tab == 2 && _searching ? _searchCtrl.text.toLowerCase() : ''),
+          AdminIssuancesBody(searchQuery: _tab == 3 && _searching ? _searchCtrl.text.toLowerCase() : ''),
+        ],
+      ),
+    );
+  }
+}
+
+/// Embeddable body — can be placed inside any parent (e.g. a tab in the dashboard).
+class AdminVehiclesListBody extends StatefulWidget {
+  final String searchQuery;
+  const AdminVehiclesListBody({super.key, this.searchQuery = ''});
+
+  @override
+  State<AdminVehiclesListBody> createState() => _AdminVehiclesListBodyState();
+}
+
+class _AdminVehiclesListBodyState extends State<AdminVehiclesListBody> {
+  static const _red = Color(0xFFE8001C);
   static const _col = 'vehicles';
 
-  final _searchCtrl = TextEditingController();
-  bool _searching = false;
-  String _searchQuery = '';
-
+  String _typeFilter = 'all'; // 'all', 'car', 'truck'
   List<String>? _cachedTypes;
 
   @override
@@ -42,12 +147,6 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
 
   CollectionReference get _db => FirebaseFirestore.instance.collection(_col);
 
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
-
   Future<List<String>> _fetchVehicleTypes() async {
     if (_cachedTypes != null) return _cachedTypes!;
     final snap = await FirebaseFirestore.instance
@@ -70,128 +169,113 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddVehicleModal(),
-        backgroundColor: _red,
-        child: const Icon(Icons.add, color: Colors.white, size: 28),
-      ),
-      appBar: AppBar(
-        backgroundColor: _red,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: _searching
-            ? TextField(
-                controller: _searchCtrl,
-                autofocus: true,
-                onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  hintText: 'Search vehicles...',
-                  hintStyle: TextStyle(color: Colors.white54),
-                  border: InputBorder.none,
-                ),
-              )
-            : const Text('Vehicle List',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-        actions: [
-          IconButton(
-            icon: Icon(_searching ? Icons.close : Icons.search, color: Colors.white),
-            onPressed: () => setState(() {
-              _searching = !_searching;
-              if (!_searching) { _searchCtrl.clear(); _searchQuery = ''; }
-            }),
-          ),
-        ],
-      ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: _db.snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 40),
-              const SizedBox(height: 8),
-              Text('Error: ${snapshot.error}', textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red, fontSize: 12)),
-            ]));
-          }
+    return StreamBuilder<QuerySnapshot>(
+      stream: _db.snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 40),
+            const SizedBox(height: 8),
+            Text('Error: ${snapshot.error}', textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.red, fontSize: 12)),
+          ]));
+        }
 
-          final docs = snapshot.data?.docs ?? [];
-          final vehicles = docs.map((d) {
-            final data = d.data() as Map<String, dynamic>;
-            return {
-              'id': d.id,
-              'plate': data['plate'] as String? ?? '',
-              'desc': data['desc'] as String? ?? '',
-              'owner': data['owner'] as String? ?? '',
-              'odo': data['odo'] as String? ?? '',
-              'type': data['type'] as String? ?? '',
-              'status': data['status'] as String? ?? 'Active',
-              'lastSvcOdo': data['lastSvcOdo'] as String? ?? '',
-              'lastSvcDate': data['lastSvcDate'] as String? ?? '',
-              'svcFreq': data['svcFreq'] as String? ?? '',
-            };
-          }).toList()
-            ..sort((a, b) => (a['plate'] as String).compareTo(b['plate'] as String));
+        final docs = snapshot.data?.docs ?? [];
+        final vehicles = docs.map((d) {
+          final data = d.data() as Map<String, dynamic>;
+          return {
+            'id': d.id,
+            'plate': data['plate']?.toString() ?? '',
+            'desc': data['desc']?.toString() ?? '',
+            'owner': data['owner']?.toString() ?? '',
+            'odo': data['odo']?.toString() ?? '',
+            'type': data['type']?.toString() ?? '',
+            'status': data['status']?.toString() ?? 'Active',
+            'lastSvcOdo': data['lastSvcOdo']?.toString() ?? '',
+            'lastSvcDate': data['lastSvcDate']?.toString() ?? '',
+            'svcFreq': data['svcFreq']?.toString() ?? '',
+          };
+        }).toList()
+          ..sort((a, b) => (a['plate'] as String).compareTo(b['plate'] as String));
 
-          final filtered = _searchQuery.isEmpty
-              ? vehicles
-              : vehicles.where((v) =>
-                  v['plate']!.toLowerCase().contains(_searchQuery) ||
-                  v['desc']!.toLowerCase().contains(_searchQuery) ||
-                  v['owner']!.toLowerCase().contains(_searchQuery)).toList();
+        final filtered = widget.searchQuery.isEmpty
+            ? vehicles
+            : vehicles.where((v) =>
+                v['plate']!.toLowerCase().contains(widget.searchQuery) ||
+                v['desc']!.toLowerCase().contains(widget.searchQuery) ||
+                v['owner']!.toLowerCase().contains(widget.searchQuery)).toList();
 
-          final good = vehicles.where((v) => v['status'] == 'Active').length;
-          final maint = vehicles.where((v) => v['status'] == 'Under Maintenance').length;
-          final overdue = vehicles.where((v) => v['status'] == 'Overdue').length;
+        final afterTypeFilter = _typeFilter == 'all'
+            ? filtered
+            : filtered.where((v) => (v['type'] ?? '').toLowerCase() == _typeFilter).toList();
 
-          return Column(children: [
+        return Stack(children: [
+          Column(children: [
+            // ── Stat chips ──
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Row(children: [
-                _statChip('Total', '${vehicles.length}', const Color(0xFF2563EB), Icons.directions_car_outlined),
+                _statChip('Total', '${vehicles.length}', const Color(0xFF2563EB), Icons.directions_car_outlined, 'all'),
                 const SizedBox(width: 8),
-                _statChip('Cars', '${vehicles.where((v) => (v['type'] ?? '').toLowerCase() == 'car').length}', const Color(0xFF003087), Icons.directions_car_outlined),
+                _statChip('Cars', '${vehicles.where((v) => (v['type'] ?? '').toLowerCase() == 'car').length}', const Color(0xFF003087), Icons.directions_car_outlined, 'car'),
                 const SizedBox(width: 8),
-                _statChip('Trucks', '${vehicles.where((v) => (v['type'] ?? '').toLowerCase() == 'truck').length}', _red, Icons.local_shipping_outlined),
+                _statChip('Trucks', '${vehicles.where((v) => (v['type'] ?? '').toLowerCase() == 'truck').length}', _red, Icons.local_shipping_outlined, 'truck'),
               ]),
             ),
+            // ── List ──
             Expanded(
-              child: filtered.isEmpty
+              child: afterTypeFilter.isEmpty
                 ? const Center(child: Text('No vehicles found.', style: TextStyle(color: Color(0xFF718096))))
                 : ListView.separated(
                     padding: const EdgeInsets.all(16),
-                    itemCount: filtered.length,
+                    itemCount: afterTypeFilter.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (_, i) => _vehicleCard(filtered[i]),
+                    itemBuilder: (_, i) => _vehicleCard(afterTypeFilter[i]),
                   ),
             ),
-          ]);
-        },
-      ),
+          ]),
+          // ── FAB ──
+          Positioned(
+            bottom: 16,
+            right: 16,
+            child: FloatingActionButton(
+              onPressed: () => _showAddVehicleModal(),
+              backgroundColor: _red,
+              child: const Icon(Icons.add, color: Colors.white, size: 28),
+            ),
+          ),
+        ]);
+      },
     );
   }
 
-  Widget _statChip(String label, String value, Color color, IconData icon) {
+  Widget _statChip(String label, String value, Color color, IconData icon, String filter) {
+    final isActive = _typeFilter == filter;
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
-        child: Column(children: [
-          Container(
-            width: 32, height: 32,
-            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-            child: Icon(icon, color: color, size: 16),
-          ),
-          const SizedBox(height: 6),
-          Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
-          Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
-        ]),
+      child: GestureDetector(
+        onTap: () => setState(() => _typeFilter = _typeFilter == filter ? 'all' : filter),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          decoration: BoxDecoration(
+            color: isActive ? color.withOpacity(0.08) : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: isActive ? color : Colors.transparent, width: 1.5),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
+          child: Column(children: [
+            Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+              child: Icon(icon, color: color, size: 16),
+            ),
+            const SizedBox(height: 6),
+            Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+            Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
+          ]),
+        ),
       ),
     );
   }
@@ -211,23 +295,18 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
             Text('${v['owner']} • ${v['odo']}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
           ])),
           const Icon(Icons.chevron_right, size: 20, color: Color(0xFFa0aec0)),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF718096)),
-            onSelected: (val) {
-              if (val == 'edit') _showAddVehicleModal(vehicle: v);
-              if (val == 'delete') _confirmDelete(v);
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text('Edit')])),
-              PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: Colors.red), SizedBox(width: 8), Text('Delete', style: TextStyle(color: Colors.red))])),
-            ],
-          ),
         ]),
       ),
     );
   }
 
   void _showVehicleDetails(Map<String, String> v) {
+    final lastSvcOdo = int.tryParse((v['lastSvcOdo'] ?? '').replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    final currentOdo = int.tryParse((v['odo'] ?? '').replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    final kmSince = (currentOdo > 0 && lastSvcOdo > 0 && currentOdo >= lastSvcOdo)
+        ? '${(currentOdo - lastSvcOdo).toString()} km'
+        : '—';
+
     showModalBottomSheet(
       context: context, isScrollControlled: true,
       backgroundColor: Colors.white,
@@ -256,17 +335,28 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 _detailRow('Plate Number', v['plate']!),
                 _detailRow('Description', v['desc']!),
-                _detailRow('Owner', v['owner']!),
-                _detailRow('Odometer', v['odo']!),
                 _detailRow('Vehicle Type', v['type']!),
-                _detailRow('Last Service Date', v['lastSvcDate']!),
-                _detailRow('Next PMS Due', _calcNextPms(v['lastSvcDate']!, v['svcFreq']!)),
+                _detailRow('Owner', v['owner']!),
+                _detailRow('Current Odometer', v['odo']!.isNotEmpty ? v['odo']! : '—'),
+                _detailRow('Last Service Date', _fmtDate(v['lastSvcDate']!)),
+                _detailRow('Last Service Odometer', lastSvcOdo > 0 ? '$lastSvcOdo km' : '—'),
+                _detailRow('KM Since Last Service', kmSince),
+                _detailRow('Next PMS Due', _fmtDate(_calcNextPms(v['lastSvcDate']!, v['svcFreq']!))),
+                _detailRow('Service Frequency', v['svcFreq']!.isNotEmpty ? '${v['svcFreq']} month(s)' : '—'),
                 const SizedBox(height: 16),
                 SizedBox(width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: () { Navigator.pop(context); _showAddVehicleModal(vehicle: v); },
                     icon: const Icon(Icons.edit_outlined, size: 16),
                     label: const Text('Edit Vehicle'),
+                  )),
+                const SizedBox(height: 10),
+                SizedBox(width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () { Navigator.pop(context); _confirmDelete(v); },
+                    icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                    label: const Text('Delete Vehicle', style: TextStyle(color: Colors.red)),
+                    style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)),
                   )),
               ]),
             ),
@@ -298,6 +388,15 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
     if (date == null || months == null) return '—';
     final next = DateTime(date.year, date.month + months, date.day);
     return '${next.year}-${next.month.toString().padLeft(2, '0')}-${next.day.toString().padLeft(2, '0')}';
+  }
+
+  static const _monthsFull = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  String _fmtDate(String dateStr) {
+    if (dateStr.isEmpty || dateStr == '—') return '—';
+    final d = DateTime.tryParse(dateStr);
+    if (d == null) return dateStr;
+    return '${_monthsFull[d.month - 1]} ${d.day}, ${d.year}';
   }
 
   Widget _detailRow(String label, String value) {
@@ -377,6 +476,14 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
                   const SizedBox(height: 10),
                   TextField(controller: svcFreqCtrl, keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: 'Service Frequency (months)', border: OutlineInputBorder(), hintText: 'e.g. 3')),
+                  const SizedBox(height: 10),
+                  // ── Just Serviced Toggle ──
+                  _JustServicedSection(
+                    lastSvcDateCtrl: lastSvcDateCtrl,
+                    lastSvcOdoCtrl: lastSvcOdoCtrl,
+                    initialChecked: isEdit && (lastSvcDateCtrl.text.isNotEmpty || lastSvcOdoCtrl.text.isNotEmpty),
+                    readOnly: isEdit,
+                  ),
                   const SizedBox(height: 20),
                   Row(children: [
                     Expanded(child: OutlinedButton(
@@ -622,6 +729,97 @@ class _OwnerAutocompleteState extends State<_OwnerAutocomplete> {
         ),
       ),
     );
+  }
+}
+
+/// "Vehicle was just serviced" section — shows last service date + odometer fields
+class _JustServicedSection extends StatefulWidget {
+  final TextEditingController lastSvcDateCtrl;
+  final TextEditingController lastSvcOdoCtrl;
+  final bool initialChecked;
+  final bool readOnly;
+  const _JustServicedSection({required this.lastSvcDateCtrl, required this.lastSvcOdoCtrl, this.initialChecked = false, this.readOnly = false});
+
+  @override
+  State<_JustServicedSection> createState() => _JustServicedSectionState();
+}
+
+class _JustServicedSectionState extends State<_JustServicedSection> {
+  late bool _checked;
+
+  @override
+  void initState() {
+    super.initState();
+    _checked = widget.initialChecked;
+    if (_checked && widget.lastSvcDateCtrl.text.isEmpty) {
+      final now = DateTime.now();
+      widget.lastSvcDateCtrl.text = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      GestureDetector(
+        onTap: widget.readOnly ? null : () {
+          setState(() => _checked = !_checked);
+          if (_checked && widget.lastSvcDateCtrl.text.isEmpty) {
+            final now = DateTime.now();
+            widget.lastSvcDateCtrl.text = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+          }
+          if (!_checked) {
+            widget.lastSvcDateCtrl.clear();
+            widget.lastSvcOdoCtrl.clear();
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: _checked ? const Color(0xFFF0FFF4) : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: _checked ? const Color(0xFF9ae6b4) : const Color(0xFFe2e8f0), width: 1.5),
+          ),
+          child: Row(children: [
+            Icon(_checked ? Icons.check_box : Icons.check_box_outline_blank,
+              color: _checked ? const Color(0xFF16a34a) : const Color(0xFFcbd5e0), size: 20),
+            const SizedBox(width: 10),
+            const Expanded(child: Text('🔧 Vehicle was just serviced',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF16a34a)))),
+          ]),
+        ),
+      ),
+      if (_checked) ...[
+        const SizedBox(height: 10),
+        TextField(
+          controller: widget.lastSvcDateCtrl,
+          readOnly: true,
+          enabled: !widget.readOnly,
+          decoration: InputDecoration(labelText: 'Last Service Date', border: const OutlineInputBorder(), suffixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
+            filled: widget.readOnly, fillColor: widget.readOnly ? const Color(0xFFF7F8FA) : null),
+          onTap: widget.readOnly ? null : () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: DateTime.tryParse(widget.lastSvcDateCtrl.text) ?? DateTime.now(),
+              firstDate: DateTime(2020),
+              lastDate: DateTime.now(),
+              builder: (c, child) => Theme(data: Theme.of(c).copyWith(colorScheme: const ColorScheme.light(primary: Color(0xFFE8001C))), child: child!),
+            );
+            if (picked != null) {
+              widget.lastSvcDateCtrl.text = '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+            }
+          },
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: widget.lastSvcOdoCtrl,
+          keyboardType: TextInputType.number,
+          readOnly: widget.readOnly,
+          enabled: !widget.readOnly,
+          decoration: InputDecoration(labelText: 'Last Service Odometer (km)', border: const OutlineInputBorder(), suffixText: 'km',
+            filled: widget.readOnly, fillColor: widget.readOnly ? const Color(0xFFF7F8FA) : null),
+        ),
+      ],
+    ]);
   }
 }
 

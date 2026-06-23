@@ -77,6 +77,9 @@ class _CustomerCalendarFloatingState extends State<CustomerCalendarFloating>
       final date   = data['preferredDate'] as String? ?? '';
       final status = data['status']        as String? ?? 'Pending';
       if (date.isEmpty) continue;
+      // Skip completed or in-progress bookings
+      final statusLower = status.toLowerCase();
+      if (statusLower == 'completed' || statusLower == 'in progress' || statusLower == 'dismissed') continue;
       final due = DateTime.tryParse(date);
       if (due == null) continue;
       final daysUntil =

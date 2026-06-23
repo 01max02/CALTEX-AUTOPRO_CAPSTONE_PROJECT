@@ -395,7 +395,13 @@ class _CustomerMyBookingsState extends State<CustomerMyBookings> {
             );
           }
 
-          final docs = snapshot.data?.docs ?? [];
+          final allDocs = snapshot.data?.docs ?? [];
+
+          // Exclude "In Progress" and "Completed" bookings
+          final docs = allDocs.where((doc) {
+            final status = ((doc.data() as Map<String, dynamic>)['status'] as String? ?? '').toLowerCase();
+            return status != 'in progress' && status != 'completed';
+          }).toList();
 
           docs.sort((a, b) {
             final aTime = (a.data()

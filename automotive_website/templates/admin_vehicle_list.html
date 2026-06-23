@@ -148,11 +148,11 @@
             <div id="lastServiceSection" style="display:none;grid-template-columns:1fr 1fr;gap:0.75rem;">
                 <div class="form-group" style="margin:0;">
                     <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Last Service Date</label>
-                    <input type="date" name="lastServiceDate" id="lastServiceDateInput" readonly style="margin-top:0.3rem;background:#f7fafc;cursor:not-allowed;color:#718096;">
+                    <input type="date" name="lastServiceDate" id="lastServiceDateInput" style="margin-top:0.3rem;">
                 </div>
                 <div class="form-group" style="margin:0;">
                     <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Last Service Odometer (km)</label>
-                    <input type="number" name="lastServiceOdometer" id="lastServiceOdoInput" readonly placeholder="e.g. 44500" min="0" style="margin-top:0.3rem;background:#f7fafc;cursor:not-allowed;color:#718096;">
+                    <input type="number" name="lastServiceOdometer" id="lastServiceOdoInput" placeholder="e.g. 44500" min="0" style="margin-top:0.3rem;">
                 </div>
             </div>
             <div class="form-group" style="margin:0;">
@@ -228,12 +228,10 @@
     var section = document.getElementById('lastServiceSection');
     var lsdInput = document.getElementById('lastServiceDateInput');
     var lsoInput = document.getElementById('lastServiceOdoInput');
-    var odoInput = document.getElementById('currentOdometerInput');
     if (cb.checked) {
       if (section) section.style.display = 'grid';
       var todayStr = new Date().toISOString().split('T')[0];
       if (lsdInput) { lsdInput.value = todayStr; lsdInput.max = todayStr; }
-      if (lsoInput && odoInput && odoInput.value) lsoInput.value = odoInput.value;
     } else {
       if (section) section.style.display = 'none';
       if (lsdInput) lsdInput.value = '';
@@ -242,12 +240,7 @@
   }
 
   function onOdometerInput() {
-    var cb = document.getElementById('justServicedCheck');
-    if (cb && cb.checked) {
-      var lsoInput = document.getElementById('lastServiceOdoInput');
-      var odoInput = document.getElementById('currentOdometerInput');
-      if (lsoInput && odoInput) lsoInput.value = odoInput.value;
-    }
+    // No longer auto-sync to last service odometer — they are independent fields
   }
 
   // ── Vehicle modal functions ──
@@ -326,9 +319,14 @@
     var lsdInput = document.getElementById('lastServiceDateInput');
     if (lsdInput) lsdInput.max = todayStr;
     var cb = document.getElementById('justServicedCheck');
-    if (cb) cb.checked = false;
+    if (cb) { cb.checked = false; cb.disabled = false; }
     var section = document.getElementById('lastServiceSection');
     if (section) section.style.display = 'none';
+    // Reset last service fields to editable state for Add mode
+    var lsdInput = document.getElementById('lastServiceDateInput');
+    var lsoInput = document.getElementById('lastServiceOdoInput');
+    if (lsdInput) { lsdInput.readOnly = false; lsdInput.style.background = ''; lsdInput.style.color = ''; lsdInput.style.cursor = ''; }
+    if (lsoInput) { lsoInput.readOnly = false; lsoInput.style.background = ''; lsoInput.style.color = ''; lsoInput.style.cursor = ''; }
     populateVehicleTypeDropdown('assetTypeSelect', '');
     document.getElementById('addAssetModal').classList.add('active');
   }
@@ -357,8 +355,13 @@
     var hasServiceData = !!(asset.lastServiceDate || asset.lastSvcDate || asset.lastSvcOdo || asset.lastServiceOdometer);
     var cb = document.getElementById('justServicedCheck');
     var section = document.getElementById('lastServiceSection');
-    if (cb) cb.checked = hasServiceData;
+    var lsdInput = document.getElementById('lastServiceDateInput');
+    var lsoInput = document.getElementById('lastServiceOdoInput');
+    if (cb) { cb.checked = hasServiceData; cb.disabled = true; }
     if (section) section.style.display = hasServiceData ? 'grid' : 'none';
+    // Make last service fields read-only when editing
+    if (lsdInput) { lsdInput.readOnly = true; lsdInput.style.background = '#f7fafc'; lsdInput.style.color = '#718096'; lsdInput.style.cursor = 'not-allowed'; }
+    if (lsoInput) { lsoInput.readOnly = true; lsoInput.style.background = '#f7fafc'; lsoInput.style.color = '#718096'; lsoInput.style.cursor = 'not-allowed'; }
     populateVehicleTypeDropdown('assetTypeSelect', asset.type || '');
     document.getElementById('addAssetModal').classList.add('active');
   }

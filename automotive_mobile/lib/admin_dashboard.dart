@@ -15,6 +15,8 @@ import 'admin_rag_ai.dart';
 import 'admin_domain_management.dart';
 import 'barcode_scanner_screen.dart';
 import 'admin_service_bookings.dart';
+import 'admin_issuances.dart';
+import 'admin_bottomnavbar.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -29,6 +31,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   String _initials = '?';
   String? _photoUrl;
   String _userName = '';
+  String _txnFilter = 'all'; // 'all', 'IN', 'OUT'
 
   @override
   void initState() {
@@ -74,11 +77,24 @@ class _AdminDashboardState extends State<AdminDashboard> {
         elevation: 6,
         child: const Icon(Icons.question_answer_rounded, color: Colors.white, size: 24),
       ),
-      bottomNavigationBar: _buildBottomNav(),
+      bottomNavigationBar: AdminBottomNavBar(
+        currentIndex: _currentIndex,
+        onTap: (i) {
+          if (i == 2) {
+            // Vehicles → full-screen with own AppBar + tabs
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminVehiclesList()));
+          } else {
+            setState(() => _currentIndex = i);
+          }
+        },
+      ),
     );
   }
 
   PreferredSizeWidget _buildTopBar() {
+    // When on Vehicles tab, show the sub-tab name as the title
+    final displayTitle = _userName.isNotEmpty ? _userName : 'Admin Portal';
+
     return AppBar(
       backgroundColor: _red,
       elevation: 0,
@@ -94,7 +110,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 : null),
         ),
         const SizedBox(width: 10),
-        Expanded(child: Text(_userName.isNotEmpty ? _userName : 'Admin Portal',
+        Expanded(child: Text(displayTitle,
           style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
           overflow: TextOverflow.ellipsis)),
       ]),
@@ -115,248 +131,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
     switch (_currentIndex) {
       case 0: return _buildDashboard();
       case 1: return _buildInventory();
-      case 2: return _buildVehicles();
       case 3: return _buildMore();
       default: return _buildDashboard();
     }
-  }
-
-  Widget _buildBottomNav() {
-    return Container(
-      decoration: const BoxDecoration(color: Colors.white,
-        boxShadow: [BoxShadow(color: Color(0x18000000), blurRadius: 12, offset: Offset(0, -2))]),
-      child: SafeArea(
-        child: SizedBox(
-          height: 64,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // 2 left + center placeholder + 2 right
-              Row(children: [
-                _navBtn(0), // Dashboard
-                _navBtn(1), // Inventory
-                const Expanded(child: SizedBox()), // center placeholder
-                _navBtn(2), // Vehicles
-                _navBtn(3), // More
-              ]),
-              // Center floating scanner button
-              Positioned(
-                top: -20, left: 0, right: 0,
-                child: Center(
-                  child: GestureDetector(
-                    onTap: () => _showScanModal(),
-                    child: Container(
-                      width: 56, height: 56,
-                      decoration: BoxDecoration(
-                        color: _red,
-                        shape: BoxShape.circle,
-                        boxShadow: [BoxShadow(color: _red.withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4))],
-                        border: Border.all(color: Colors.white, width: 3),
-                      ),
-                      child: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 26),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _navBtn(int i) {
-    final active = _currentIndex == i;
-    return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _currentIndex = i),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(_navItems[i].icon, color: active ? _red : const Color(0xFF718096), size: 22),
-          const SizedBox(height: 2),
-          Text(_navItems[i].label, style: TextStyle(fontSize: 9,
-            color: active ? _red : const Color(0xFF718096),
-            fontWeight: active ? FontWeight.w600 : FontWeight.normal)),
-        ]),
-      ),
-    );
-  }
-
-  void _showScanModal() async {
-    final result = await Navigator.push<String>(context,
-      MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()));
-    if (result == null || !mounted) return;
-
-    // Look up in item_master by barcode, qr, or num
-    QuerySnapshot snap = await FirebaseFirestore.instance
-        .collection('item_master').where('barcode', isEqualTo: result).limit(1).get();
-    if (snap.docs.isEmpty) {
-      snap = await FirebaseFirestore.instance
-          .collection('item_master').where('qr', isEqualTo: result).limit(1).get();
-    }
-    if (snap.docs.isEmpty) {
-      snap = await FirebaseFirestore.instance
-          .collection('item_master').where('num', isEqualTo: result.toUpperCase()).limit(1).get();
-    }
-
-    if (!mounted) return;
-
-    if (snap.docs.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No item found for: $result'), backgroundColor: Colors.red));
-      return;
-    }
-
-    final data = snap.docs.first.data() as Map<String, dynamic>;
-    final item = {
-      'id': snap.docs.first.id,
-      'num': data['num'] as String? ?? '',
-      'name': data['name'] as String? ?? '',
-      'group': data['group'] as String? ?? '',
-      'uom': data['uom'] as String? ?? '',
-      'cost': data['cost'] as String? ?? '',
-      'type': data['type'] as String? ?? '',
-    };
-
-    // Check if already in stock
-    final stockSnap = await FirebaseFirestore.instance
-        .collection('stock_inventory').where('num', isEqualTo: item['num']).limit(1).get();
-    final inStock = stockSnap.docs.isNotEmpty;
-    final stockData = inStock ? stockSnap.docs.first.data() : null;
-
-    if (!mounted) return;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: SingleChildScrollView(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            // ── Colored header ──
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-              decoration: BoxDecoration(
-                color: inStock
-                  ? const Color(0xFF003087)
-                  : item['type'] == 'Service' ? const Color(0xFF003087) : _red,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-              ),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Container(
-                    width: 48, height: 48,
-                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(14)),
-                    child: Icon(
-                      item['type'] == 'Service' ? Icons.build_outlined : Icons.inventory_2_outlined,
-                      color: Colors.white, size: 24),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(item['name']!,
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
-                    Text('${item['num']} • ${item['group']}',
-                      style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                  ])),
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 32, height: 32,
-                      decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(8)),
-                      child: const Icon(Icons.close, color: Colors.white, size: 18)),
-                  ),
-                ]),
-                const SizedBox(height: 16),
-                // Chips row
-                Row(children: [
-                  _scanBadge(Icons.straighten_outlined, item['uom']!),
-                  const SizedBox(width: 8),
-                  _scanBadge(Icons.attach_money, item['cost']!),
-                  const SizedBox(width: 8),
-                  _scanBadge(
-                    item['type'] == 'Service' ? Icons.build_outlined : Icons.category_outlined,
-                    item['type']!),
-                ]),
-              ]),
-            ),
-            // ── Body ──
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                // Stock status banner
-                if (inStock && stockData != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.green.shade200)),
-                    child: Row(children: [
-                      Container(width: 36, height: 36,
-                        decoration: BoxDecoration(color: Colors.green.shade100, borderRadius: BorderRadius.circular(10)),
-                        child: const Icon(Icons.check_circle_outline, color: Colors.green, size: 20)),
-                      const SizedBox(width: 12),
-                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        const Text('In Stock', style: TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.w700)),
-                        Text('Current quantity: ${stockData['stock']} ${stockData['uom']}',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1a202c))),
-                      ])),
-                    ]),
-                  ),
-                  const SizedBox(height: 16),
-                ] else if (!inStock) ...[
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.orange.shade200)),
-                    child: Row(children: [
-                      Container(width: 36, height: 36,
-                        decoration: BoxDecoration(color: Colors.orange.shade100, borderRadius: BorderRadius.circular(10)),
-                        child: const Icon(Icons.warning_amber_outlined, color: Colors.orange, size: 20)),
-                      const SizedBox(width: 12),
-                      const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('Not in Stock', style: TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.w700)),
-                        Text('This item has no stock record yet.', style: TextStyle(fontSize: 12, color: Color(0xFF718096))),
-                      ])),
-                    ]),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                // Action
-                if (inStock)
-                  _ScanReceiveWidget(
-                    stockId: stockSnap.docs.first.id,
-                    stockData: stockData!,
-                    uom: item['uom']!,
-                    onDone: () => Navigator.pop(context),
-                  ),
-                if (!inStock)
-                  _ScanAddStockWidget(
-                    itemData: item,
-                    onDone: () => Navigator.pop(context),
-                  ),
-              ]),
-            ),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  Widget _scanBadge(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(20)),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 12, color: Colors.white),
-        const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
-      ]),
-    );
   }
 
   // ── DASHBOARD ──
@@ -615,7 +392,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           value: isLoading ? '…' : '$totalVehicles',
                           icon: Icons.directions_car_outlined,
                           color: const Color(0xFF003087),
-                          onTap: () => setState(() { _currentIndex = 2; _vehTab = 0; }),
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminVehiclesList())),
                         ),
                         _clickableStatCard(
                           label: 'Due for PMS',
@@ -636,7 +413,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           value: isLoading ? '…' : '$servicesToday',
                           icon: Icons.check_circle_outline,
                           color: const Color(0xFF2c7a7b),
-                          onTap: () => setState(() { _currentIndex = 2; _vehTab = 2; }),
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminVehiclesList())),
                         ),
                       ],
                     ),
@@ -1173,7 +950,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                       _sectionTitle("Today's Services"),
                       TextButton(
-                        onPressed: () => setState(() { _currentIndex = 2; _vehTab = 2; }),
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminVehiclesList())),
                         child: const Text('See all', style: TextStyle(fontSize: 12, color: Color(0xFF003087)))),
                     ]),
                     const SizedBox(height: 8),
@@ -1670,6 +1447,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               'item': name,
                               'desc': 'Issued for maintenance ${s['id']} — $plate',
                               'type': 'OUT', 'qty': '-$qty', 'date': dateStr, 'by': byName,
+                              'commodityGroup': iData['group'] ?? '',
+                              'assetDesc': s['desc'] ?? '',
+                              'plate': plate,
                               'createdAt': FieldValue.serverTimestamp(),
                             });
                           }
@@ -1884,12 +1664,26 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _buildTransactions() {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('transactions')
-          .orderBy('createdAt', descending: true)
-          .limit(50)
-          .snapshots(),
-      builder: (context, snapshot) {
+      stream: FirebaseFirestore.instance.collection('vehicles').snapshots(),
+      builder: (context, vehSnapshot) {
+        // Build plate -> description map from vehicles
+        final vehMap = <String, String>{};
+        if (vehSnapshot.hasData) {
+          for (final d in vehSnapshot.data!.docs) {
+            final data = d.data() as Map<String, dynamic>;
+            final plate = (data['plate'] as String? ?? '').toUpperCase();
+            final desc = data['desc'] as String? ?? '';
+            if (plate.isNotEmpty) vehMap[plate] = desc;
+          }
+        }
+
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('transactions')
+              .orderBy('createdAt', descending: true)
+              .limit(50)
+              .snapshots(),
+          builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -1910,34 +1704,73 @@ class _AdminDashboardState extends State<AdminDashboard> {
             'type': data['type'] as String? ?? 'IN',
             'qty': data['qty'] as String? ?? '0',
             'by': data['by'] as String? ?? '—',
+            'commodityGroup': data['commodityGroup'] as String? ?? '',
+            'assetDesc': data['assetDesc'] as String? ?? '',
+            'plate': data['plate'] as String? ?? '',
           };
         }).toList();
 
         final totalIn = txns.where((t) => t['type'] == 'IN').length;
         final totalOut = txns.where((t) => t['type'] == 'OUT').length;
 
+        final filteredTxns = _txnFilter == 'all'
+            ? txns
+            : txns.where((t) => t['type'] == _txnFilter).toList();
+
         return Column(children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Row(children: [
-              _txnStat('Total', '${txns.length}', Icons.swap_horiz, Colors.blue),
+              _txnStat('Total', '${txns.length}', Icons.swap_horiz, Colors.blue, 'all'),
               const SizedBox(width: 8),
-              _txnStat('Stock In', '$totalIn', Icons.download_outlined, const Color(0xFF003087)),
+              _txnStat('Stock In', '$totalIn', Icons.download_outlined, const Color(0xFF003087), 'IN'),
               const SizedBox(width: 8),
-              _txnStat('Stock Out', '$totalOut', Icons.upload_outlined, _red),
+              _txnStat('Stock Out', '$totalOut', Icons.upload_outlined, _red, 'OUT'),
             ]),
           ),
           Expanded(
-            child: txns.isEmpty
+            child: filteredTxns.isEmpty
               ? const Center(child: Text('No transactions yet.', style: TextStyle(color: Color(0xFF718096))))
               : ListView.separated(
                   padding: const EdgeInsets.all(16),
-                  itemCount: txns.length,
+                  itemCount: filteredTxns.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (_, i) {
-                    final t = txns[i];
+                    final t = filteredTxns[i];
                     final isIn = t['type'] == 'IN';
                     final typeColor = isIn ? const Color(0xFF003087) : _red;
+                    final cleanDesc = _cleanTxnDesc(t['desc'] ?? '—');
+                    // Get vehicle description: prefer stored assetDesc, then lookup by plate from vehMap
+                    String vehicleDesc = t['assetDesc'] ?? '';
+                    if (vehicleDesc.isEmpty) {
+                      final storedPlate = (t['plate'] ?? '').toUpperCase();
+                      if (storedPlate.isNotEmpty) {
+                        vehicleDesc = vehMap[storedPlate] ?? '';
+                      }
+                      if (vehicleDesc.isEmpty) {
+                        // Try extracting plate from desc
+                        final rawDesc = t['desc'] ?? '';
+                        String extractedPlate = '';
+                        // Pattern 1: after em-dash "— PLATE"
+                        final emMatch = RegExp(r'—\s*([A-Z0-9][\w\-]*)').firstMatch(rawDesc);
+                        if (emMatch != null) {
+                          extractedPlate = emMatch.group(1)?.toUpperCase() ?? '';
+                        }
+                        // Pattern 2: "Issued for/to PLATE" (skip "maintenance")
+                        if (extractedPlate.isEmpty) {
+                          final issMatch = RegExp(r'Issued (?:to|for)\s+([A-Z0-9][\w\-]*)', caseSensitive: false).firstMatch(rawDesc);
+                          if (issMatch != null) {
+                            final candidate = issMatch.group(1) ?? '';
+                            if (candidate.toLowerCase() != 'maintenance') {
+                              extractedPlate = candidate.toUpperCase();
+                            }
+                          }
+                        }
+                        if (extractedPlate.isNotEmpty) {
+                          vehicleDesc = vehMap[extractedPlate] ?? '';
+                        }
+                      }
+                    }
                     return GestureDetector(
                       onTap: () => _showTxnDetails(t),
                       child: Container(
@@ -1947,10 +1780,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         child: Row(children: [
                           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Text(t['item']!, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                            Text(
-                              (t['desc']!).replaceAll(RegExp(r'for maintenance SVC-\d+ [—\-] '), 'for ').replaceAll(RegExp(r'for maintenance SVC-\d+'), ''),
+                            if ((t['commodityGroup'] ?? '').isNotEmpty)
+                              Text(t['commodityGroup']!, style: const TextStyle(fontSize: 10, color: Color(0xFF4a5568))),
+                            Text(cleanDesc,
                               style: const TextStyle(fontSize: 11, color: Color(0xFF718096)),
                               maxLines: 1, overflow: TextOverflow.ellipsis),
+                            if (vehicleDesc.isNotEmpty)
+                              Text(vehicleDesc, style: const TextStyle(fontSize: 10, color: Color(0xFF718096), fontStyle: FontStyle.italic)),
                             const SizedBox(height: 2),
                             Row(children: [
                               const Icon(Icons.calendar_today_outlined, size: 10, color: Color(0xFF718096)),
@@ -1980,6 +1816,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
           ),
         ]);
+          },
+        );
       },
     );
   }
@@ -1987,50 +1825,130 @@ class _AdminDashboardState extends State<AdminDashboard> {
   void _showTxnDetails(Map<String, String> t) {
     final isIn = t['type'] == 'IN';
     final typeColor = isIn ? const Color(0xFF003087) : _red;
+
+    // Async lookup commodity group and vehicle desc from item_master/vehicles if not stored
+    String commodityGroup = t['commodityGroup'] ?? '';
+    String assetDesc = t['assetDesc'] ?? '';
+    String plate = t['plate'] ?? '';
+
+    Future<(String, String)> _lookupDetails() async {
+      String cg = commodityGroup;
+      String vDesc = assetDesc;
+      final itemName = t['item'] ?? '';
+
+      // Lookup commodity group from item_master if missing
+      if (cg.isEmpty && itemName.isNotEmpty && itemName != '—') {
+        final snap = await FirebaseFirestore.instance
+            .collection('item_master').where('name', isEqualTo: itemName).limit(1).get();
+        if (snap.docs.isNotEmpty) {
+          cg = (snap.docs.first.data()['group'] as String?) ?? '—';
+        }
+      }
+      if (cg.isEmpty) cg = '—';
+
+      // Lookup vehicle description from vehicles collection if missing
+      if (vDesc.isEmpty && plate.isNotEmpty) {
+        final vSnap = await FirebaseFirestore.instance
+            .collection('vehicles').where('plate', isEqualTo: plate).limit(1).get();
+        if (vSnap.docs.isNotEmpty) {
+          vDesc = (vSnap.docs.first.data()['desc'] as String?) ?? '';
+        }
+      }
+      // If still empty, try extracting plate from desc field
+      if (vDesc.isEmpty) {
+        final desc = t['desc'] ?? '';
+        String extractedPlate = '';
+        
+        // Pattern 1: "Issued for maintenance SVC-001 — PLATE" (plate is after em-dash)
+        final emDashMatch = RegExp(r'—\s*([A-Z0-9][\w\-]*)').firstMatch(desc);
+        if (emDashMatch != null) {
+          extractedPlate = emDashMatch.group(1) ?? '';
+        }
+        // Pattern 2: "Issued for PLATE" or "Issued to PLATE" (no maintenance ID)
+        if (extractedPlate.isEmpty) {
+          final issuedMatch = RegExp(r'Issued (?:to|for)\s+([A-Z0-9][\w\-]*)', caseSensitive: false).firstMatch(desc);
+          if (issuedMatch != null) {
+            final candidate = issuedMatch.group(1) ?? '';
+            // Skip if it matched "maintenance" 
+            if (candidate.toLowerCase() != 'maintenance') {
+              extractedPlate = candidate;
+            }
+          }
+        }
+        
+        if (extractedPlate.isNotEmpty) {
+          final vSnap = await FirebaseFirestore.instance
+              .collection('vehicles').where('plate', isEqualTo: extractedPlate.toUpperCase()).limit(1).get();
+          if (vSnap.docs.isNotEmpty) {
+            vDesc = (vSnap.docs.first.data()['desc'] as String?) ?? '';
+          }
+        }
+      }
+
+      return (cg, vDesc);
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => DraggableScrollableSheet(
-        expand: false, initialChildSize: 0.5, maxChildSize: 0.75,
-        builder: (_, ctrl) => SingleChildScrollView(
-          controller: ctrl,
-          child: Column(children: [
-            // Red/Green header
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-              decoration: BoxDecoration(
-                color: typeColor,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(t['item']!, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                  Text(isIn ? 'Stock In' : 'Stock Out', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                ])),
-                GestureDetector(onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.close, color: Colors.white)),
+      builder: (_) => FutureBuilder<(String, String)>(
+        future: _lookupDetails(),
+        builder: (context, detailsSnap) {
+          final cg = detailsSnap.data?.$1 ?? (commodityGroup.isNotEmpty ? commodityGroup : '—');
+          final vehDesc = detailsSnap.data?.$2 ?? assetDesc;
+          return DraggableScrollableSheet(
+            expand: false, initialChildSize: 0.55, maxChildSize: 0.75,
+            builder: (_, ctrl) => SingleChildScrollView(
+              controller: ctrl,
+              child: Column(children: [
+                // Red/Blue header
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                  decoration: BoxDecoration(
+                    color: typeColor,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                  ),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(t['item']!, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text(cg != '—' ? cg : (isIn ? 'Stock In (Received)' : 'Stock Out (Issued)'), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                    ])),
+                    GestureDetector(onTap: () => Navigator.pop(context),
+                      child: const Icon(Icons.close, color: Colors.white)),
+                  ]),
+                ),
+                // Details
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _txnDetailRow('Item', t['item'] ?? '—'),
+                    _txnDetailRow('Commodity Group', cg),
+                    // Description with vehicle desc below (same as website)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const SizedBox(width: 120, child: Text('Description', style: TextStyle(fontSize: 12, color: Color(0xFF718096), fontWeight: FontWeight.w500))),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(_cleanTxnDesc(t['desc'] ?? '—'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1a202c))),
+                          if (vehDesc.isNotEmpty)
+                            Text(vehDesc, style: const TextStyle(fontSize: 12, color: Color(0xFF718096), fontStyle: FontStyle.italic)),
+                        ])),
+                      ]),
+                    ),
+                    _txnDetailRow('Type', isIn ? 'Stock In (Received)' : 'Stock Out (Issued)'),
+                    _txnDetailRow('Quantity', t['qty'] ?? '—'),
+                    _txnDetailRow('Date', _fmtDateLong(t['date'] ?? '—')),
+                    _txnDetailRow('Performed By', t['by'] ?? '—'),
+                    const SizedBox(height: 8),
+                  ]),
+                ),
               ]),
             ),
-            // Details
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                _txnDetailRow('Item', t['item'] ?? '—'),
-                _txnDetailRow('Description', (t['desc'] ?? '—')
-                  .replaceAll(RegExp(r'for maintenance SVC-\d+ [—\-] '), 'for ')
-                  .replaceAll(RegExp(r'for maintenance SVC-\d+'), '')),
-                _txnDetailRow('Type', isIn ? 'Stock In (IN)' : 'Stock Out (OUT)'),
-                _txnDetailRow('Quantity', t['qty'] ?? '—'),
-                _txnDetailRow('Date', _fmtDateLong(t['date'] ?? '—')),
-                _txnDetailRow('Performed By', t['by'] ?? '—'),
-                const SizedBox(height: 8),
-              ]),
-            ),
-          ]),
-        ),
+          );
+        },
       ),
     );
   }
@@ -2045,448 +1963,34 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _txnStat(String label, String value, IconData icon, Color color) {
+  Widget _txnStat(String label, String value, IconData icon, Color color, String filter) {
+    final isActive = _txnFilter == filter;
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
-        child: Column(children: [
-          Icon(icon, color: color, size: 18),
-          const SizedBox(height: 4),
-          Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
-          Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
-        ]),
+      child: GestureDetector(
+        onTap: () => setState(() => _txnFilter = _txnFilter == filter ? 'all' : filter),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+          decoration: BoxDecoration(
+            color: isActive ? color.withOpacity(0.08) : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: isActive ? color : Colors.transparent, width: 1.5),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
+          child: Column(children: [
+            Container(
+              width: 30, height: 30,
+              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+              child: Icon(icon, color: color, size: 15),
+            ),
+            const SizedBox(height: 4),
+            Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
+            Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
+          ]),
+        ),
       ),
     );
   }
 
   // ── VEHICLES ──
-  int _vehTab = 1; // 0=Vehicle List, 1=Issuances, 2=Maintenance, 3=Bookings
-
-  Widget _buildVehicles() {
-    return Stack(children: [
-      Column(children: [
-        Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Row(children: [
-            _vehTabBtn('Vehicles', 0),
-            _vehTabBtn('Issuances', 1),
-            _vehTabBtn('Maintenance', 2),
-            _vehTabBtn('Bookings', 3),
-          ]),
-        ),
-        Expanded(child: _vehTab == 0
-            ? _buildVehicleListRedirect()
-            : _vehTab == 1
-                ? _buildIssuances()
-                : _vehTab == 2
-                    ? _buildMaintenanceRedirect()
-                    : _buildBookingsRedirect()),
-      ]),
-    ]);
-  }
-
-  Widget _vehTabBtn(String label, int idx) {
-    final active = _vehTab == idx;
-    return Expanded(child: GestureDetector(
-      onTap: () => setState(() => _vehTab = idx),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: active ? _red : Colors.transparent, width: 2))),
-        child: Text(label, textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 12, fontWeight: active ? FontWeight.w700 : FontWeight.normal,
-            color: active ? _red : const Color(0xFF718096))),
-      ),
-    ));
-  }
-
-  bool _vehNavigating = false;
-
-  Widget _buildVehicleListRedirect() {
-    if (!_vehNavigating) {
-      _vehNavigating = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        await Navigator.push(context,
-          MaterialPageRoute(builder: (_) => const AdminVehiclesList()));
-        if (mounted) setState(() { _vehTab = 1; _vehNavigating = false; });
-      });
-    }
-    return const SizedBox.shrink();
-  }
-
-  Widget _buildMaintenanceRedirect() {
-    if (!_vehNavigating) {
-      _vehNavigating = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        await Navigator.push(context,
-          MaterialPageRoute(builder: (_) => const AdminVehicleMaintenance()));
-        if (mounted) setState(() { _vehTab = 1; _vehNavigating = false; });
-      });
-    }
-    return const SizedBox.shrink();
-  }
-
-  Widget _buildBookingsRedirect() {
-    if (!_vehNavigating) {
-      _vehNavigating = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        await Navigator.push(context,
-          MaterialPageRoute(builder: (_) => const AdminServiceBookings()));
-        if (mounted) setState(() { _vehTab = 1; _vehNavigating = false; });
-      });
-    }
-    return const SizedBox.shrink();
-  }
-
-  Widget _buildVehicleList() {
-    final vehicles = [
-      {'plate': 'ABC-1234', 'desc': 'Isuzu Truck NQR 2021', 'owner': 'Juan Dela Cruz', 'odo': '45,000 km', 'status': 'Good'},
-      {'plate': 'XYZ-5678', 'desc': 'Toyota Hilux 2020', 'owner': 'Pedro Santos', 'odo': '32,000 km', 'status': 'Maintenance'},
-      {'plate': 'DEF-9012', 'desc': 'Mitsubishi L300 2019', 'owner': 'Jose Reyes', 'odo': '78,000 km', 'status': 'Overdue'},
-    ];
-    return Column(children: [
-      _searchBar('Search vehicles...', () {}),
-      Expanded(child: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: vehicles.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (_, i) {
-          final v = vehicles[i];
-          final statusColor = v['status'] == 'Good' ? Colors.green : v['status'] == 'Maintenance' ? Colors.orange : _red;
-          return Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
-            child: Row(children: [
-              Container(width: 44, height: 44,
-                decoration: BoxDecoration(color: const Color(0xFFF0F4FF), borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.local_shipping_outlined, color: _red, size: 22)),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(v['plate']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                Text(v['desc']!, style: const TextStyle(fontSize: 12, color: Color(0xFF4a5568))),
-                Text('${v['owner']} • ${v['odo']}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
-              ])),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                child: Text(v['status']!, style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w600)),
-              ),
-            ]),
-          );
-        },
-      )),
-    ]);
-  }
-
-  Widget _buildMaintenance() {
-    final services = [
-      {'id': 'SVC-001', 'plate': 'ABC-1234', 'mechanic': 'Juan', 'date': 'Mar 28', 'cost': '₱2,500', 'status': 'Completed'},
-      {'id': 'SVC-002', 'plate': 'XYZ-5678', 'mechanic': 'Pedro', 'date': 'Mar 28', 'cost': '₱1,800', 'status': 'Ongoing'},
-      {'id': 'SVC-003', 'plate': 'DEF-9012', 'mechanic': 'Jose', 'date': 'Mar 27', 'cost': '₱3,200', 'status': 'Pending'},
-    ];
-    return Column(children: [
-      Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(children: [
-          _miniStatInv('Total', '12', Colors.blue),
-          const SizedBox(width: 8),
-          _miniStatInv('Ongoing', '3', Colors.orange),
-          const SizedBox(width: 8),
-          _miniStatInv('Completed', '9', Colors.green),
-        ]),
-      ),
-      Expanded(child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        itemCount: services.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (_, i) {
-          final s = services[i];
-          final statusColor = s['status'] == 'Completed' ? Colors.green : s['status'] == 'Ongoing' ? Colors.orange : const Color(0xFF718096);
-          return Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
-            child: Row(children: [
-              Container(width: 4, height: 52, decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(4))),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('${s['id']} • ${s['plate']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                Text('Mechanic: ${s['mechanic']} • ${s['date']}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
-              ])),
-              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text(s['cost']!, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                  child: Text(s['status']!, style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w600)),
-                ),
-              ]),
-            ]),
-          );
-        },
-      )),
-    ]);
-  }
-
-  Widget _buildIssuances() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('issuances')
-          .orderBy('createdAt', descending: true)
-          .limit(50)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(child: Text('Error loading issuances: ${snapshot.error}'));
-        }
-        
-        final docs = snapshot.data?.docs ?? [];
-        debugPrint('Issuances loaded: ${docs.length} records');
-        
-        final issuances = docs.map((d) {
-          final data = d.data() as Map<String, dynamic>;
-          return {
-            'docId': d.id,
-            'id': data['id'] as String? ?? d.id,
-            'date': data['date'] as String? ?? '—',
-            'plate': data['plate'] as String? ?? '—',
-            'assetDesc': data['assetDesc'] as String? ?? '—',
-            'itemNum': data['itemNum'] as String? ?? '—',
-            'itemName': data['itemName'] as String? ?? '—',
-            'itemType': data['itemType'] as String? ?? 'Material',
-            'commodityGroup': data['commodityGroup'] as String? ?? '—',
-            'uom': data['uom'] as String? ?? '—',
-            'qty': data['qty'] as String? ?? '0',
-            'unitCost': data['unitCost'] as String? ?? '0',
-            'subtotal': data['subtotal'] as String? ?? '0',
-            'createdBy': data['createdBy'] as String? ?? '—',
-          };
-        }).toList();
-
-        final totalServices = issuances.where((i) => i['itemType'] == 'Service').length;
-        final totalMaterials = issuances.where((i) => i['itemType'] == 'Material').length;
-
-        return Column(children: [
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
-              const SizedBox(height: 4),
-              Row(children: [
-                _issStatChip('Total', '${issuances.length}', Colors.blue),
-                const SizedBox(width: 8),
-                _issStatChip('Services', '$totalServices', const Color(0xFF003087)),
-                const SizedBox(width: 8),
-                _issStatChip('Materials', '$totalMaterials', _red),
-              ]),
-            ]),
-          ),
-          Expanded(
-            child: issuances.isEmpty
-              ? const Center(child: Text('No issuances yet.', style: TextStyle(color: Color(0xFF718096))))
-              : ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: issuances.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) {
-                    final iss = issuances[i];
-                    final isService = iss['itemType'] == 'Service';
-                    final typeColor = isService ? const Color(0xFF003087) : _red;
-                    final typeBg = isService ? const Color(0xFFebf8ff) : const Color(0xFFfff5f5);
-                    final subtotal = double.tryParse(iss['subtotal']!) ?? 0;
-                    return GestureDetector(
-                      onTap: () => _showIssuanceDetails(iss),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
-                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
-                        child: Row(children: [
-                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(iss['plate']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            Text('${iss['itemName']} • ${iss['commodityGroup']}', style: const TextStyle(fontSize: 11, color: Color(0xFF4a5568))),
-                            Row(children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(color: typeBg, borderRadius: BorderRadius.circular(20)),
-                                child: Text(iss['itemType']!, style: TextStyle(fontSize: 9, color: typeColor, fontWeight: FontWeight.w700)),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(_fmtDateLong(iss['date']!), style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
-                            ]),
-                          ])),
-                          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                            Text('₱${subtotal.toStringAsFixed(2)}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1a202c))),
-                            Text('${iss['qty']} ${iss['uom']}',
-                              style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
-                          ]),
-                          const SizedBox(width: 6),
-                          const Icon(Icons.chevron_right, size: 18, color: Color(0xFFa0aec0)),
-                        ]),
-                      ),
-                    );
-                  },
-                ),
-          ),
-        ]);
-      },
-    );
-  }
-
-  Widget _issStatChip(String label, String value, Color color) {
-    final icon = label == 'Total'
-        ? Icons.receipt_long_outlined
-        : label == 'Services'
-            ? Icons.build_outlined
-            : Icons.inventory_2_outlined;
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(color: const Color(0xFFF7F8FA), borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withOpacity(0.2))),
-        child: Column(children: [
-          Container(
-            width: 30, height: 30,
-            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-            child: Icon(icon, color: color, size: 15),
-          ),
-          const SizedBox(height: 5),
-          Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
-          Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
-        ]),
-      ),
-    );
-  }
-
-  void _showIssuanceDetails(Map<String, String> iss) {
-    final isService = iss['itemType'] == 'Service';
-    final typeColor = isService ? const Color(0xFF003087) : _red;
-    final subtotal = double.tryParse(iss['subtotal']!) ?? 0;
-    final unitCost = double.tryParse(iss['unitCost']!) ?? 0;
-
-    showModalBottomSheet(
-      context: context, isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => DraggableScrollableSheet(
-        expand: false, initialChildSize: 0.75, maxChildSize: 0.92,
-        builder: (_, ctrl) => SingleChildScrollView(
-          controller: ctrl,
-          child: Column(children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-              decoration: BoxDecoration(
-                color: isService ? const Color(0xFF003087) : _red,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(iss['itemName']!, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
-                  Text(iss['itemNum']!, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                ])),
-                GestureDetector(onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.close, color: Colors.white)),
-              ]),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFe2e8f0))),
-                  child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Text('Subtotal', style: TextStyle(color: Color(0xFF718096), fontSize: 10, fontWeight: FontWeight.w700)),
-                      Text('₱${subtotal.toStringAsFixed(2)}',
-                        style: const TextStyle(color: Color(0xFF1a202c), fontSize: 22, fontWeight: FontWeight.w800)),
-                    ]),
-                    Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                      const Text('Date', style: TextStyle(color: Color(0xFF718096), fontSize: 10, fontWeight: FontWeight.w700)),
-                      Text(_fmtDateLong(iss['date']!), style: const TextStyle(color: Color(0xFF1a202c), fontSize: 13, fontWeight: FontWeight.w700)),
-                    ]),
-                  ]),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity, padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFe2e8f0))),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('📋  ITEM DETAILS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF718096), letterSpacing: 0.5)),
-                    const SizedBox(height: 12),
-                    _issGridRow('Item Name', iss['itemName']!),
-                    _issGridRow('Item Type', iss['itemType']!),
-                    _issGridRow('Commodity Group', iss['commodityGroup']!),
-                    _issGridRow('UOM', iss['uom']!),
-                    _issGridRow('Vehicle Plate', iss['plate']!),
-                    _issGridRow('Vehicle', iss['assetDesc']!),
-                    _issGridRow('Issued By', iss['createdBy']!),
-                  ]),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity, padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFe2e8f0))),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('💰  COST BREAKDOWN', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF718096), letterSpacing: 0.5)),
-                    const SizedBox(height: 12),
-                    Row(children: [
-                      Expanded(child: _costBox('Quantity', '${iss['qty']}', iss['uom']!, const Color(0xFFF7F8FA), const Color(0xFF1a202c))),
-                      const SizedBox(width: 8),
-                      Expanded(child: _costBox('Unit Cost', '₱${unitCost.toStringAsFixed(2)}', '', const Color(0xFFebf8ff), const Color(0xFF2b6cb0))),
-                      const SizedBox(width: 8),
-                      Expanded(child: _costBox('Subtotal', '₱${subtotal.toStringAsFixed(2)}', '', const Color(0xFFfff5f5), const Color(0xFFE8001C))),
-                    ]),
-                  ]),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-                    child: const Text('Close'),
-                  )),
-              ]),
-            ),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  Widget _issGridRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        SizedBox(width: 120, child: Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF718096), fontWeight: FontWeight.w600))),
-        Expanded(child: Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1a202c)))),
-      ]),
-    );
-  }
-
-  Widget _costBox(String label, String value, String sub, Color bg, Color valueColor) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
-      child: Column(children: [
-        Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096), fontWeight: FontWeight.w700), textAlign: TextAlign.center),
-        const SizedBox(height: 4),
-        Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: valueColor), textAlign: TextAlign.center),
-        if (sub.isNotEmpty) Text(sub, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
-      ]),
-    );
-  }
-
   // ── MORE ──
   Widget _buildMore() {
     final items = [
@@ -2788,295 +2292,37 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
     return dateStr;
   }
-}
 
-class _ScanAddStockWidget extends StatefulWidget {
-  final Map<String, String> itemData;
-  final VoidCallback onDone;
+  /// Cleans transaction descriptions — same logic as the website
+  /// Returns (cleanedDesc, assetLine) where assetLine is the vehicle description
+  (String, String) _cleanTxnDescWithAsset(String raw) {
+    if (raw.isEmpty || raw == '—') return (raw, '');
+    var d = raw
+        .replaceAll(RegExp(r'for maintenance SVC-\d+\s*[—\-]\s*', caseSensitive: false), 'for ')
+        .replaceAll(RegExp(r'for maintenance SVC-\d+', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\s*SVC-\d+\s*', caseSensitive: false), '')
+        .replaceAll(RegExp(r'for maintenance\s+[A-Za-z0-9]{15,}\s*[—\-]\s*', caseSensitive: false), 'for ')
+        .replaceAll(RegExp(r'for maintenance\s+[A-Za-z0-9]{15,}', caseSensitive: false), '')
+        .replaceAllMapped(
+            RegExp(r'^(Stock received|Initial stock received)\s*[—\-]\s*.+$', caseSensitive: false),
+            (m) => m.group(1) ?? '')
+        .trim();
+    if (d.isEmpty) d = '—';
 
-  const _ScanAddStockWidget({required this.itemData, required this.onDone});
+    // Extract vehicle description from "Issued to/for PLATE — Vehicle Desc"
+    String assetLine = '';
+    final issuedMatch = RegExp(r'^(Issued (?:to|for)\s+\S+)\s*—\s*(.+)$', caseSensitive: false).firstMatch(d);
+    if (issuedMatch != null && (issuedMatch.group(2) ?? '').trim().isNotEmpty) {
+      assetLine = issuedMatch.group(2)!.trim();
+      d = issuedMatch.group(1)!.trim();
+    }
 
-  @override
-  State<_ScanAddStockWidget> createState() => _ScanAddStockWidgetState();
-}
-
-class _ScanAddStockWidgetState extends State<_ScanAddStockWidget> {
-  static const _red = Color(0xFFE8001C);
-  final _stockCtrl = TextEditingController();
-  final _minCtrl = TextEditingController();
-  final _maxCtrl = TextEditingController();
-  final _reorderCtrl = TextEditingController();
-  bool _loading = false;
-
-  @override
-  void dispose() {
-    _stockCtrl.dispose();
-    _minCtrl.dispose();
-    _maxCtrl.dispose();
-    _reorderCtrl.dispose();
-    super.dispose();
+    return (d, assetLine);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final uom = widget.itemData['uom'] ?? '';
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F4FF),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFbee3f8)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Row(children: [
-          Icon(Icons.add_box_outlined, color: _red, size: 16),
-          SizedBox(width: 6),
-          Text('Stock Level Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _red)),
-        ]),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _stockCtrl,
-          keyboardType: TextInputType.number,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: 'Current Quantity *',
-            border: const OutlineInputBorder(),
-            filled: true, fillColor: Colors.white,
-            suffixText: uom,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(children: [
-          Expanded(child: TextField(
-            controller: _minCtrl,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: 'Min Level *',
-              border: const OutlineInputBorder(),
-              filled: true, fillColor: Colors.white,
-              suffixText: uom,
-            ),
-          )),
-          const SizedBox(width: 8),
-          Expanded(child: TextField(
-            controller: _maxCtrl,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: 'Max Level *',
-              border: const OutlineInputBorder(),
-              filled: true, fillColor: Colors.white,
-              suffixText: uom,
-            ),
-          )),
-        ]),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _reorderCtrl,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            labelText: 'Reorder Quantity',
-            border: const OutlineInputBorder(),
-            filled: true, fillColor: Colors.white,
-            suffixText: uom,
-          ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _loading ? null : () async {
-              final stock = int.tryParse(_stockCtrl.text.trim()) ?? 0;
-              final min = int.tryParse(_minCtrl.text.trim()) ?? 0;
-              final max = int.tryParse(_maxCtrl.text.trim()) ?? 0;
-              final reorder = int.tryParse(_reorderCtrl.text.trim()) ?? 0;
-              if (_stockCtrl.text.isEmpty || _minCtrl.text.isEmpty || _maxCtrl.text.isEmpty) return;
-              setState(() => _loading = true);
-              try {
-                // Check duplicate
-                final existing = await FirebaseFirestore.instance
-                    .collection('stock_inventory')
-                    .where('num', isEqualTo: widget.itemData['num'])
-                    .limit(1).get();
-                if (existing.docs.isNotEmpty) {
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Already in stock inventory.'), backgroundColor: Colors.orange));
-                  setState(() => _loading = false);
-                  return;
-                }
-                await FirebaseFirestore.instance.collection('stock_inventory').add({
-                  'num': widget.itemData['num'],
-                  'name': widget.itemData['name'],
-                  'group': widget.itemData['group'],
-                  'uom': widget.itemData['uom'],
-                  'stock': stock,
-                  'min': min,
-                  'max': max,
-                  'reorder': reorder,
-                  'status': stock > min ? 'OK' : 'Low',
-                  'createdAt': FieldValue.serverTimestamp(),
-                  'updatedAt': FieldValue.serverTimestamp(),
-                });
-                // Log transaction
-                final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-                final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-                final byName = (userDoc.data()?['name'] as String?) ?? 'Admin';
-                final now = DateTime.now();
-                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                final dateStr = '${months[now.month - 1]} ${now.day}, ${now.year}';
-                await FirebaseFirestore.instance.collection('transactions').add({
-                  'item': widget.itemData['name'] ?? '',
-                  'desc': 'Initial stock added',
-                  'type': 'IN',
-                  'qty': '+$stock',
-                  'date': dateStr,
-                  'by': byName,
-                  'createdAt': FieldValue.serverTimestamp(),
-                });
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Added to stock inventory.'), backgroundColor: Colors.green));
-                  widget.onDone();
-                }
-              } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
-                setState(() => _loading = false);
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-            child: _loading
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.save_outlined, size: 16),
-                    SizedBox(width: 6),
-                    Text('Save to Stock'),
-                  ]),
-          ),
-        ),
-      ]),
-    );
-  }
-}
-
-class _ScanReceiveWidget extends StatefulWidget {
-  final String stockId;
-  final Map<String, dynamic> stockData;
-  final String uom;
-  final VoidCallback onDone;
-
-  const _ScanReceiveWidget({
-    required this.stockId,
-    required this.stockData,
-    required this.uom,
-    required this.onDone,
-  });
-
-  @override
-  State<_ScanReceiveWidget> createState() => _ScanReceiveWidgetState();
-}
-
-class _ScanReceiveWidgetState extends State<_ScanReceiveWidget> {
-  static const _blue = Color(0xFF003087);
-  final _qtyCtrl = TextEditingController();
-  bool _loading = false;
-
-  @override
-  void dispose() {
-    _qtyCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final currentStock = (widget.stockData['stock'] as num?)?.toInt() ?? 0;
-    final min = (widget.stockData['min'] as num?)?.toInt() ?? 0;
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFebf8ff),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF90cdf4)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Row(children: [
-          Icon(Icons.download_outlined, color: _blue, size: 16),
-          SizedBox(width: 6),
-          Text('Receive Items', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _blue)),
-        ]),
-        const SizedBox(height: 10),
-        Row(children: [
-          Expanded(
-            child: TextField(
-              controller: _qtyCtrl,
-              keyboardType: TextInputType.number,
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: 'Quantity to receive *',
-                border: const OutlineInputBorder(),
-                filled: true,
-                fillColor: Colors.white,
-                suffixText: widget.uom,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          SizedBox(
-            height: 56,
-            child: ElevatedButton(
-              onPressed: _loading ? null : () async {
-                final qty = int.tryParse(_qtyCtrl.text.trim()) ?? 0;
-                if (qty <= 0) return;
-                setState(() => _loading = true);
-                try {
-                  final newStock = currentStock + qty;
-                  await FirebaseFirestore.instance
-                      .collection('stock_inventory')
-                      .doc(widget.stockId)
-                      .update({
-                    'stock': newStock,
-                    'status': newStock > min ? 'OK' : 'Low',
-                    'updatedAt': FieldValue.serverTimestamp(),
-                  });
-                  // Log transaction
-                  final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-                  final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-                  final byName = (userDoc.data()?['name'] as String?) ?? 'Admin';
-                  final now = DateTime.now();
-                  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                  final dateStr = '${months[now.month - 1]} ${now.day}, ${now.year}';
-                  await FirebaseFirestore.instance.collection('transactions').add({
-                    'item': widget.stockData['name'] ?? '',
-                    'desc': 'Stock received',
-                    'type': 'IN',
-                    'qty': '+$qty',
-                    'date': dateStr,
-                    'by': byName,
-                    'stockId': widget.stockId,
-                    'createdAt': FieldValue.serverTimestamp(),
-                  });
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('+$qty ${widget.uom} received. New stock: $newStock'),
-                        backgroundColor: Colors.green));
-                    widget.onDone();
-                  }
-                } catch (e) {
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
-                  setState(() => _loading = false);
-                }
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: _blue, foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-              child: _loading
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('✅ Confirm'),
-            ),
-          ),
-        ]),
-      ]),
-    );
+  /// Cleans transaction descriptions — same logic as the website
+  String _cleanTxnDesc(String raw) {
+    final (cleaned, _) = _cleanTxnDescWithAsset(raw);
+    return cleaned;
   }
 }

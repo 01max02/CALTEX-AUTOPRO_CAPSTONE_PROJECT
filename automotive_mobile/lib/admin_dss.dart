@@ -64,6 +64,9 @@ class _AdminDSSState extends State<AdminDSS> {
   String _searchQuery = '';
   final _searchController = TextEditingController();
 
+  String _stockFilter = 'all'; // 'all', 'Out of Stock', 'Low Stock', 'Adequate'
+  String _pmsFilter = 'all'; // 'all', 'Overdue', 'Due Today', 'Due This Week', 'Due Soon', 'Active'
+
   @override
   void initState() {
     super.initState();
@@ -635,6 +638,10 @@ class _AdminDSSState extends State<AdminDSS> {
   }
 
   Widget _buildStockDSSContent(List<Map<String, String>> items) {
+    final afterFilter = _stockFilter == 'all'
+        ? items
+        : items.where((i) => i['priority'] == _stockFilter).toList();
+
     return Column(children: [
       // ── KPI chips ──
       Container(
@@ -642,22 +649,24 @@ class _AdminDSSState extends State<AdminDSS> {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
         child: Column(children: [
           Row(children: [
-            _kpiChip('Out of Stock', '${items.where((i) => i['priority'] == 'Out of Stock').length}', const Color(0xFFe53e3e), Icons.warning_amber_rounded),
+            _kpiChipTappable('Out of Stock', '${items.where((i) => i['priority'] == 'Out of Stock').length}', const Color(0xFFe53e3e), Icons.warning_amber_rounded, 'Out of Stock', _stockFilter, (f) => setState(() => _stockFilter = _stockFilter == f ? 'all' : f)),
             const SizedBox(width: 8),
-            _kpiChip('Low Stock', '${items.where((i) => i['priority'] == 'Low Stock').length}', const Color(0xFFd69e2e), Icons.trending_down_outlined),
+            _kpiChipTappable('Low Stock', '${items.where((i) => i['priority'] == 'Low Stock').length}', const Color(0xFFd69e2e), Icons.trending_down_outlined, 'Low Stock', _stockFilter, (f) => setState(() => _stockFilter = _stockFilter == f ? 'all' : f)),
             const SizedBox(width: 8),
-            _kpiChip('Adequate', '${items.where((i) => i['priority'] == 'Adequate').length}', const Color(0xFF38a169), Icons.check_circle_outline),
+            _kpiChipTappable('Adequate', '${items.where((i) => i['priority'] == 'Adequate').length}', const Color(0xFF38a169), Icons.check_circle_outline, 'Adequate', _stockFilter, (f) => setState(() => _stockFilter = _stockFilter == f ? 'all' : f)),
           ]),
         ]),
       ),
       // ── Item list ──
       Expanded(
-        child: ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: items.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
-          itemBuilder: (_, i) => _buildStockCard(items[i]),
-        ),
+        child: afterFilter.isEmpty
+          ? const Center(child: Text('No items found.', style: TextStyle(color: Color(0xFF718096))))
+          : ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: afterFilter.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (_, i) => _buildStockCard(afterFilter[i]),
+            ),
       ),
     ]);
   }
@@ -1023,33 +1032,39 @@ class _AdminDSSState extends State<AdminDSS> {
   }
 
   Widget _buildPMSDSSContent(List<Map<String, String>> assets) {
+    final afterFilter = _pmsFilter == 'all'
+        ? assets
+        : assets.where((a) => a['priority'] == _pmsFilter).toList();
+
     return Column(children: [
       Container(
         color: Colors.white,
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
         child: Column(children: [
           Row(children: [
-            _kpiChip('Overdue', '${assets.where((a) => a['priority'] == 'Overdue').length}', _red, Icons.error_outline),
+            _kpiChipTappable('Overdue', '${assets.where((a) => a['priority'] == 'Overdue').length}', _red, Icons.error_outline, 'Overdue', _pmsFilter, (f) => setState(() => _pmsFilter = _pmsFilter == f ? 'all' : f)),
             const SizedBox(width: 8),
-            _kpiChip('Due Today', '${assets.where((a) => a['priority'] == 'Due Today').length}', const Color(0xFF0033A0), Icons.schedule_outlined),
+            _kpiChipTappable('Due Today', '${assets.where((a) => a['priority'] == 'Due Today').length}', const Color(0xFF0033A0), Icons.schedule_outlined, 'Due Today', _pmsFilter, (f) => setState(() => _pmsFilter = _pmsFilter == f ? 'all' : f)),
           ]),
           const SizedBox(height: 8),
           Row(children: [
-            _kpiChip('Due This Week', '${assets.where((a) => a['priority'] == 'Due This Week').length}', const Color(0xFFdd6b20), Icons.calendar_today_outlined),
+            _kpiChipTappable('Due This Week', '${assets.where((a) => a['priority'] == 'Due This Week').length}', const Color(0xFFdd6b20), Icons.calendar_today_outlined, 'Due This Week', _pmsFilter, (f) => setState(() => _pmsFilter = _pmsFilter == f ? 'all' : f)),
             const SizedBox(width: 8),
-            _kpiChip('Due Soon', '${assets.where((a) => a['priority'] == 'Due Soon').length}', const Color(0xFFb7791f), Icons.event_outlined),
+            _kpiChipTappable('Due Soon', '${assets.where((a) => a['priority'] == 'Due Soon').length}', const Color(0xFFb7791f), Icons.event_outlined, 'Due Soon', _pmsFilter, (f) => setState(() => _pmsFilter = _pmsFilter == f ? 'all' : f)),
             const SizedBox(width: 8),
-            _kpiChip('Active', '${assets.where((a) => a['priority'] == 'Active').length}', const Color(0xFF276749), Icons.check_circle_outline),
+            _kpiChipTappable('Active', '${assets.where((a) => a['priority'] == 'Active').length}', const Color(0xFF276749), Icons.check_circle_outline, 'Active', _pmsFilter, (f) => setState(() => _pmsFilter = _pmsFilter == f ? 'all' : f)),
           ]),
         ]),
       ),
       Expanded(
-        child: ListView.separated(
+        child: afterFilter.isEmpty
+          ? const Center(child: Text('No vehicles found.', style: TextStyle(color: Color(0xFF718096))))
+          : ListView.separated(
           padding: const EdgeInsets.all(16),
-          itemCount: assets.length,
+          itemCount: afterFilter.length,
           separatorBuilder: (_, __) => const SizedBox(height: 10),
           itemBuilder: (_, i) {
-            final a = assets[i];
+            final a = afterFilter[i];
             final color = a['priority'] == 'Overdue' ? _red
                 : a['priority'] == 'Due Today' ? const Color(0xFF0033A0)
                 : a['priority'] == 'Due This Week' ? const Color(0xFFdd6b20)
@@ -1272,6 +1287,33 @@ class _AdminDSSState extends State<AdminDSS> {
           Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
           Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096)), textAlign: TextAlign.center),
         ]),
+      ),
+    );
+  }
+
+  Widget _kpiChipTappable(String label, String value, Color color, IconData icon, String filter, String currentFilter, void Function(String) onTap) {
+    final isActive = currentFilter == filter;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onTap(filter),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+          decoration: BoxDecoration(
+            color: isActive ? color.withOpacity(0.08) : const Color(0xFFF7F8FA),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: isActive ? color : color.withOpacity(0.2), width: isActive ? 1.5 : 1),
+          ),
+          child: Column(children: [
+            Container(
+              width: 28, height: 28,
+              decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
+              child: Icon(icon, color: color, size: 15),
+            ),
+            const SizedBox(height: 5),
+            Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
+            Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096)), textAlign: TextAlign.center),
+          ]),
+        ),
       ),
     );
   }

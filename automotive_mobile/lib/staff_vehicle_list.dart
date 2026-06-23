@@ -16,6 +16,7 @@ class _StaffVehicleListState extends State<StaffVehicleList> {
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
   bool _searching = false;
+  String _typeFilter = 'all'; // 'all', 'car', 'truck'
   List<String>? _cachedTypes;
 
   CollectionReference get _db => FirebaseFirestore.instance.collection(_col);
@@ -68,6 +69,15 @@ class _StaffVehicleListState extends State<StaffVehicleList> {
     if (date == null || months == null) return '—';
     final next = DateTime(date.year, date.month + months, date.day);
     return '${next.year}-${next.month.toString().padLeft(2, '0')}-${next.day.toString().padLeft(2, '0')}';
+  }
+
+  static const _monthsFull = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  String _fmtDate(String dateStr) {
+    if (dateStr.isEmpty || dateStr == '—') return '—';
+    final d = DateTime.tryParse(dateStr);
+    if (d == null) return dateStr;
+    return '${_monthsFull[d.month - 1]} ${d.day}, ${d.year}';
   }
 
   @override
@@ -127,15 +137,15 @@ class _StaffVehicleListState extends State<StaffVehicleList> {
             final data = d.data() as Map<String, dynamic>;
             return {
               'id': d.id,
-              'plate': data['plate'] as String? ?? '',
-              'desc': data['desc'] as String? ?? '',
-              'owner': data['owner'] as String? ?? '',
-              'odo': data['odo'] as String? ?? '',
-              'type': data['type'] as String? ?? '',
-              'status': data['status'] as String? ?? 'Active',
-              'lastSvcOdo': data['lastSvcOdo'] as String? ?? '',
-              'lastSvcDate': data['lastSvcDate'] as String? ?? '',
-              'svcFreq': data['svcFreq'] as String? ?? '',
+              'plate': data['plate']?.toString() ?? '',
+              'desc': data['desc']?.toString() ?? '',
+              'owner': data['owner']?.toString() ?? '',
+              'odo': data['odo']?.toString() ?? '',
+              'type': data['type']?.toString() ?? '',
+              'status': data['status']?.toString() ?? 'Active',
+              'lastSvcOdo': data['lastSvcOdo']?.toString() ?? '',
+              'lastSvcDate': data['lastSvcDate']?.toString() ?? '',
+              'svcFreq': data['svcFreq']?.toString() ?? '',
             };
           }).toList()
             ..sort((a, b) => (a['plate'] as String).compareTo(b['plate'] as String));
@@ -147,6 +157,10 @@ class _StaffVehicleListState extends State<StaffVehicleList> {
                   v['desc']!.toLowerCase().contains(_searchQuery) ||
                   v['owner']!.toLowerCase().contains(_searchQuery)).toList();
 
+          final afterTypeFilter = _typeFilter == 'all'
+              ? filtered
+              : filtered.where((v) => (v['type'] ?? '').toLowerCase() == _typeFilter).toList();
+
           final good = vehicles.where((v) => v['status'] == 'Active').length;
           final maint = vehicles.where((v) => v['status'] == 'Under Maintenance').length;
           final overdue = vehicles.where((v) => v['status'] == 'Overdue').length;
@@ -155,21 +169,21 @@ class _StaffVehicleListState extends State<StaffVehicleList> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Row(children: [
-                _statChip('Total', '${vehicles.length}', const Color(0xFF2563EB), Icons.directions_car_outlined),
+                _statChip('Total', '${vehicles.length}', const Color(0xFF2563EB), Icons.directions_car_outlined, 'all'),
                 const SizedBox(width: 8),
-                _statChip('Cars', '${vehicles.where((v) => (v['type'] ?? '').toLowerCase() == 'car').length}', const Color(0xFF003087), Icons.directions_car_outlined),
+                _statChip('Cars', '${vehicles.where((v) => (v['type'] ?? '').toLowerCase() == 'car').length}', const Color(0xFF003087), Icons.directions_car_outlined, 'car'),
                 const SizedBox(width: 8),
-                _statChip('Trucks', '${vehicles.where((v) => (v['type'] ?? '').toLowerCase() == 'truck').length}', _red, Icons.local_shipping_outlined),
+                _statChip('Trucks', '${vehicles.where((v) => (v['type'] ?? '').toLowerCase() == 'truck').length}', _red, Icons.local_shipping_outlined, 'truck'),
               ]),
             ),
             Expanded(
-              child: filtered.isEmpty
+              child: afterTypeFilter.isEmpty
                 ? const Center(child: Text('No vehicles found.', style: TextStyle(color: Color(0xFF718096))))
                 : ListView.separated(
                     padding: const EdgeInsets.all(16),
-                    itemCount: filtered.length,
+                    itemCount: afterTypeFilter.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (_, i) => _vehicleCard(filtered[i]),
+                    itemBuilder: (_, i) => _vehicleCard(afterTypeFilter[i]),
                   ),
             ),
           ]);
@@ -178,22 +192,29 @@ class _StaffVehicleListState extends State<StaffVehicleList> {
     );
   }
 
-  Widget _statChip(String label, String value, Color color, IconData icon) {
+  Widget _statChip(String label, String value, Color color, IconData icon, String filter) {
+    final isActive = _typeFilter == filter;
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
-        child: Column(children: [
-          Container(
-            width: 32, height: 32,
-            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-            child: Icon(icon, color: color, size: 16),
-          ),
-          const SizedBox(height: 6),
-          Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
-          Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
-        ]),
+      child: GestureDetector(
+        onTap: () => setState(() => _typeFilter = _typeFilter == filter ? 'all' : filter),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          decoration: BoxDecoration(
+            color: isActive ? color.withOpacity(0.08) : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: isActive ? color : Colors.transparent, width: 1.5),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
+          child: Column(children: [
+            Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+              child: Icon(icon, color: color, size: 16),
+            ),
+            const SizedBox(height: 6),
+            Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+            Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
+          ]),
+        ),
       ),
     );
   }
@@ -222,6 +243,12 @@ class _StaffVehicleListState extends State<StaffVehicleList> {
   }
 
   void _showVehicleDetails(Map<String, String> v) {
+    final lastSvcOdo = int.tryParse((v['lastSvcOdo'] ?? '').replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    final currentOdo = int.tryParse((v['odo'] ?? '').replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    final kmSince = (currentOdo > 0 && lastSvcOdo > 0 && currentOdo >= lastSvcOdo)
+        ? '${(currentOdo - lastSvcOdo).toString()} km'
+        : '—';
+
     showModalBottomSheet(
       context: context, isScrollControlled: true,
       backgroundColor: Colors.white,
@@ -251,11 +278,14 @@ class _StaffVehicleListState extends State<StaffVehicleList> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _detailRow('Plate Number', v['plate']!),
                   _detailRow('Description', v['desc']!),
-                  _detailRow('Owner', v['owner']!),
-                  _detailRow('Odometer', v['odo']!),
                   _detailRow('Vehicle Type', v['type']!),
-                  _detailRow('Last Service Date', v['lastSvcDate']!),
-                  _detailRow('Next PMS Due', _calcNextPms(v['lastSvcDate']!, v['svcFreq']!)),
+                  _detailRow('Owner', v['owner']!),
+                  _detailRow('Current Odometer', v['odo']!.isNotEmpty ? v['odo']! : '—'),
+                  _detailRow('Last Service Date', _fmtDate(v['lastSvcDate']!)),
+                  _detailRow('Last Service Odometer', lastSvcOdo > 0 ? '$lastSvcOdo km' : '—'),
+                  _detailRow('KM Since Last Service', kmSince),
+                  _detailRow('Next PMS Due', _fmtDate(_calcNextPms(v['lastSvcDate']!, v['svcFreq']!))),
+                  _detailRow('Service Frequency', v['svcFreq']!.isNotEmpty ? '${v['svcFreq']} month(s)' : '—'),
                   const SizedBox(height: 16),
                   SizedBox(width: double.infinity,
                     child: OutlinedButton.icon(
@@ -354,6 +384,14 @@ class _StaffVehicleListState extends State<StaffVehicleList> {
                     const SizedBox(height: 10),
                     TextField(controller: svcFreqCtrl, keyboardType: TextInputType.number,
                       decoration: const InputDecoration(labelText: 'Service Frequency (months)', border: OutlineInputBorder(), hintText: 'e.g. 3')),
+                    const SizedBox(height: 10),
+                    // ── Just Serviced Toggle ──
+                    _JustServicedSection(
+                      lastSvcDateCtrl: lastSvcDateCtrl,
+                      lastSvcOdoCtrl: lastSvcOdoCtrl,
+                      initialChecked: isEdit && (lastSvcDateCtrl.text.isNotEmpty || lastSvcOdoCtrl.text.isNotEmpty),
+                      readOnly: isEdit,
+                    ),
                     const SizedBox(height: 20),
                     Row(children: [
                       Expanded(child: OutlinedButton(
@@ -569,6 +607,97 @@ class _OwnerAutocompleteState extends State<_OwnerAutocomplete> {
         ),
       ),
     );
+  }
+}
+
+/// "Vehicle was just serviced" section
+class _JustServicedSection extends StatefulWidget {
+  final TextEditingController lastSvcDateCtrl;
+  final TextEditingController lastSvcOdoCtrl;
+  final bool initialChecked;
+  final bool readOnly;
+  const _JustServicedSection({required this.lastSvcDateCtrl, required this.lastSvcOdoCtrl, this.initialChecked = false, this.readOnly = false});
+
+  @override
+  State<_JustServicedSection> createState() => _JustServicedSectionState();
+}
+
+class _JustServicedSectionState extends State<_JustServicedSection> {
+  late bool _checked;
+
+  @override
+  void initState() {
+    super.initState();
+    _checked = widget.initialChecked;
+    if (_checked && widget.lastSvcDateCtrl.text.isEmpty) {
+      final now = DateTime.now();
+      widget.lastSvcDateCtrl.text = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      GestureDetector(
+        onTap: widget.readOnly ? null : () {
+          setState(() => _checked = !_checked);
+          if (_checked && widget.lastSvcDateCtrl.text.isEmpty) {
+            final now = DateTime.now();
+            widget.lastSvcDateCtrl.text = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+          }
+          if (!_checked) {
+            widget.lastSvcDateCtrl.clear();
+            widget.lastSvcOdoCtrl.clear();
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: _checked ? const Color(0xFFF0FFF4) : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: _checked ? const Color(0xFF9ae6b4) : const Color(0xFFe2e8f0), width: 1.5),
+          ),
+          child: Row(children: [
+            Icon(_checked ? Icons.check_box : Icons.check_box_outline_blank,
+              color: _checked ? const Color(0xFF16a34a) : const Color(0xFFcbd5e0), size: 20),
+            const SizedBox(width: 10),
+            const Expanded(child: Text('🔧 Vehicle was just serviced',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF16a34a)))),
+          ]),
+        ),
+      ),
+      if (_checked) ...[
+        const SizedBox(height: 10),
+        TextField(
+          controller: widget.lastSvcDateCtrl,
+          readOnly: true,
+          enabled: !widget.readOnly,
+          decoration: InputDecoration(labelText: 'Last Service Date', border: const OutlineInputBorder(), suffixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
+            filled: widget.readOnly, fillColor: widget.readOnly ? const Color(0xFFF7F8FA) : null),
+          onTap: widget.readOnly ? null : () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: DateTime.tryParse(widget.lastSvcDateCtrl.text) ?? DateTime.now(),
+              firstDate: DateTime(2020),
+              lastDate: DateTime.now(),
+              builder: (c, child) => Theme(data: Theme.of(c).copyWith(colorScheme: const ColorScheme.light(primary: Color(0xFFE8001C))), child: child!),
+            );
+            if (picked != null) {
+              widget.lastSvcDateCtrl.text = '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+            }
+          },
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: widget.lastSvcOdoCtrl,
+          keyboardType: TextInputType.number,
+          readOnly: widget.readOnly,
+          enabled: !widget.readOnly,
+          decoration: InputDecoration(labelText: 'Last Service Odometer (km)', border: const OutlineInputBorder(), suffixText: 'km',
+            filled: widget.readOnly, fillColor: widget.readOnly ? const Color(0xFFF7F8FA) : null),
+        ),
+      ],
+    ]);
   }
 }
 

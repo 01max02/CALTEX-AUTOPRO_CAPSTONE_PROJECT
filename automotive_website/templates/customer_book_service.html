@@ -322,8 +322,19 @@ async function _loadBookingData(user) {
     .map(function(d){ return Object.assign({id:d.id}, d.data()); })
     .filter(function(i){ return (i.type||i.itemType||'').toLowerCase() === 'service'; });
 
+  // Auto-select vehicle from URL param (e.g. ?vehicleId=xxx)
+  var urlParams = new URLSearchParams(window.location.search);
+  var preselectedId = urlParams.get('vehicleId');
+  if (preselectedId && _bsVehicles.some(function(v){ return v.id === preselectedId; })) {
+    _bsSelectedVehicles[preselectedId] = true;
+    _bsVehicleServices[preselectedId] = {};
+  }
+
   _renderVehicles();
   _renderServices();
+  _renderPerVehicleServices();
+  _updateDateSuggestion();
+  _updateSummaryCard();
 }
 
 function _renderVehicles() {

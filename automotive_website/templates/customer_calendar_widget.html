@@ -200,6 +200,8 @@
       .then(function(snap) {
         snap.forEach(function(doc) {
           var d    = doc.data();
+          var st   = (d.status || '').toLowerCase();
+          if (st === 'completed' || st === 'in progress' || st === 'dismissed') return;
           var date = d.preferredDate || '';
           if (!date) return;
           var due  = new Date(date + 'T00:00:00');

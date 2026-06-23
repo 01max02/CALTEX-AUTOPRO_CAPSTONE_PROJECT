@@ -18,6 +18,7 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
   final _searchCtrl = TextEditingController();
   bool _searching = false;
   String _searchQuery = '';
+  String _statusFilter = 'all'; // 'all', 'Pending', 'Ongoing', 'Completed'
 
   CollectionReference get _db => FirebaseFirestore.instance.collection(_col);
 
@@ -144,6 +145,7 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
               'date': data['date'] as String? ?? '',
               'cost': data['cost'] as String? ?? '0',
               'status': data['status'] as String? ?? 'Pending',
+              'odometer': data['odometer'],
               'svcRows': data['svcRows'],
               'matRows': data['matRows'],
               'issues': data['issues'],
@@ -157,6 +159,10 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
                   (s['plate'] as String).toLowerCase().contains(_searchQuery) ||
                   (s['mechanic'] as String).toLowerCase().contains(_searchQuery)).toList();
 
+          final afterStatusFilter = _statusFilter == 'all'
+              ? filtered
+              : filtered.where((s) => s['status'] == _statusFilter).toList();
+
           final total = services.length;
           final ongoing = services.where((s) => s['status'] == 'Ongoing').length;
           final completed = services.where((s) => s['status'] == 'Completed').length;
@@ -166,23 +172,23 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Row(children: [
-                _statChip('Total', '$total', Colors.blue),
+                _statChip('Total', '$total', Colors.blue, 'all'),
                 const SizedBox(width: 8),
-                _statChip('Ongoing', '$ongoing', Colors.orange),
+                _statChip('Ongoing', '$ongoing', Colors.orange, 'Ongoing'),
                 const SizedBox(width: 8),
-                _statChip('Completed', '$completed', Colors.green),
+                _statChip('Completed', '$completed', Colors.green, 'Completed'),
                 const SizedBox(width: 8),
-                _statChip('Pending', '$pending', const Color(0xFF718096)),
+                _statChip('Pending', '$pending', const Color(0xFF718096), 'Pending'),
               ]),
             ),
             Expanded(
-              child: filtered.isEmpty
+              child: afterStatusFilter.isEmpty
                 ? const Center(child: Text('No services found.', style: TextStyle(color: Color(0xFF718096))))
                 : ListView.separated(
                     padding: const EdgeInsets.all(16),
-                    itemCount: filtered.length,
+                    itemCount: afterStatusFilter.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (_, i) => _serviceCard(filtered[i]),
+                    itemBuilder: (_, i) => _serviceCard(afterStatusFilter[i]),
                   ),
             ),
           ]);
@@ -191,36 +197,34 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
     );
   }
 
-  Widget _statChip(String label, String value, Color color) {
+  Widget _statChip(String label, String value, Color color, String filter) {
     IconData icon;
     switch (label) {
-      case 'Total':
-        icon = Icons.build_circle_outlined;
-        break;
-      case 'Ongoing':
-        icon = Icons.autorenew_outlined;
-        break;
-      case 'Completed':
-        icon = Icons.check_circle_outline;
-        break;
-      case 'Pending':
-        icon = Icons.pending_outlined;
-        break;
-      default:
-        icon = Icons.info_outline;
+      case 'Total': icon = Icons.build_circle_outlined; break;
+      case 'Ongoing': icon = Icons.autorenew_outlined; break;
+      case 'Completed': icon = Icons.check_circle_outline; break;
+      case 'Pending': icon = Icons.pending_outlined; break;
+      default: icon = Icons.info_outline;
     }
+    final isActive = _statusFilter == filter;
     
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
-        child: Column(children: [
-          Icon(icon, color: color, size: 18),
-          const SizedBox(height: 4),
-          Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
-          Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
-        ]),
+      child: GestureDetector(
+        onTap: () => setState(() => _statusFilter = _statusFilter == filter ? 'all' : filter),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isActive ? color.withOpacity(0.08) : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: isActive ? color : Colors.transparent, width: 1.5),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
+          child: Column(children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 4),
+            Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
+            Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
+          ]),
+        ),
       ),
     );
   }
@@ -287,6 +291,7 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
                   _detailRow('Plate Number', s['plate'] as String),
                   _detailRow('Mechanic', s['mechanic'] as String),
                   _detailRow('Service Date', s['date'] as String),
+                  _detailRow('Odometer Reading', s['odometer'] != null ? '${s['odometer']} km' : '—'),
                   _detailRow('Total Cost', _formatCost(s['cost'] as String)),
                   Row(children: [
                     const SizedBox(width: 130, child: Text('Status', style: TextStyle(fontSize: 12, color: Color(0xFF718096), fontWeight: FontWeight.w500))),
@@ -447,11 +452,33 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
                           final vSnap = await FirebaseFirestore.instance
                               .collection('vehicles').where('plate', isEqualTo: plate).limit(1).get();
                           if (vSnap.docs.isNotEmpty) {
-                            await vSnap.docs.first.reference.update({
+                            final vUpdate = <String, dynamic>{
                               'status': 'Completed',
                               'completedAt': FieldValue.serverTimestamp(),
                               'lastSvcDate': '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
-                            });
+                            };
+                            // Also update odometer fields from the maintenance record
+                            final mainDoc = await _db.doc(s['docId'] as String).get();
+                            final mainData = mainDoc.data() as Map<String, dynamic>? ?? {};
+                            final odoReading = mainData['odometer'];
+                            if (odoReading != null) {
+                              final odoInt = int.tryParse(odoReading.toString()) ?? 0;
+                              if (odoInt > 0) {
+                                vUpdate['lastSvcOdo'] = odoInt;
+                                vUpdate['lastServiceOdometer'] = odoInt;
+                                vUpdate['odometer'] = odoInt;
+                                vUpdate['odo'] = '$odoInt km';
+                              }
+                            }
+                            await vSnap.docs.first.reference.update(vUpdate);
+                          }
+
+                          // Also update linked service booking to "Completed" if exists
+                          final mainDoc3 = await _db.doc(s['docId'] as String).get();
+                          final mainData3 = mainDoc3.data() as Map<String, dynamic>? ?? {};
+                          final bookingId = mainData3['bookingId'] as String?;
+                          if (bookingId != null && bookingId.isNotEmpty) {
+                            await FirebaseFirestore.instance.collection('service_bookings').doc(bookingId).update({'status': 'Completed'}).catchError((_) {});
                           }
                           }(); // end background lambda
                         },
@@ -519,6 +546,7 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
     final dateCtrl = TextEditingController(
       text: service?['date'] as String? ?? '${_monthName(DateTime.now().month)} ${DateTime.now().day}, ${DateTime.now().year}',
     );
+    final odoCtrl = TextEditingController(text: (service?['odometer'] ?? '').toString().replaceAll(RegExp(r'[^0-9]'), ''));
     Map<String, dynamic>? foundVehicle = isEdit ? _vehicleMap[service!['plate']] : null;
 
     // ── Issue tags ──
@@ -693,6 +721,10 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    // ── Odometer Reading ──
+                    TextField(controller: odoCtrl, keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Odometer Reading (km) *', border: OutlineInputBorder(), suffixText: 'km', hintText: 'e.g. 45000')),
+                    const SizedBox(height: 16),
                     // ── Vehicle Issues ──
                     const Text('Vehicle Issues', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF4a5568))),
                     const SizedBox(height: 4),
@@ -799,6 +831,12 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
                       Expanded(child: ElevatedButton(
                         onPressed: () async {
                           if (plateCtrl.text.trim().isEmpty || mechanicCtrl.text.trim().isEmpty) return;
+                          final odoValue = int.tryParse(odoCtrl.text.trim()) ?? 0;
+                          if (odoValue <= 0) {
+                            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Please enter an odometer reading.'), backgroundColor: Colors.orange));
+                            return;
+                          }
 
                           // Validate material quantities against stock
                           for (final r in matRows) {
@@ -848,6 +886,7 @@ class _StaffMaintenanceState extends State<StaffMaintenance> {
                             'desc': foundVehicle?['desc'] as String? ?? '',
                             'mechanic': mechanicCtrl.text.trim(),
                             'date': dateCtrl.text.trim(),
+                            'odometer': odoValue,
                             'cost': '₱${totalCost().toStringAsFixed(2)}',
                             'status': isEdit ? service!['status'] as String : 'Pending',
                             'issues': selectedIssues,

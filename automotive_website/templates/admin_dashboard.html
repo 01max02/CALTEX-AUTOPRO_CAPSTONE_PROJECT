@@ -270,7 +270,7 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
                             </div>
                             <div class="stat-number" id="statDueForPms">0</div>
-                            <div class="stat-label">Due for PMS</div>
+                            <div class="stat-label">Due for PMS This Week</div>
                         </div>
                         <div class="stat-card" onclick="window.location.href='admin_inventory_stock.html'" style="cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.10)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
                             <div class="stat-icon red">
@@ -474,7 +474,7 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                             </div>
                             <div class="stat-number" id="txnIn" style="color:#003087;">0</div>
-                            <div class="stat-label">Stock In (Received)</div>
+                            <div class="stat-label">Stock In (Received#)</div>
                         </div>
                         <div class="stat-card" onclick="txnSetFilter('OUT',document.getElementById('txnPill_OUT'))" style="cursor:pointer;">
                             <div class="stat-icon red">
@@ -1214,6 +1214,8 @@
                     .replace(/for maintenance SVC-\d+\s*[—\-]\s*/gi, 'for ')
                     .replace(/for maintenance SVC-\d+/gi, '')
                     .replace(/\s*SVC-\d+\s*/gi, '')
+                    .replace(/for maintenance\s+[A-Za-z0-9]{15,}\s*[—\-]\s*/gi, 'for ')
+                    .replace(/for maintenance\s+[A-Za-z0-9]{15,}/gi, '')
                     .replace(/^(Stock received|Initial stock received)\s*[—\-]\s*.+$/i, function(m, base) { return base; })
                     .trim();
                 return d || '—';

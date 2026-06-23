@@ -5,7 +5,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class CustomerBookService extends StatefulWidget {
   /// When [embedded] is true (inside a TabBarView), the AppBar is hidden.
   final bool embedded;
-  const CustomerBookService({super.key, this.embedded = false});
+  /// When set, this vehicle will be pre-selected on load.
+  final String? preselectedVehicleId;
+  const CustomerBookService({super.key, this.embedded = false, this.preselectedVehicleId});
 
   @override
   State<CustomerBookService> createState() => _CustomerBookServiceState();
@@ -72,6 +74,16 @@ class _CustomerBookServiceState extends State<CustomerBookService> {
         _vehicles = myVehicles;
         _loading = false;
       });
+      // Auto-select pre-selected vehicle if provided
+      if (widget.preselectedVehicleId != null) {
+        final vId = widget.preselectedVehicleId!;
+        if (myVehicles.any((v) => v['id'] == vId)) {
+          setState(() {
+            _selectedVehicleIds.add(vId);
+            _vehicleServices.putIfAbsent(vId, () => <String>{});
+          });
+        }
+      }
     }
   }
 

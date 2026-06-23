@@ -183,6 +183,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                     'type': data['type'] as String? ?? '',
                     'status': data['status'] as String? ?? 'Active',
                     'lastSvcDate': data['lastSvcDate'] as String? ?? '',
+                    'lastSvcOdo': (data['lastSvcOdo'] ?? data['lastServiceOdometer'] ?? '').toString(),
                     'odo': data['odo'] as String? ?? '',
                     'svcFreq': data['svcFreq'] as String? ?? '',
                   };
@@ -478,7 +479,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16),
                       boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
                     child: Column(children: [
-                      _detailRow(Icons.speed_outlined, 'Odometer', v['odo']!.isNotEmpty ? v['odo']! : '—', const Color(0xFF718096)),
+                      _detailRow(Icons.speed_outlined, 'Last Service Odometer', v['lastSvcOdo']!.isNotEmpty && v['lastSvcOdo'] != '0' ? '${int.tryParse(v['lastSvcOdo']!.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0} km' : '—', const Color(0xFF718096)),
                       _divider(),
                       _detailRow(Icons.calendar_today_outlined, 'Last Service', lastSvcDate.isNotEmpty ? _fmtDateLong(lastSvcDate) : '—', const Color(0xFF2b6cb0)),
                       _divider(),
@@ -489,7 +490,43 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                   ),
                   const SizedBox(height: 16),
                   if (status == 'Overdue') ...[
-                    _RescheduleWidget(vehicleId: v['id']!, plate: v['plate']!),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context); // close modal
+                        Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => CustomerBookService(preselectedVehicleId: v['id']!)));
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF5F5),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFED7D7), width: 1.5),
+                        ),
+                        child: Row(children: [
+                          Container(
+                            width: 38, height: 38,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8001C).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10)),
+                            child: const Icon(Icons.calendar_month_outlined, size: 18, color: Color(0xFFE8001C)),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text('PMS is overdue', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFE8001C))),
+                            SizedBox(height: 2),
+                            Text('Book a service now to avoid further issues.', style: TextStyle(fontSize: 11, color: Color(0xFF718096))),
+                          ])),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8001C),
+                              borderRadius: BorderRadius.circular(8)),
+                            child: const Text('Book', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+                          ),
+                        ]),
+                      ),
+                    ),
                     const SizedBox(height: 12),
                   ],
                 ]),

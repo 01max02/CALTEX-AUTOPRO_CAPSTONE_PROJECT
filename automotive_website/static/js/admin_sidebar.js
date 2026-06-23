@@ -100,6 +100,16 @@ function toggleAdminSidebar() {
     if (overlay) overlay.classList.toggle('active', isOpen);
 }
 
+// ── Expand/collapse sidebar (icon-only ↔ full width) ──
+window.toggleSidebarExpand = function() {
+    const sidebar = document.getElementById('adminSidebar');
+    if (!sidebar) return;
+    const isExpanded = sidebar.classList.toggle('expanded');
+    document.body.classList.toggle('sidebar-expanded', isExpanded);
+    // Save preference
+    localStorage.setItem('sidebarExpanded', isExpanded ? '1' : '0');
+};
+
 function initSidebarActive() {
     const page = document.body.getAttribute('data-page') || 'overview';
 
@@ -110,10 +120,16 @@ function initSidebarActive() {
 
 function bindHeaderControls() {
     const menuBtn = document.getElementById('adminMenuBtn');
-    if (menuBtn) menuBtn.addEventListener('click', toggleAdminSidebar);
+    if (menuBtn) menuBtn.addEventListener('click', toggleSidebarExpand);
 
     const overlay = document.getElementById('adminSidebarOverlay');
-    if (overlay) overlay.addEventListener('click', toggleAdminSidebar);
+    if (overlay) overlay.addEventListener('click', function() {
+        var sidebar = document.getElementById('adminSidebar');
+        if (sidebar) sidebar.classList.remove('expanded');
+        document.body.classList.remove('sidebar-expanded');
+        localStorage.setItem('sidebarExpanded', '0');
+        overlay.classList.remove('active');
+    });
 
     // Apply cached notification badge count (set by admin_firebase.js onSnapshot)
     // This handles the case where the snapshot fired before the header was injected
@@ -178,7 +194,16 @@ function bindHeaderControls() {
         : Promise.resolve();
 
     const sidebarPromise = sidebarContainer
-        ? fetch('admin_sidebar.html').then(r => r.text()).then(html => { sidebarContainer.innerHTML = html; initSidebarActive(); })
+        ? fetch('admin_sidebar.html').then(r => r.text()).then(html => {
+            sidebarContainer.innerHTML = html;
+            initSidebarActive();
+            // Restore expanded state from localStorage
+            if (localStorage.getItem('sidebarExpanded') === '1') {
+                var sidebar = document.getElementById('adminSidebar');
+                if (sidebar) sidebar.classList.add('expanded');
+                document.body.classList.add('sidebar-expanded');
+            }
+        })
         : Promise.resolve();
 
     Promise.all([headerPromise, sidebarPromise]).then(bindHeaderControls);

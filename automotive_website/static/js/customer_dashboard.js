@@ -256,48 +256,26 @@
     document.getElementById('cuModalDesc').textContent = v.desc || '—';
 
     document.getElementById('cuModalDetails').innerHTML = `
-      ${detailRow('#718096', 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 5v5l3 3', 'Odometer', v.odo ? String(v.odo).replace(/\s*km$/i, '') + ' km' : '—')}
+      ${detailRow('#718096', 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 5v5l3 3', 'Last Service Odometer', v.lastSvcOdo ? Number(String(v.lastSvcOdo).replace(/[^0-9]/g, '')).toLocaleString() + ' km' : '—')}
       ${detailRow('#2b6cb0', 'M3 4h18v18H3zM16 2v4M8 2v4M3 10h18', 'Last Service', v.lastSvcDate ? fmtDateLong(v.lastSvcDate) : '—')}
       ${detailRow(color, 'M8 6l4-4 4 4M8 18l4 4 4-4M4 12h16', 'Next PMS Due', fmtDateLong(nextPms))}
       ${detailRow(color, 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'Status', `<span style="background:${bg};color:${color};padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:700;">${statusLabel}</span>`)}
       ${status === 'Overdue' ? `
-        <div style="margin-top:14px;padding:12px;background:#fff5f5;border-radius:12px;border:1.5px solid #fed7d7;" id="cuRescheduleSection">
-          <div style="font-size:12px;font-weight:600;color:#E8001C;margin-bottom:8px;">⚠️ PMS is overdue — request a reschedule</div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <input type="date" id="cuRescheduleDate" min="${new Date().toISOString().split('T')[0]}"
-              style="flex:1;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;font-family:inherit;outline:none;"
-              onfocus="this.style.borderColor='#E8001C'" onblur="this.style.borderColor='#e2e8f0'">
-            <button onclick="cuRequestReschedule('${v.id}','${v.plate}')"
-              style="padding:8px 14px;background:#E8001C;border:none;border-radius:8px;color:white;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit;">
-              Request
-            </button>
+        <div style="margin-top:14px;padding:12px;background:#fff5f5;border-radius:12px;border:1.5px solid #fed7d7;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:38px;height:38px;background:rgba(232,0,28,0.1);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E8001C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:12px;font-weight:700;color:#E8001C;">PMS is overdue</div>
+              <div style="font-size:11px;color:#718096;margin-top:2px;">Book a service now to avoid further issues.</div>
+            </div>
+            <a href="customer_book_service.html?vehicleId=${v.id}" style="padding:8px 14px;background:#E8001C;border:none;border-radius:8px;color:white;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;white-space:nowrap;">Book</a>
           </div>
         </div>` : ''}
     `;
 
     document.getElementById('cuVehicleModal').classList.add('active');
-
-    // Check for existing pending reschedule request
-    if (status === 'Overdue') {
-      const user = auth.currentUser;
-      if (user) {
-        db.collection('pms_reschedule_requests')
-          .where('vehicleId', '==', v.id)
-          .where('customerId', '==', user.uid)
-          .where('status', '==', 'Pending')
-          .limit(1).get()
-          .then(function(snap) {
-            const sec = document.getElementById('cuRescheduleSection');
-            if (sec && !snap.empty) {
-              sec.style.background = '#fffbeb';
-              sec.style.borderColor = '#fcd34d';
-              sec.innerHTML = '<div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#d97706;">'
-                + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'
-                + 'You already have a pending reschedule request for this vehicle.</div>';
-            }
-          }).catch(function() {});
-      }
-    }
   };
 
   function detailRow(color, svgPath, label, value) {
