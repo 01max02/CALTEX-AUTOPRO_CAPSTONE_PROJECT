@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'barcode_scanner_screen.dart';
-import 'admin_inventory_stock.dart';
 
 /// Reusable bottom navigation bar for the Admin Dashboard.
 /// Handles tab switching and the center scanner button.

@@ -3,21 +3,33 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'barcode_scanner_screen.dart';
-import 'admin_inventory_stock.dart';
 
-class AdminInventoryItemMaster extends StatefulWidget {
+/// Standalone full-screen wrapper (for direct navigation if needed elsewhere).
+class AdminInventoryItemMaster extends StatelessWidget {
   const AdminInventoryItemMaster({super.key});
 
   @override
-  State<AdminInventoryItemMaster> createState() => _AdminInventoryItemMasterState();
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Color(0xFFF7F8FA),
+      body: AdminInventoryItemMasterBody(),
+    );
+  }
 }
 
-class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
+/// Embeddable body — used inside AdminInventoryHub's IndexedStack.
+class AdminInventoryItemMasterBody extends StatefulWidget {
+  final String searchQuery;
+  const AdminInventoryItemMasterBody({super.key, this.searchQuery = ''});
+
+  @override
+  State<AdminInventoryItemMasterBody> createState() => _AdminInventoryItemMasterBodyState();
+}
+
+class _AdminInventoryItemMasterBodyState extends State<AdminInventoryItemMasterBody> {
   static const _red = Color(0xFFE8001C);
   static const _col = 'item_master';
 
-  final _searchCtrl = TextEditingController();
-  bool _searching = false;
   String _searchQuery = '';
 
   CollectionReference get _db => FirebaseFirestore.instance.collection(_col);
@@ -38,7 +50,6 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
 
   @override
   void dispose() {
-    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -59,42 +70,9 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddItemModal(),
-        backgroundColor: _red,
-        child: const Icon(Icons.add, color: Colors.white, size: 28),
-      ),
-      appBar: AppBar(
-        backgroundColor: _red,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: _searching
-            ? TextField(
-                controller: _searchCtrl,
-                autofocus: true,
-                onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  hintText: 'Search items...',
-                  hintStyle: TextStyle(color: Colors.white54),
-                  border: InputBorder.none,
-                ),
-              )
-            : const Text('Item Master',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-        actions: [
-          IconButton(
-            icon: Icon(_searching ? Icons.close : Icons.search_outlined, color: Colors.white),
-            onPressed: () => setState(() {
-              _searching = !_searching;
-              if (!_searching) { _searchCtrl.clear(); _searchQuery = ''; }
-            }),
-          ),
-        ],
-      ),
-      body: StreamBuilder<QuerySnapshot>(
+    final activeQuery = widget.searchQuery.isNotEmpty ? widget.searchQuery : _searchQuery;
+    return Stack(children: [
+      StreamBuilder<QuerySnapshot>(
         stream: _db.orderBy('createdAt', descending: true).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -122,12 +100,12 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
             };
           }).toList();
 
-          final filtered = _searchQuery.isEmpty
+          final filtered = activeQuery.isEmpty
               ? items
               : items.where((i) =>
-                  i['name']!.toLowerCase().contains(_searchQuery) ||
-                  i['num']!.toLowerCase().contains(_searchQuery) ||
-                  i['group']!.toLowerCase().contains(_searchQuery)).toList();
+                  i['name']!.toLowerCase().contains(activeQuery) ||
+                  i['num']!.toLowerCase().contains(activeQuery) ||
+                  i['group']!.toLowerCase().contains(activeQuery)).toList();
 
           final total = items.length;
           final materials = items.where((i) => i['type'] == 'Material').length;
@@ -157,7 +135,17 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
           ]);
         },
       ),
-    );
+      // FAB
+      Positioned(
+        bottom: 16, right: 16,
+        child: FloatingActionButton(
+          heroTag: 'itemmaster_fab',
+          onPressed: () => _showAddItemModal(),
+          backgroundColor: _red,
+          child: const Icon(Icons.add, color: Colors.white, size: 28),
+        ),
+      ),
+    ]);
   }
 
   Widget _statChip(String label, String value, Color color, IconData icon) {
@@ -182,72 +170,43 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
 
   Widget _itemCard(Map<String, String> item) {
     final isSvc = item['type'] == 'Service';
-    final accentColor = isSvc ? const Color(0xFF003087) : _red;
+    final typeColor = isSvc ? const Color(0xFF003087) : _red;
+    final typeBg    = isSvc ? const Color(0xFFebf8ff) : const Color(0xFFFFF5F5);
+
     return GestureDetector(
       onTap: () => _showItemDetails(item),
       child: Container(
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFF0F4F8)),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
         ),
-        child: Column(children: [
-          // Top: name + group + menu
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 6, 10),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(item['name']!, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF1a202c))),
-                const SizedBox(height: 4),
-                Text(item['group']!, style: const TextStyle(fontSize: 12, color: Color(0xFF718096))),
-              ])),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_horiz, size: 20, color: Color(0xFFa0aec0)),
-                onSelected: (val) {
-                  if (val == 'edit') _showAddItemModal(item: item);
-                  if (val == 'delete') _confirmDelete(item);
-                },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text('Edit')])),
-                  PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: Colors.red), SizedBox(width: 8), Text('Delete', style: TextStyle(color: Colors.red))])),
-                ],
-              ),
-            ]),
-          ),
-          // Bottom: price + uom + type + arrow
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-            decoration: const BoxDecoration(
-              color: Color(0xFFFAFBFC),
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(14)),
-              border: Border(top: BorderSide(color: Color(0xFFF0F4F8))),
+        child: Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(item['name']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1a202c))),
+            Text(
+              item['group']!.isNotEmpty ? '${item['num']!} • ${item['group']!}' : item['num']!,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF4a5568)),
             ),
-            child: Row(children: [
+            const SizedBox(height: 4),
+            Row(children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: accentColor.withOpacity(0.2)),
-                ),
-                child: Text(item['type']!, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: accentColor)),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(color: typeBg, borderRadius: BorderRadius.circular(20)),
+                child: Text(isSvc ? 'Service' : 'Material',
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: typeColor)),
               ),
-              const SizedBox(width: 10),
-              Text(item['uom']!, style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
-              const Spacer(),
-              Text(_fmtCost(item['cost']!), style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: accentColor)),
-              const SizedBox(width: 10),
-              Container(
-                width: 24, height: 24,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0F4F8),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Icon(Icons.chevron_right, size: 16, color: Color(0xFF718096)),
-              ),
+              const SizedBox(width: 6),
+              Text(item['uom']!, style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
             ]),
-          ),
+          ])),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(_fmtCost(item['cost']!),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: typeColor)),
+          ]),
+          const SizedBox(width: 6),
+          const Icon(Icons.chevron_right, size: 18, color: Color(0xFFa0aec0)),
         ]),
       ),
     );
@@ -332,12 +291,20 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
                     const Text('No scan codes assigned.', style: TextStyle(fontSize: 12, color: Color(0xFF718096))),
                 ],
                 const SizedBox(height: 16),
-                SizedBox(width: double.infinity,
-                  child: OutlinedButton.icon(
+                Row(children: [
+                  Expanded(child: OutlinedButton.icon(
                     onPressed: () { Navigator.pop(context); _showAddItemModal(item: item); },
                     icon: const Icon(Icons.edit_outlined, size: 16),
                     label: const Text('Edit'),
                   )),
+                  const SizedBox(width: 10),
+                  Expanded(child: OutlinedButton.icon(
+                    onPressed: () { Navigator.pop(context); _confirmDelete(item); },
+                    icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                    label: const Text('Delete', style: TextStyle(color: Colors.red)),
+                    style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)),
+                  )),
+                ]),
               ]),
             ),
           ]),
