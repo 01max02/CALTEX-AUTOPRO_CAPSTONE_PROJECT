@@ -1,5 +1,6 @@
 import traceback
 import uuid
+import re as _re
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from schemas import ChatRequest, ChatResponse, CustomerChatRequest, SessionInfoResponse
@@ -13,6 +14,45 @@ app = FastAPI(
     title="Caltex AutoPro AI",
     description="AI assistant with server-side conversational memory",
 )
+
+
+# ── Rate-limit helper ─────────────────────────────────────────────────────────
+
+def _parse_rate_limit_reset(error_message: str) -> str:
+    """
+    Extract the reset time from a Groq RateLimitError message.
+    e.g. 'Please try again in 15m46.944s' → 'about 15 minutes'
+    """
+    m = _re.search(r'in\s+(\d+h)?\s*(\d+m)?', error_message)
+    if m:
+        hours   = m.group(1) or ""
+        minutes = m.group(2) or ""
+        parts   = []
+        if hours:
+            parts.append(hours.replace("h", " hour(s)"))
+        if minutes:
+            parts.append(minutes.replace("m", " minute(s)"))
+        if parts:
+            return "about " + " and ".join(parts)
+    return "some time"
+
+
+def _rate_limit_reply(error_message: str) -> dict:
+    """Build a structured rate-limit response the frontends can detect."""
+    reset_in = _parse_rate_limit_reset(error_message)
+    return {
+        "rate_limited": True,
+        "reply": (
+            f"⚠️ The AI service has reached its daily usage limit (Groq free tier).\n\n"
+            f"It will automatically reset in {reset_in}.\n\n"
+            f"Please try again later."
+        ),
+        "reset_in": reset_in,
+    }
+
+
+def _is_rate_limit(exc: Exception) -> bool:
+    return "rate_limit" in type(exc).__name__.lower() or "429" in str(exc)
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -95,6 +135,14 @@ def admin_chat(req: ChatRequest):
         )
 
     except Exception as e:
+        if _is_rate_limit(e):
+            rl = _rate_limit_reply(str(e))
+            return ChatResponse(
+                reply=rl["reply"],
+                session_id=session_id,
+                rate_limited=True,
+                reset_in=rl["reset_in"],
+            )
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -322,6 +370,14 @@ def customer_chat_endpoint(req: CustomerChatRequest):
         )
 
     except Exception as e:
+        if _is_rate_limit(e):
+            rl = _rate_limit_reply(str(e))
+            return ChatResponse(
+                reply=rl["reply"],
+                session_id=session_id,
+                rate_limited=True,
+                reset_in=rl["reset_in"],
+            )
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 

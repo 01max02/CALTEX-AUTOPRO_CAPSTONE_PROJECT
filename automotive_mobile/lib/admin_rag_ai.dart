@@ -82,6 +82,8 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
   String? _sessionId;  // server-side memory key
 
   bool _loading       = false;
+  bool _rateLimited   = false;   // true when Groq daily token limit is reached
+  String _resetIn     = '';      // human-readable reset time
   bool _backendOnline = false;
 
   @override
@@ -128,7 +130,7 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
 
   Future<void> _sendQuery([String? preset]) async {
     final text = (preset ?? _inputCtrl.text).trim();
-    if (text.isEmpty || _loading) return;
+    if (text.isEmpty || _loading || _rateLimited) return;
 
     // ── Report intent? Handle separately ──────────────────────────────────
     final reportType = _detectReportIntent(text);
@@ -160,8 +162,8 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
             Uri.parse('$_kAiBaseUrl/admin/chat'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
-              'message': text,
-              'history': historyPayload,
+              'message':    text,
+              'session_id': _sessionId,  // server-side memory key
             }),
           )
           .timeout(const Duration(seconds: 60));
@@ -171,8 +173,22 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
         final reply  = (data['reply'] as String? ?? '').trim();
         final answer = reply.isNotEmpty ? reply : 'No response generated.';
 
-        _history.add({'role': 'user',      'content': text});
-        _history.add({'role': 'assistant', 'content': answer});
+        // Persist session_id for continuity across turns
+        if (data['session_id'] != null) {
+          _sessionId = data['session_id'] as String;
+        }
+
+        // Handle rate limit
+        if (data['rate_limited'] == true) {
+          final resetIn = data['reset_in'] as String? ?? 'some time';
+          setState(() {
+            _loading = false;
+            _rateLimited = true;
+            _resetIn = resetIn;
+            _messages.add(_ChatMessage(role: 'ai', text: answer));
+          });
+          return;
+        }
 
         setState(() {
           _loading = false;
@@ -390,10 +406,20 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
             IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.white),
               tooltip: 'Clear chat',
-              onPressed: () => setState(() {
-                _messages.clear();
-                _history.clear();
-              }),
+              onPressed: () {
+                // Clear server-side session memory
+                if (_sessionId != null) {
+                  http.delete(Uri.parse('$_kAiBaseUrl/session/$_sessionId'))
+                      .catchError((_) {});
+                  _sessionId = null;
+                }
+                setState(() {
+                  _messages.clear();
+                  _history.clear();
+                  _rateLimited = false;
+                  _resetIn = '';
+                });
+              },
             ),
         ],
       ),
@@ -421,6 +447,33 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF975A16))),
+              ),
+            ]),
+          ),
+
+        // Rate-limit banner
+        if (_rateLimited)
+          Container(
+            width: double.infinity,
+            color: const Color(0xFFFFFBEB),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(children: [
+              const Text('⚠️', style: TextStyle(fontSize: 16)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: RichText(
+                  text: TextSpan(
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF975A16)),
+                    children: [
+                      const TextSpan(
+                          text: 'Daily AI limit reached. ',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      TextSpan(
+                          text: 'Resets in $_resetIn. '
+                              'Chat is disabled until then.'),
+                    ],
+                  ),
+                ),
               ),
             ]),
           ),
@@ -471,11 +524,11 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
               ),
               const SizedBox(width: 8),
               GestureDetector(
-                onTap: _loading ? null : _sendQuery,
+                onTap: _loading || _rateLimited ? null : _sendQuery,
                 child: Container(
                   width: 44, height: 44,
                   decoration: BoxDecoration(
-                    color: _loading ? Colors.grey : _red,
+                    color: _loading || _rateLimited ? Colors.grey : _red,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.send, color: Colors.white, size: 18),

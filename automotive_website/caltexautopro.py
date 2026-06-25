@@ -703,10 +703,12 @@ def ai_chat():
             resp.raise_for_status()
             payload = resp.json()
             return jsonify({
-                'success':    True,
-                'answer':     payload.get('reply', ''),
-                'session_id': payload.get('session_id', ''),
-                'tool_calls': payload.get('tool_calls', []),
+                'success':      True,
+                'answer':       payload.get('reply', ''),
+                'session_id':   payload.get('session_id', ''),
+                'rate_limited': payload.get('rate_limited', False),
+                'reset_in':     payload.get('reset_in', ''),
+                'tool_calls':   payload.get('tool_calls', []),
             })
         except _requests_lib.exceptions.ConnectionError:
             return jsonify({'success': False, 'offline': True,
@@ -771,10 +773,12 @@ def ai_chat():
             })
 
         return jsonify({
-            'success':    True,
-            'answer':     payload.get('reply', ''),
-            'session_id': payload.get('session_id', ''),
-            'tool_calls': payload.get('tool_calls', []),
+            'success':      True,
+            'answer':       payload.get('reply', ''),
+            'session_id':   payload.get('session_id', ''),
+            'rate_limited': payload.get('rate_limited', False),
+            'reset_in':     payload.get('reset_in', ''),
+            'tool_calls':   payload.get('tool_calls', []),
         })
     except _requests_lib.exceptions.ConnectionError:
         return jsonify({

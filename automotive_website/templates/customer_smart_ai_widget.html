@@ -200,6 +200,34 @@
   const messages = [];
   let _chatHistory = [];    // rolling client-side history (legacy fallback)
   let _sessionId   = null;  // server-side session key returned by the backend
+  let _rateLimited = false;
+
+  // ── Rate-limit UI helper ──────────────────────────────────────────────────
+  function _setRateLimited(limited, resetIn) {
+    _rateLimited = limited;
+    const input   = document.getElementById('aiInput');
+    const sendBtn = document.querySelector('.ai-send');
+    const banner  = document.getElementById('aiRateBanner');
+    if (limited) {
+      if (input)   { input.disabled = true; input.placeholder = 'AI unavailable — daily limit reached'; }
+      if (sendBtn) { sendBtn.style.opacity = '0.4'; sendBtn.style.pointerEvents = 'none'; }
+      if (!banner) {
+        const b = document.createElement('div');
+        b.id = 'aiRateBanner';
+        b.style.cssText = 'background:#fffbeb;border-top:1px solid #f6e05e;padding:9px 18px;' +
+          'font-size:12px;color:#975a16;text-align:center;flex-shrink:0;';
+        b.innerHTML = '⚠️ <strong>Daily AI limit reached.</strong> ' +
+          'Resets in <strong>' + (resetIn || 'some time') + '</strong>. ' +
+          'Chat disabled until then.';
+        const inputBar = document.querySelector('.ai-input-bar');
+        if (inputBar) inputBar.parentNode.insertBefore(b, inputBar);
+      }
+    } else {
+      if (input)   { input.disabled = false; input.placeholder = 'Ask about your vehicles...'; }
+      if (sendBtn) { sendBtn.style.opacity = ''; sendBtn.style.pointerEvents = ''; }
+      if (banner)  banner.remove();
+    }
+  }
 
   async function loadData(user) {
     try {
@@ -307,6 +335,7 @@
     const input = document.getElementById('aiInput');
     const text = (preset || input.value).trim();
     if (!text) return;
+    if (_rateLimited) return;  // blocked while rate-limited
 
     // Hide welcome + chips on first message
     document.getElementById('aiWelcome').style.display = 'none';
@@ -343,6 +372,14 @@
       if (data.offline || !data.success) {
         // Backend offline — fall back to local processing
         addBubble(processQuery(text), 'bot');
+      } else if (data.rate_limited) {
+        // Groq daily token limit reached — show notice and lock input
+        _setRateLimited(true, data.reset_in || 'some time');
+        addBubble(
+          '⚠️ Daily AI limit reached.\n\n' +
+          'The AI service has hit its daily usage limit (Groq free tier).\n' +
+          'It will reset in ' + (data.reset_in || 'some time') + '.\n\n' +
+          'Please try again later.', 'bot');
       } else if (data.answer) {
         // Store session_id for continuity across turns
         if (data.session_id) { _sessionId = data.session_id; }
@@ -362,6 +399,7 @@
       fetch('/api/ai-session/' + _sessionId, { method: 'DELETE' }).catch(function(){});
       _sessionId = null;
     }
+    _setRateLimited(false);
     const msgs = document.getElementById('aiMessages');
     msgs.innerHTML = '';
     document.getElementById('aiWelcome').style.display = 'block';

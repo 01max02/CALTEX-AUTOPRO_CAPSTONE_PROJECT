@@ -97,6 +97,39 @@
 var _ragInitials = 'AD';
 var _ragReady = false;
 var _ragSessionId = null;  // server-side session key — sent back on each request
+var _ragRateLimited = false;
+
+// ── Rate-limit helpers ────────────────────────────────────────────────────
+function _ragSetRateLimited(limited, resetIn) {
+  _ragRateLimited = limited;
+  var input  = document.getElementById('ragAiInput');
+  var sendBtn = input ? input.closest('div').querySelector('button') : null;
+  var banner  = document.getElementById('ragRateBanner');
+
+  if (limited) {
+    if (input)   { input.disabled = true;  input.placeholder = 'AI unavailable — daily limit reached'; }
+    if (sendBtn) { sendBtn.style.opacity = '0.4'; sendBtn.style.pointerEvents = 'none'; }
+    if (!banner) {
+      // Insert banner below the panel header
+      var chat = document.getElementById('ragAiChat');
+      if (chat && chat.parentNode) {
+        var b = document.createElement('div');
+        b.id = 'ragRateBanner';
+        b.style.cssText = 'background:#fffbeb;border-bottom:1px solid #f6e05e;' +
+          'padding:8px 14px;font-size:11px;color:#975a16;display:flex;' +
+          'align-items:center;gap:6px;flex-shrink:0;';
+        b.innerHTML = '⚠️ <strong>Daily AI limit reached.</strong> ' +
+          'Resets in <strong>' + (resetIn || 'some time') + '</strong>. ' +
+          'Chat is disabled until reset.';
+        chat.parentNode.insertBefore(b, chat);
+      }
+    }
+  } else {
+    if (input)   { input.disabled = false; input.placeholder = 'Ask about fleet, inventory, maintenance...'; }
+    if (sendBtn) { sendBtn.style.opacity = ''; sendBtn.style.pointerEvents = ''; }
+    if (banner)  { banner.remove(); }
+  }
+}
 
 window.ragAiToggle = function() {
   var panel = document.getElementById('ragAiPanel');
@@ -190,6 +223,7 @@ window.ragAiSend = function(preset) {
   var input = document.getElementById('ragAiInput');
   var text = (preset||input.value).trim();
   if (!text) return;
+  if (_ragRateLimited) { return; }  // blocked while rate-limited
   if (!_ragReady) { _ragAppend('ai','⏳ <strong>Still loading data…</strong> Please wait.'); return; }
   document.getElementById('ragAiChips').style.display='none';
   _ragAppend('user', _ragEsc(text));
@@ -211,6 +245,18 @@ window.ragAiSend = function(preset) {
     _ragRemoveTyping();
     // Persist the session_id returned by the backend for memory continuity
     if (data.session_id) { _ragSessionId = data.session_id; }
+
+    // ── Rate limit notice ─────────────────────────────────────────────────
+    if (data.rate_limited) {
+      _ragSetRateLimited(true, data.reset_in || 'some time');
+      _ragAppend('ai',
+        '⚠️ <strong>Daily AI limit reached.</strong><br>' +
+        'The AI service (Groq free tier) has reached its daily token limit.<br>' +
+        'It will reset in <strong>' + (data.reset_in || 'some time') + '</strong>.<br>' +
+        'Please try again later.');
+      return;
+    }
+
     if (data.offline || !data.success) {
       // RAG engine not available — fall back to local JS engine
       var result = _ragProcess(text);
@@ -250,6 +296,7 @@ window.ragAiClear = function() {
     fetch('/api/ai-session/' + _ragSessionId, { method: 'DELETE' }).catch(function(){});
     _ragSessionId = null;
   }
+  _ragSetRateLimited(false);
   document.getElementById('ragAiChat').innerHTML='';
   document.getElementById('ragAiChips').style.display='flex';
   _ragShowWelcome();

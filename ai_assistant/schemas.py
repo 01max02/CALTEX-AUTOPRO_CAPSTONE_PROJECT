@@ -11,6 +11,8 @@ class ChatResponse(BaseModel):
     reply: str
     session_id: str                    # always returned so the client can send it back
     tool_calls: list[dict] = []
+    rate_limited: bool = False         # True when Groq daily token limit is reached
+    reset_in: str = ""                 # human-readable reset time e.g. "about 15 minutes"
 
 
 class CustomerChatRequest(BaseModel):

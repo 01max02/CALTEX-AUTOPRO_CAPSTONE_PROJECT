@@ -3,7 +3,7 @@ LLM client using Groq (fast cloud inference, OpenAI-compatible API).
 """
 import json
 import logging
-from groq import Groq, BadRequestError
+from groq import Groq, BadRequestError, RateLimitError
 from config import settings
 from firestore_tools import TOOL_SCHEMAS, TOOL_FUNCTIONS
 from verifier import verify_reply
@@ -96,14 +96,15 @@ def chat(user_message: str, history: list[dict] | None = None, _retry: bool = Fa
     for _ in range(5):
         try:
             response = _call_groq(messages, tools=TOOL_SCHEMAS)
+        except RateLimitError:
+            # Re-raise so main.py can return the structured rate-limit response
+            raise
         except BadRequestError as e:
             error_str = str(e)
             logger.warning("Groq BadRequestError: %s", error_str)
 
             # If Groq rejected because of a null/invalid arg in a tool call,
-            # retry the same question without tools so the LLM can still respond.
-            # This covers the "list all materials" type of vague queries where the
-            # LLM tries to call a tool but generates bad arguments.
+            # retry without tools so the LLM can still answer in plain text.
             if "tool" in error_str.lower() or "function" in error_str.lower():
                 try:
                     fallback = _call_groq(messages)  # no tools — plain text answer
@@ -115,6 +116,8 @@ def chat(user_message: str, history: list[dict] | None = None, _retry: bool = Fa
                         "verified": True,
                         "unsupported_numbers": [],
                     }
+                except RateLimitError:
+                    raise
                 except Exception as fallback_err:
                     logger.error("Fallback call also failed: %s", fallback_err)
 

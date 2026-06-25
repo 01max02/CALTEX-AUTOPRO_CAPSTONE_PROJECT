@@ -30,7 +30,8 @@ class _CustomerSmartAIState extends State<CustomerSmartAI> {
   final _scrollCtrl = ScrollController();
 
   final List<_Msg> _messages = [];
-  final List<Map<String, String>> _history = []; // rolling conversation history
+  final List<Map<String, String>> _history = []; // legacy — kept for fallback only
+  String? _sessionId;  // server-side memory key
 
   // Customer identity — loaded from Firebase, needed for scoped AI queries
   String _customerUid  = '';
@@ -40,6 +41,8 @@ class _CustomerSmartAIState extends State<CustomerSmartAI> {
   bool _dataLoaded    = false;
   bool _loading       = false;
   bool _backendOnline = false;
+  bool _rateLimited   = false;
+  String _resetIn     = '';
 
   @override
   void initState() {
@@ -115,6 +118,7 @@ class _CustomerSmartAIState extends State<CustomerSmartAI> {
   Future<void> _send([String? preset]) async {
     final text = (preset ?? _chatCtrl.text).trim();
     if (text.isEmpty || _loading) return;
+    if (_rateLimited) return;
 
     if (!_dataLoaded) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -145,7 +149,7 @@ class _CustomerSmartAIState extends State<CustomerSmartAI> {
               'message':       text,
               'customer_uid':  _customerUid,
               'customer_name': _customerName,
-              'history':       historyPayload,
+              'session_id':    _sessionId,  // server-side memory key
             }),
           )
           .timeout(const Duration(seconds: 60));
@@ -155,8 +159,22 @@ class _CustomerSmartAIState extends State<CustomerSmartAI> {
         final reply = (data['reply'] as String? ?? '').trim();
         final answer = reply.isNotEmpty ? reply : 'No response generated.';
 
-        _history.add({'role': 'user',      'content': text});
-        _history.add({'role': 'assistant', 'content': answer});
+        // Persist session_id for memory continuity
+        if (data['session_id'] != null) {
+          _sessionId = data['session_id'] as String;
+        }
+
+        // Handle rate limit
+        if (data['rate_limited'] == true) {
+          final resetIn = data['reset_in'] as String? ?? 'some time';
+          setState(() {
+            _loading = false;
+            _rateLimited = true;
+            _resetIn = resetIn;
+            _messages.add(_Msg(role: 'ai', text: data['reply'] as String? ?? ''));
+          });
+          return;
+        }
 
         setState(() {
           _loading = false;
@@ -206,6 +224,37 @@ class _CustomerSmartAIState extends State<CustomerSmartAI> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
+      appBar: _messages.isNotEmpty
+          ? AppBar(
+              backgroundColor: _red,
+              elevation: 0,
+              automaticallyImplyLeading: false,
+              title: const Text('Vehicle Assistant',
+                  style: TextStyle(
+                      color: Colors.white, fontSize: 15,
+                      fontWeight: FontWeight.bold)),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.white),
+                  tooltip: 'Clear chat',
+                  onPressed: () {
+                    // Clear server-side session memory
+                    if (_sessionId != null) {
+                      http.delete(Uri.parse('$_kAiBaseUrl/session/$_sessionId'))
+                          .catchError((_) {});
+                      _sessionId = null;
+                    }
+                    setState(() {
+                      _messages.clear();
+                      _history.clear();
+                      _rateLimited = false;
+                      _resetIn = '';
+                    });
+                  },
+                ),
+              ],
+            )
+          : null,
       body: Column(children: [
         // Offline banner
         if (!_backendOnline && _dataLoaded)
@@ -230,6 +279,35 @@ class _CustomerSmartAIState extends State<CustomerSmartAI> {
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF975A16))),
+              ),
+            ]),
+          ),
+
+        // Rate-limit banner
+        if (_rateLimited)
+          Container(
+            width: double.infinity,
+            color: const Color(0xFFFFFBEB),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(children: [
+              const Text('⚠️', style: TextStyle(fontSize: 15)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: RichText(
+                  text: TextSpan(
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF975A16)),
+                    children: [
+                      const TextSpan(
+                        text: 'Daily AI limit reached. ',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      TextSpan(
+                        text: 'Resets in $_resetIn. '
+                            'Chat is disabled until then.',
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ]),
           ),
