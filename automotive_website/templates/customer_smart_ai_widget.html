@@ -162,6 +162,9 @@
     <button class="ai-chip" onclick="send('Which vehicles have PMS overdue?')">⚠️ Overdue</button>
     <button class="ai-chip" onclick="send('Which vehicles have PMS due soon?')">📅 Due soon</button>
     <button class="ai-chip" onclick="send('Show my service history')">📋 History</button>
+    <button class="ai-chip" onclick="send('Show my bookings')">🗓️ Bookings</button>
+    <button class="ai-chip" onclick="send('What services do you offer and their prices?')">💰 Service prices</button>
+    <button class="ai-chip" onclick="send('How much is a change oil?')">🔍 Change oil cost</button>
 </div>
 
 <div class="ai-input-bar">
@@ -195,6 +198,8 @@
 
   let _myVehicles = [], _myMaintenance = [], _dataLoaded = false;
   const messages = [];
+  let _chatHistory = [];    // rolling client-side history (legacy fallback)
+  let _sessionId   = null;  // server-side session key returned by the backend
 
   async function loadData(user) {
     try {
@@ -319,41 +324,51 @@
 
     const typing = addTyping();
 
-    // Try RAG AI backend via Flask proxy first
+    // Call the AI backend (customer/chat), fall back to local if offline
     try {
+      const user = firebase.auth().currentUser;
       const resp = await fetch('/api/ai-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: text,
-          session_id: cpUser.uid || cpUser.email || 'anonymous',
-          user_type: 'customer',
+          message:       text,
+          user_type:     'customer',
+          customer_uid:  user ? user.uid : (cpUser.uid || ''),
+          customer_name: cpUser.name || '',
+          session_id:    _sessionId,
         }),
       });
       const data = await resp.json();
       typing.remove();
       if (data.offline || !data.success) {
-        // RAG engine not available — fall back to local processing
+        // Backend offline — fall back to local processing
         addBubble(processQuery(text), 'bot');
       } else if (data.answer) {
+        // Store session_id for continuity across turns
+        if (data.session_id) { _sessionId = data.session_id; }
         addBubble(data.answer, 'bot');
       } else {
         addBubble(processQuery(text), 'bot');
       }
     } catch (err) {
-      // Network error or Flask down — fall back to local processing
       typing.remove();
       addBubble(processQuery(text), 'bot');
     }
   };
 
   window.clearChat = function () {
+    // Clear server-side session memory
+    if (_sessionId) {
+      fetch('/api/ai-session/' + _sessionId, { method: 'DELETE' }).catch(function(){});
+      _sessionId = null;
+    }
     const msgs = document.getElementById('aiMessages');
     msgs.innerHTML = '';
     document.getElementById('aiWelcome').style.display = 'block';
     document.getElementById('aiChips').style.display = 'flex';
     document.getElementById('clearBtn').style.display = 'none';
     msgs.appendChild(document.getElementById('aiWelcome'));
+    _chatHistory = [];
   };
 
   // Wait for Firebase Auth before loading data

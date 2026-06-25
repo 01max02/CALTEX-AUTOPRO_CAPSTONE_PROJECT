@@ -638,243 +638,230 @@ def customer_smart_ai():
 def customer_header():
     return render_template('customer_header.html')
 
-# ── RAG AI Engine (in-process) ────────────────────────────────────────────────
-# Imports the RAG engine directly — no separate server needed.
-# The rag_module.py is auto-generated from AI_ASSISTANT/rag_ai.py
-# Run: python build_rag_module.py (if rag_module.py doesn't exist)
+# ── Admin AI Backend Proxy ─────────────────────────────────────────────────────
+# The admin AI is served by the standalone FastAPI service in ai_assistant/.
+# Start it with:  cd ai_assistant && uvicorn main:app --port 8000
+#
+# The Flask server acts as a proxy so the browser never talks directly to the
+# FastAPI service (avoids CORS and keeps auth in one place).
+#
+# Only admin requests are proxied.  Customer AI chat keeps its local JS fallback.
 
-_rag_engine = None
-_rag_error = None
+import requests as _requests_lib
 
-# Tell the RAG module to use the same Firebase credentials as caltexautopro.py
-if not os.environ.get('FIREBASE_CREDENTIALS_PATH'):
-    os.environ['FIREBASE_CREDENTIALS_PATH'] = _SERVICE_ACCOUNT_PATH
+# Base URL of the ai_assistant FastAPI service — override via env var if needed.
+_AI_BACKEND_URL = os.environ.get('AI_BACKEND_URL', 'http://localhost:8002')
 
-# Groq LLM API key for conversational AI responses
-if not os.environ.get('GROQ_API_KEY'):
-    _groq_key_path = os.path.join(os.path.dirname(__file__), '.groq_key')
-    if os.path.exists(_groq_key_path):
-        os.environ['GROQ_API_KEY'] = open(_groq_key_path).read().strip()
 
-try:
-    from rag_module import EnhancedRag
-    _rag_engine = EnhancedRag()
-    # Pre-warm the cache at startup so first query is fast
+def _ai_backend_available() -> bool:
+    """Quick liveness ping to the AI backend."""
     try:
-        _rag_engine.retriever.base_retriever._refresh_cache_if_needed()
-        _cached_count = len(_rag_engine.retriever.base_retriever._cached_records)
-        print(f'✅ RAG AI Engine initialized (in-process) — {_cached_count} records cached')
-    except Exception as _warm_err:
-        print(f'✅ RAG AI Engine initialized (cache warm failed: {_warm_err})')
-except Exception as _e:
-    _rag_error = str(_e)
-    print(f'⚠️  RAG AI Engine not loaded: {_e}')
-    print('   The AI chat will fall back to basic responses.')
+        r = _requests_lib.get(f'{_AI_BACKEND_URL}/health', timeout=3)
+        return r.status_code == 200
+    except Exception:
+        return False
 
 
 @app.route('/api/ai-chat', methods=['POST'])
 def ai_chat():
-    """AI chat endpoint — uses RAG engine directly (no separate server)."""
-    import threading
+    """Proxy AI chat to ai_assistant FastAPI service with session memory.
 
-    data = request.get_json(silent=True) or {}
-    message = data.get('message', '').strip()
-    session_id = data.get('session_id', '')
-    user_type = data.get('user_type', 'customer')
+    - user_type == 'admin'    → POST /admin/chat
+    - user_type == 'customer' → POST /customer/chat  (scoped to that customer)
+
+    The backend returns a session_id which the frontend must send back on the
+    next request — this is how server-side conversational memory works.
+    """
+    data          = request.get_json(silent=True) or {}
+    message       = data.get('message', '').strip()
+    user_type     = data.get('user_type', 'customer')
+    session_id    = data.get('session_id', '').strip() or None
+    customer_uid  = data.get('customer_uid', '').strip()
+    customer_name = data.get('customer_name', '').strip()
 
     if not message:
         return jsonify({'success': False, 'error': 'Empty message'}), 400
 
-    if _rag_engine is None:
-        return jsonify({
-            'success': False,
-            'error': f'RAG AI not available: {_rag_error}',
-            'answer': 'The AI service is not available right now. Please try the quick-help options.',
-            'offline': True,
-        }), 503
-
-    # Run the RAG query with a timeout to prevent hanging
-    result_holder = [None]
-    error_holder = [None]
-
-    def _run_query():
+    # ── Customer chat ─────────────────────────────────────────────────────────
+    if user_type == 'customer':
+        if not customer_uid or not customer_name:
+            return jsonify({
+                'success': False, 'offline': True,
+                'answer': 'Customer identity missing. Please log in again.',
+            }), 400
         try:
-            result_holder[0] = _rag_engine.ask(
-                query=message,
-                session_id=session_id or 'default',
-                user_type=user_type,
+            resp = _requests_lib.post(
+                f'{_AI_BACKEND_URL}/customer/chat',
+                json={
+                    'message':       message,
+                    'customer_uid':  customer_uid,
+                    'customer_name': customer_name,
+                    'session_id':    session_id,
+                },
+                timeout=60,
             )
+            resp.raise_for_status()
+            payload = resp.json()
+            return jsonify({
+                'success':    True,
+                'answer':     payload.get('reply', ''),
+                'session_id': payload.get('session_id', ''),
+                'tool_calls': payload.get('tool_calls', []),
+            })
+        except _requests_lib.exceptions.ConnectionError:
+            return jsonify({'success': False, 'offline': True,
+                            'answer': 'The AI service is offline.'}), 503
+        except _requests_lib.exceptions.Timeout:
+            return jsonify({'success': False, 'offline': True,
+                            'answer': 'The AI service timed out. Please try again.'}), 503
         except Exception as e:
-            error_holder[0] = e
+            return jsonify({'success': False, 'offline': True,
+                            'answer': f'AI service error: {e}'}), 503
 
-    thread = threading.Thread(target=_run_query, daemon=True)
-    thread.start()
-    thread.join(timeout=45)  # 45 second timeout (first query fetches from Firestore)
+    # ── Admin chat ────────────────────────────────────────────────────────────
+    if user_type != 'admin':
+        return jsonify({'success': False, 'offline': True,
+                        'answer': 'Unknown user type.'}), 400
 
-    if thread.is_alive():
-        # Query timed out — Firestore is slow or unreachable
+    try:
+        resp = _requests_lib.post(
+            f'{_AI_BACKEND_URL}/admin/chat',
+            json={'message': message, 'session_id': session_id},
+            timeout=60,
+        )
+        resp.raise_for_status()
+        payload = resp.json()
+
+        # ── Report intent detection ───────────────────────────────────────────
+        import re as _re
+        _msg_lower = message.lower()
+        _report_keywords = _re.compile(
+            r'\b(generate|create|make|export|download|print)\b.*\b(report|pdf|excel|xlsx)\b'
+            r'|\b(pdf|excel|xlsx)\s+report\b'
+            r'|\breport\s+(pdf|excel|xlsx)\b',
+            _re.IGNORECASE
+        )
+        _type_map = {
+            'inventory':   'inventory',
+            'stock':       'inventory',
+            'issuance':    'issuance',
+            'issued':      'issuance',
+            'maintenance': 'maintenance',
+            'service':     'maintenance',
+            'repair':      'maintenance',
+            'vehicle':     'vehicles',
+            'fleet':       'vehicles',
+            'booking':     'bookings',
+            'appointment': 'bookings',
+        }
+        if _report_keywords.search(_msg_lower):
+            detected_type   = 'inventory'
+            for kw, rtype in _type_map.items():
+                if kw in _msg_lower:
+                    detected_type = rtype
+                    break
+            detected_format = 'excel' if any(w in _msg_lower for w in ('excel', 'xlsx', 'spreadsheet')) else 'pdf'
+            return jsonify({
+                'success':       True,
+                'report_ready':  True,
+                'report_type':   detected_type,
+                'report_format': detected_format,
+                'session_id':    payload.get('session_id', ''),
+                'answer':        payload.get('reply', f'Your {detected_type} report is ready to download.'),
+            })
+
+        return jsonify({
+            'success':    True,
+            'answer':     payload.get('reply', ''),
+            'session_id': payload.get('session_id', ''),
+            'tool_calls': payload.get('tool_calls', []),
+        })
+    except _requests_lib.exceptions.ConnectionError:
         return jsonify({
             'success': False,
-            'error': 'Query timed out — Firestore may be slow or unreachable',
-            'answer': 'The AI is taking too long to respond. This usually means the database connection is slow. Please try again.',
             'offline': True,
+            'answer': 'The AI service is offline. Start it with: cd ai_assistant && uvicorn main:app --port 8000',
         }), 503
-
-    if error_holder[0]:
-        err_msg = str(error_holder[0])
-        if 'credentials' in err_msg.lower() or 'not found' in err_msg.lower():
-            answer = 'The AI service cannot connect to the database. Please ensure serviceAccountKey.json is in the automotive_website folder.'
-        else:
-            answer = 'An error occurred while processing your question. Please try again.'
+    except _requests_lib.exceptions.Timeout:
         return jsonify({
             'success': False,
-            'error': err_msg,
-            'answer': answer,
             'offline': True,
+            'answer': 'The AI service timed out. Please try again.',
         }), 503
-
-    result = result_holder[0]
-    if result is None:
+    except Exception as e:
         return jsonify({
             'success': False,
-            'error': 'No result returned',
-            'answer': 'The AI could not generate a response. Please try again.',
             'offline': True,
+            'answer': f'AI service error: {e}',
         }), 503
-
-    # Ensure we always return a success field and answer
-    if 'answer' not in result:
-        result['answer'] = 'No response generated.'
-    if 'success' not in result:
-        result['success'] = True
-    return jsonify(result)
 
 
 @app.route('/api/ai-health', methods=['GET'])
 def ai_health_check():
-    """Check if the RAG AI engine is loaded."""
-    if _rag_engine is not None:
-        return jsonify({'online': True, 'status': 'ok', 'mode': 'in-process'})
-    return jsonify({'online': False, 'error': _rag_error}), 503
+    """Check if the AI backend service is reachable."""
+    if _ai_backend_available():
+        return jsonify({'online': True, 'status': 'ok', 'mode': 'ai_assistant'})
+    return jsonify({'online': False, 'error': 'ai_assistant service not reachable'}), 503
 
 
 @app.route('/api/ai-session/<session_id>', methods=['DELETE'])
 def ai_clear_session(session_id):
-    """Clear conversation history for a session."""
-    if _rag_engine is None:
-        return jsonify({'success': False, 'error': 'RAG AI not available'}), 503
-    result = _rag_engine.clear_session(session_id)
-    return jsonify(result)
+    """Clear server-side session memory for a given session."""
+    try:
+        _requests_lib.delete(
+            f'{_AI_BACKEND_URL}/session/{session_id}',
+            timeout=5,
+        )
+    except Exception:
+        pass  # best-effort; don't fail if backend is down
+    return jsonify({'success': True, 'cleared': session_id})
 
 
 @app.route('/api/ai-report', methods=['POST'])
 def ai_generate_report():
-    """Generate PDF or Excel report from live Firestore data.
-    
+    """Generate PDF or Excel report by proxying to ai_assistant FastAPI service.
+
     Request body:
-        report_type: "inventory" | "issuance" | "transactions"
-        format: "pdf" | "excel" (default: "pdf")
-        start_date: ISO date string (optional, e.g. "2026-05-01")
-        end_date: ISO date string (optional, e.g. "2026-05-31")
-    
-    Returns: the file as a download
+        report_type: "inventory" | "issuance" | "maintenance" | "vehicles" | "bookings"
+        format:      "pdf" | "excel"  (default: "pdf")
     """
     from flask import send_file
     import io as _io
-    from datetime import datetime, timezone
 
-    if _rag_engine is None:
-        return jsonify({'success': False, 'error': 'RAG AI not available'}), 503
-
-    data = request.get_json(silent=True) or {}
+    data        = request.get_json(silent=True) or {}
     report_type = data.get('report_type', '').strip().lower()
     file_format = data.get('format', 'pdf').strip().lower()
-    raw_start = data.get('start_date', '').strip()
-    raw_end = data.get('end_date', '').strip()
 
-    if report_type not in ('inventory', 'issuance', 'transactions'):
+    valid_types = ('inventory', 'issuance', 'maintenance', 'vehicles', 'bookings')
+    if report_type not in valid_types:
         return jsonify({
             'success': False,
-            'error': 'Invalid report_type. Use: inventory, issuance, or transactions',
+            'error': f'Invalid report_type. Use: {", ".join(valid_types)}',
         }), 400
 
-    if file_format not in ('pdf', 'excel', 'xlsx'):
-        return jsonify({
-            'success': False,
-            'error': 'Invalid format. Use: pdf or excel',
-        }), 400
-
-    # Parse optional date filters
-    start_date = None
-    end_date = None
-    period_label = 'All Time'
     try:
-        if raw_start:
-            from dateutil import parser as dateutil_parser
-            start_date = dateutil_parser.parse(raw_start)
-            if start_date.tzinfo is None:
-                start_date = start_date.replace(tzinfo=timezone.utc)
-        if raw_end:
-            from dateutil import parser as dateutil_parser
-            end_date = dateutil_parser.parse(raw_end)
-            if end_date.tzinfo is None:
-                end_date = end_date.replace(tzinfo=timezone.utc)
-        if start_date and end_date:
-            period_label = f"{start_date.strftime('%b %d, %Y')} - {end_date.strftime('%b %d, %Y')}"
-        elif start_date:
-            period_label = f"From {start_date.strftime('%b %d, %Y')}"
-        elif end_date:
-            period_label = f"Until {end_date.strftime('%b %d, %Y')}"
-    except (ValueError, TypeError):
-        pass  # If date parsing fails, proceed without filtering
-
-    try:
-        from rag_module import ReportService, FirebaseSource
-        firebase_src = _rag_engine.firebase_source
-        report_svc = ReportService(firebase_source=firebase_src)
-
-        report_data = report_svc.build_report_data(
-            report_type=report_type,
-            limit_per_domain=200,
-            period_label=period_label,
-            start_date=start_date,
-            end_date=end_date,
+        resp = _requests_lib.post(
+            f'{_AI_BACKEND_URL}/admin/report',
+            params={'report_type': report_type, 'format': file_format},
+            timeout=90,
         )
+        resp.raise_for_status()
 
-        if file_format == 'pdf':
-            content = report_svc.generate_pdf(report_data)
-            mimetype = 'application/pdf'
-            filename = f'{report_type}_report.pdf'
-        else:
-            content = report_svc.generate_excel(report_data)
-            mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            filename = f'{report_type}_report.xlsx'
+        ext      = '.pdf' if file_format == 'pdf' else '.xlsx'
+        mimetype = ('application/pdf' if file_format == 'pdf'
+                    else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        filename = f'{report_type}_report{ext}'
 
         return send_file(
-            _io.BytesIO(content),
+            _io.BytesIO(resp.content),
             mimetype=mimetype,
             as_attachment=True,
             download_name=filename,
         )
+    except _requests_lib.exceptions.ConnectionError:
+        return jsonify({'success': False, 'error': 'AI service offline'}), 503
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'answer': f'Failed to generate report: {e}',
-        }), 500
-
-
-@app.route('/api/ai-report-list', methods=['GET'])
-def ai_report_list():
-    """List available report types."""
-    return jsonify({
-        'report_types': [
-            {'id': 'inventory', 'name': 'Inventory Report', 'description': 'All inventory/item master records'},
-            {'id': 'issuance', 'name': 'Issuance Report', 'description': 'Material issuance records'},
-            {'id': 'transactions', 'name': 'Transactions Report', 'description': 'Service transactions'},
-        ],
-        'formats': ['pdf', 'excel'],
-    })
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/customer_my_bookings.html')

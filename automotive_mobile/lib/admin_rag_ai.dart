@@ -1,9 +1,67 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
+import 'package:http/http.dart' as http;
 import 'package:printing/printing.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Base URL of the ai_assistant FastAPI service.
+//
+//  Android emulator  → 10.0.2.2  maps to the host machine's localhost
+//  Physical device   → use your machine's LAN IP, e.g. 192.168.1.x
+//
+//  Override at build time:
+//    flutter run --dart-define=AI_BACKEND_URL=http://192.168.1.5:8002
+// ─────────────────────────────────────────────────────────────────────────────
+const _kAiBaseUrl = String.fromEnvironment(
+  'AI_BACKEND_URL',
+  defaultValue: 'http://10.0.2.2:8002',
+);
+
+// ── Report types supported by the backend ────────────────────────────────────
+const _kReportTypes = {
+  'inventory':   'Inventory Report',
+  'issuance':    'Issuance Report',
+  'maintenance': 'Maintenance Report',
+  'vehicles':    'Vehicle Fleet Report',
+  'bookings':    'Service Bookings Report',
+};
+
+// ── Report intent keywords (mirrors Flask proxy logic) ───────────────────────
+const _kReportTypeKeywords = {
+  'inventory':   ['inventory', 'stock'],
+  'issuance':    ['issuance', 'issued'],
+  'maintenance': ['maintenance', 'service', 'repair'],
+  'vehicles':    ['vehicle', 'fleet'],
+  'bookings':    ['booking', 'appointment'],
+};
+
+String? _detectReportIntent(String message) {
+  final lower = message.toLowerCase();
+  final isReportRequest = RegExp(
+    r'\b(generate|create|make|export|download|print)\b.*\b(report|pdf|excel)\b'
+    r'|\b(pdf|excel)\s+report\b'
+    r'|\breport\s+(pdf|excel)\b',
+  ).hasMatch(lower);
+  if (!isReportRequest) return null;
+
+  for (final entry in _kReportTypeKeywords.entries) {
+    for (final kw in entry.value) {
+      if (lower.contains(kw)) return entry.key;
+    }
+  }
+  return 'inventory'; // default
+}
+
+bool _isExcelRequest(String message) {
+  final l = message.toLowerCase();
+  return l.contains('excel') || l.contains('xlsx') || l.contains('spreadsheet');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class AdminSmartReports extends StatefulWidget {
   const AdminSmartReports({super.key});
@@ -13,78 +71,23 @@ class AdminSmartReports extends StatefulWidget {
 }
 
 class _AdminSmartReportsState extends State<AdminSmartReports> {
-  static const _red = Color(0xFFE8001C);
+  static const _red  = Color(0xFFE8001C);
   static const _blue = Color(0xFF003087);
 
-  final _inputCtrl = TextEditingController();
+  final _inputCtrl  = TextEditingController();
   final _scrollCtrl = ScrollController();
-  final List<_ChatMessage> _messages = [];
 
-  // Live data loaded from Firestore
-  List<Map<String, dynamic>> _assets = [];
-  List<Map<String, dynamic>> _inventory = [];
-  List<Map<String, dynamic>> _services = [];
-  bool _dataLoaded = false;
+  final List<_ChatMessage> _messages = [];
+  final List<Map<String, String>> _history = []; // legacy — kept for fallback only
+  String? _sessionId;  // server-side memory key
+
+  bool _loading       = false;
+  bool _backendOnline = false;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    final results = await Future.wait([
-      FirebaseFirestore.instance.collection('vehicles').get(),
-      FirebaseFirestore.instance.collection('stock_inventory').get(),
-      FirebaseFirestore.instance.collection('maintenance')
-          .orderBy('createdAt', descending: true).limit(100).get(),
-    ]);
-
-    final now = DateTime.now();
-
-    _assets = results[0].docs.map((d) {
-      final data = d.data() as Map<String, dynamic>;
-      final lastSvcDate = data['lastSvcDate'] as String? ?? '';
-      final svcFreq = data['svcFreq'] as String? ?? '';
-      final lastDate = DateTime.tryParse(lastSvcDate);
-      final months = int.tryParse(svcFreq);
-      String nextPMS = '';
-      if (lastDate != null && months != null) {
-        final next = DateTime(lastDate.year, lastDate.month + months, lastDate.day);
-        nextPMS = next.toIso8601String();
-      }
-      return {
-        'plate': data['plate'] as String? ?? '',
-        'desc': data['desc'] as String? ?? '',
-        'owner': data['owner'] as String? ?? '',
-        'status': (data['status'] as String? ?? 'active').toLowerCase(),
-        'nextPMS': nextPMS,
-      };
-    }).toList();
-
-    _inventory = results[1].docs.map((d) {
-      final data = d.data() as Map<String, dynamic>;
-      return {
-        'num': data['num'] as String? ?? '',
-        'name': data['name'] as String? ?? '',
-        'stock': (data['stock'] as num?)?.toInt() ?? 0,
-        'min': (data['min'] as num?)?.toInt() ?? 0,
-        'unit': data['uom'] as String? ?? '',
-      };
-    }).toList();
-
-    _services = results[2].docs.map((d) {
-      final data = d.data() as Map<String, dynamic>;
-      final costStr = (data['cost'] as String? ?? '0').replaceAll('₱', '').replaceAll(',', '');
-      return {
-        'plate': data['plate'] as String? ?? '',
-        'desc': data['desc'] as String? ?? '',
-        'cost': double.tryParse(costStr) ?? 0.0,
-        'status': data['status'] as String? ?? '',
-      };
-    }).toList();
-
-    if (mounted) setState(() => _dataLoaded = true);
+    _checkBackend();
   }
 
   @override
@@ -94,266 +97,271 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
     super.dispose();
   }
 
+  // ── Backend health check ───────────────────────────────────────────────────
+
+  Future<void> _checkBackend() async {
+    try {
+      final r = await http
+          .get(Uri.parse('$_kAiBaseUrl/health'))
+          .timeout(const Duration(seconds: 5));
+      if (mounted) setState(() => _backendOnline = r.statusCode == 200);
+    } catch (_) {
+      if (mounted) setState(() => _backendOnline = false);
+    }
+  }
+
+  // ── Scroll ─────────────────────────────────────────────────────────────────
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollCtrl.hasClients) {
-        _scrollCtrl.animateTo(_scrollCtrl.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+        _scrollCtrl.animateTo(
+          _scrollCtrl.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
       }
     });
   }
 
-  void _sendQuery([String? preset]) {
-    final text = preset ?? _inputCtrl.text.trim();
-    if (text.isEmpty) return;
-    if (!_dataLoaded) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Loading data, please wait...'), duration: Duration(seconds: 1)));
+  // ── Chat send ──────────────────────────────────────────────────────────────
+
+  Future<void> _sendQuery([String? preset]) async {
+    final text = (preset ?? _inputCtrl.text).trim();
+    if (text.isEmpty || _loading) return;
+
+    // ── Report intent? Handle separately ──────────────────────────────────
+    final reportType = _detectReportIntent(text);
+    if (reportType != null) {
+      setState(() {
+        _messages.add(_ChatMessage(role: 'user', text: text));
+        _inputCtrl.clear();
+      });
+      _scrollToBottom();
+      final isExcel = _isExcelRequest(text);
+      _showReportConfirm(reportType, isExcel ? 'excel' : 'pdf');
       return;
     }
+
     setState(() {
       _messages.add(_ChatMessage(role: 'user', text: text));
       _inputCtrl.clear();
+      _loading = true;
     });
     _scrollToBottom();
 
-    // Detect export intent
-    final tl = text.toLowerCase();
-    final wantPdf   = tl.contains('pdf') || (tl.contains('generate') && tl.contains('report') && !tl.contains('excel') && !tl.contains('csv'));
-    final wantCsv   = tl.contains('excel') || tl.contains('csv') || tl.contains('spreadsheet');
-    final wantExport = wantPdf || wantCsv || tl.contains('export') || tl.contains('download') || tl.contains('generate report');
+    final historyPayload = _history.length > 20
+        ? _history.sublist(_history.length - 20)
+        : List<Map<String, String>>.from(_history);
 
-    // Strip export keywords to get the actual data query
-    final dataQuery = text
-        .replaceAll(RegExp(r'generate\s+(a\s+)?report\s*(for|of|about|on)?', caseSensitive: false), '')
-        .replaceAll(RegExp(r'export\s+(to\s+)?(pdf|excel|csv|spreadsheet)?', caseSensitive: false), '')
-        .replaceAll(RegExp(r'download\s+(as\s+)?(pdf|excel|csv)?', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\b(pdf|excel|csv|spreadsheet)\b', caseSensitive: false), '')
-        .trim();
+    try {
+      final resp = await http
+          .post(
+            Uri.parse('$_kAiBaseUrl/admin/chat'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'message': text,
+              'history': historyPayload,
+            }),
+          )
+          .timeout(const Duration(seconds: 60));
 
-    Future.delayed(const Duration(milliseconds: 600), () async {
-      final result = _processQuery(dataQuery.isEmpty ? text : dataQuery);
+      if (resp.statusCode == 200) {
+        final data   = jsonDecode(resp.body) as Map<String, dynamic>;
+        final reply  = (data['reply'] as String? ?? '').trim();
+        final answer = reply.isNotEmpty ? reply : 'No response generated.';
 
-      if (wantExport && result.rows.isNotEmpty) {
-        setState(() => _messages.add(_ChatMessage(
-          role: 'ai',
-          result: _QueryResult(
-            type: 'success', icon: wantCsv ? '📊' : '📄',
-            title: wantCsv ? 'Generating CSV Report…' : 'Generating PDF Report…',
-            body: 'Preparing "${result.title}" — please wait.',
-            rows: [],
-          ),
-        )));
-        _scrollToBottom();
+        _history.add({'role': 'user',      'content': text});
+        _history.add({'role': 'assistant', 'content': answer});
 
-        if (wantCsv) {
-          await _exportCsv(result);
-        } else {
-          await _exportPdf(result);
-        }
-      } else if (wantExport && result.rows.isEmpty) {
-        setState(() => _messages.add(_ChatMessage(
-          role: 'ai',
-          result: _QueryResult(
-            type: 'warning', icon: '⚠️',
-            title: 'No Data to Export',
-            body: 'No records found for that query. Try a more specific question first.',
-            rows: [],
-          ),
-        )));
-        _scrollToBottom();
+        setState(() {
+          _loading = false;
+          _messages.add(_ChatMessage(role: 'ai', text: answer));
+        });
       } else {
-        setState(() => _messages.add(_ChatMessage(role: 'ai', result: result)));
-        _scrollToBottom();
+        setState(() {
+          _loading = false;
+          _messages.add(_ChatMessage(
+            role: 'ai',
+            text: '⚠️ AI service error (${resp.statusCode}): ${_parseError(resp.body)}',
+          ));
+        });
       }
-    });
+    } on http.ClientException catch (e) {
+      setState(() {
+        _loading = false;
+        _messages.add(_ChatMessage(
+          role: 'ai',
+          text: '🔌 Cannot reach the AI service.\n\n'
+              'Start the backend:\n'
+              '  cd ai_assistant\n'
+              '  venv\\Scripts\\uvicorn main:app --port 8002\n\n'
+              'Error: $e',
+        ));
+      });
+    } catch (e) {
+      setState(() {
+        _loading = false;
+        _messages.add(_ChatMessage(role: 'ai', text: '⚠️ Unexpected error: $e'));
+      });
+    }
+    _scrollToBottom();
   }
 
-  Future<void> _exportPdf(_QueryResult result) async {
-    final doc = pw.Document();
-    final now = DateTime.now();
-    final dateStr = '${now.day}/${now.month}/${now.year}';
+  String _parseError(String body) {
+    try {
+      final d = jsonDecode(body) as Map<String, dynamic>;
+      return d['detail']?.toString() ?? d['error']?.toString() ?? body;
+    } catch (_) {
+      return body.length > 120 ? '${body.substring(0, 120)}…' : body;
+    }
+  }
 
-    doc.addPage(pw.MultiPage(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(32),
-      build: (ctx) => [
-        // Header
-        pw.Container(
-          padding: const pw.EdgeInsets.only(bottom: 12),
-          decoration: const pw.BoxDecoration(
-            border: pw.Border(bottom: pw.BorderSide(color: PdfColors.red, width: 2))),
-          child: pw.Row(children: [
-            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              pw.Text('Caltex AutoPro', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.red)),
-              pw.Text('Smart Reports AI — Generated Report', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
-            ]),
-          ]),
-        ),
-        pw.SizedBox(height: 16),
-        pw.Text(result.title, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-        pw.SizedBox(height: 4),
-        pw.Text('Generated: $dateStr  ·  ${result.rows.length} record(s)',
-          style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
-        pw.SizedBox(height: 12),
-        pw.Text(result.body, style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700)),
-        pw.SizedBox(height: 12),
-        if (result.rows.isNotEmpty)
-          pw.Table(
-            border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
-            children: [
-              // Header row
-              pw.TableRow(
-                decoration: const pw.BoxDecoration(color: PdfColors.blue900),
-                children: [
-                  pw.Padding(padding: const pw.EdgeInsets.all(7),
-                    child: pw.Text('Item', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 11))),
-                  pw.Padding(padding: const pw.EdgeInsets.all(7),
-                    child: pw.Text('Value', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 11))),
-                ],
-              ),
-              ...result.rows.asMap().entries.map((e) => pw.TableRow(
-                decoration: pw.BoxDecoration(color: e.key.isEven ? PdfColors.grey100 : PdfColors.white),
-                children: [
-                  pw.Padding(padding: const pw.EdgeInsets.all(6),
-                    child: pw.Text(e.value.label, style: pw.TextStyle(fontSize: 10, fontWeight: e.value.isBold ? pw.FontWeight.bold : pw.FontWeight.normal))),
-                  pw.Padding(padding: const pw.EdgeInsets.all(6),
-                    child: pw.Text(e.value.value, style: pw.TextStyle(fontSize: 10, fontWeight: e.value.isBold ? pw.FontWeight.bold : pw.FontWeight.normal))),
-                ],
-              )),
-            ],
+  // ── Report generation ──────────────────────────────────────────────────────
+
+  /// Shows a bottom sheet to confirm the report type/format then downloads it.
+  void _showReportConfirm(String reportType, String format) {
+    final title = _kReportTypes[reportType] ?? 'Report';
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 40, height: 4,
+            decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2)),
           ),
-        pw.SizedBox(height: 24),
-        pw.Text('Caltex AutoPro · JA Noble Enterprise INC · Confidential',
-          style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
-      ],
-    ));
-
-    await Printing.sharePdf(
-      bytes: await doc.save(),
-      filename: '${result.title.replaceAll(RegExp(r'[^a-zA-Z0-9 ]'), '').replaceAll(' ', '_')}_${now.year}${now.month.toString().padLeft(2,'0')}${now.day.toString().padLeft(2,'0')}.pdf',
+          const SizedBox(height: 16),
+          const Text('📄 Download Report',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
+                  color: Color(0xFF1a202c))),
+          const SizedBox(height: 6),
+          Text(title,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF718096))),
+          const SizedBox(height: 20),
+          Row(children: [
+            Expanded(
+              child: _reportFormatBtn(
+                label: '📄 PDF',
+                subtitle: 'Branded report',
+                selected: format == 'pdf',
+                onTap: () { Navigator.pop(context); _downloadReport(reportType, 'pdf'); },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _reportFormatBtn(
+                label: '📊 Excel',
+                subtitle: 'Spreadsheet',
+                selected: format == 'excel',
+                onTap: () { Navigator.pop(context); _downloadReport(reportType, 'excel'); },
+              ),
+            ),
+          ]),
+        ]),
+      ),
     );
   }
 
-  Future<void> _exportCsv(_QueryResult result) async {
-    final now = DateTime.now();
-    final lines = <String>['Item,Value'];
-    for (final row in result.rows) {
-      final label = '"${row.label.replaceAll('"', '""')}"';
-      final value = '"${row.value.replaceAll('"', '""')}"';
-      lines.add('$label,$value');
-    }
-    lines.add('');
-    lines.add('"Generated by Caltex AutoPro Smart Reports AI","${now.day}/${now.month}/${now.year}"');
-
-    final csv = lines.join('\r\n');
-    final bytes = csv.codeUnits;
-
-    await Printing.sharePdf(
-      bytes: Uint8List.fromList(bytes),
-      filename: '${result.title.replaceAll(RegExp(r'[^a-zA-Z0-9 ]'), '').replaceAll(' ', '_')}_${now.year}${now.month.toString().padLeft(2,'0')}${now.day.toString().padLeft(2,'0')}.csv',
+  Widget _reportFormatBtn({
+    required String label,
+    required String subtitle,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        decoration: BoxDecoration(
+          color: selected ? _red.withOpacity(0.06) : const Color(0xFFF7F8FA),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: selected ? _red : const Color(0xFFe2e8f0),
+              width: selected ? 1.5 : 1),
+        ),
+        child: Column(children: [
+          Text(label,
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: selected ? _red : const Color(0xFF1a202c))),
+          const SizedBox(height: 4),
+          Text(subtitle,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+        ]),
+      ),
     );
   }
 
-  _QueryResult _processQuery(String query) {
-    final q = query.toLowerCase();
+  Future<void> _downloadReport(String reportType, String format) async {
+    final typeName = _kReportTypes[reportType] ?? reportType;
+    final fmtLabel = format.toUpperCase();
 
-    // Under maintenance
-    if (q.contains('under maintenance') || (q.contains('currently') && q.contains('maintenance'))) {
-      final list = _assets.where((a) =>
-        (a['status'] as String).toLowerCase().contains('maintenance')).toList();
-      if (list.isEmpty) return _QueryResult(type: 'success', icon: '✅', title: 'Assets Under Maintenance', body: 'No assets are currently under maintenance.', rows: []);
-      return _QueryResult(type: 'blue', icon: '🔵', title: 'Assets Under Maintenance',
-        body: '${list.length} asset(s) are currently under maintenance.',
-        rows: list.map((a) => _Row(label: '${a['plate']} – ${a['desc']}', value: a['owner'] as String)).toList());
+    // Show progress in chat
+    setState(() {
+      _messages.add(_ChatMessage(
+          role: 'ai',
+          text: '⏳ Generating $typeName ($fmtLabel)…'));
+      _loading = true;
+    });
+    _scrollToBottom();
+
+    try {
+      final resp = await http
+          .post(
+            Uri.parse('$_kAiBaseUrl/admin/report'
+                '?report_type=$reportType&format=$format'),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 90));
+
+      if (resp.statusCode == 200) {
+        final ext      = format == 'pdf' ? 'pdf' : 'xlsx';
+        final filename = '${reportType}_report.$ext';
+
+        // Save to temp dir and open with system viewer
+        final dir  = await getTemporaryDirectory();
+        final file = File('${dir.path}/$filename');
+        await file.writeAsBytes(resp.bodyBytes);
+
+        setState(() {
+          _loading = false;
+          _messages.removeLast(); // remove the "Generating…" message
+          _messages.add(_ChatMessage(
+            role: 'ai',
+            text: '✅ $typeName downloaded successfully!',
+            reportFile: file,
+            reportFormat: format,
+            reportLabel: typeName,
+          ));
+        });
+        _scrollToBottom();
+
+        // Auto-open the file
+        await OpenFile.open(file.path);
+      } else {
+        throw Exception('Server error ${resp.statusCode}: ${_parseError(resp.body)}');
+      }
+    } catch (e) {
+      setState(() {
+        _loading = false;
+        _messages.removeLast();
+        _messages.add(_ChatMessage(
+          role: 'ai',
+          text: '❌ Failed to generate $typeName: $e',
+        ));
+      });
+      _scrollToBottom();
     }
-
-    // PMS overdue
-    if (q.contains('overdue') || q.contains('past due') || q.contains('missed')) {
-      final now = DateTime.now();
-      final list = _assets.where((a) {
-        final due = DateTime.tryParse(a['nextPMS'] as String? ?? '');
-        return due != null && due.isBefore(now);
-      }).toList();
-      if (list.isEmpty) return _QueryResult(type: 'success', icon: '✅', title: 'PMS Overdue', body: 'No assets are overdue for PMS.', rows: []);
-      return _QueryResult(type: 'danger', icon: '⚠️', title: 'Assets with PMS Overdue',
-        body: '${list.length} asset(s) have overdue PMS schedules.',
-        rows: list.map((a) {
-          final due = DateTime.parse(a['nextPMS'] as String);
-          final days = now.difference(due).inDays;
-          return _Row(label: '${a['plate']} – ${a['desc']}', value: 'Overdue by $days day(s)');
-        }).toList());
-    }
-
-    // PMS due soon
-    if (q.contains('due soon') || q.contains('upcoming') || (q.contains('pms') && q.contains('schedule'))) {
-      final now = DateTime.now();
-      final list = _assets.where((a) {
-        final due = DateTime.tryParse(a['nextPMS'] as String? ?? '');
-        if (due == null) return false;
-        final diff = due.difference(now).inDays;
-        return diff >= 0 && diff <= 30;
-      }).toList();
-      if (list.isEmpty) return _QueryResult(type: 'success', icon: '✅', title: 'PMS Due Soon', body: 'No assets have PMS due in the next 30 days.', rows: []);
-      return _QueryResult(type: 'warning', icon: '📅', title: 'Assets with PMS Due Soon',
-        body: '${list.length} asset(s) have PMS due within 30 days.',
-        rows: list.map((a) {
-          final due = DateTime.parse(a['nextPMS'] as String);
-          final diff = due.difference(now).inDays;
-          return _Row(label: '${a['plate']} – ${a['desc']}', value: diff == 0 ? 'Due today!' : 'Due in $diff day(s)');
-        }).toList());
-    }
-
-    // Low stock
-    if (q.contains('low stock') || q.contains('reorder') || q.contains('running low') || q.contains('low in stock')) {
-      final list = _inventory.where((i) => (i['stock'] as int) <= (i['min'] as int)).toList();
-      if (list.isEmpty) return _QueryResult(type: 'success', icon: '✅', title: 'Low Stock Items', body: 'All inventory items are sufficiently stocked.', rows: []);
-      return _QueryResult(type: 'warning', icon: '📦', title: 'Low Stock Inventory Items',
-        body: '${list.length} item(s) are at or below minimum stock level.',
-        rows: list.map((i) => _Row(label: '${i['num']} – ${i['name']}', value: '${i['stock']} ${i['unit']} (min: ${i['min']})')).toList());
-    }
-
-    // Total cost / monthly cost
-    if (q.contains('cost') || q.contains('expense') || q.contains('repair cost') || q.contains('monthly')) {
-      final total = _services.fold<double>(0, (sum, s) => sum + (s['cost'] as double));
-      return _QueryResult(type: 'blue', icon: '💰', title: 'Total Repair Cost',
-        body: 'Total maintenance cost across all service transactions.',
-        rows: [
-          ..._services.map((s) => _Row(label: '${s['plate']} – ${s['desc']}', value: '₱${(s['cost'] as double).toStringAsFixed(2)}')),
-          _Row(label: 'TOTAL', value: '₱${total.toStringAsFixed(2)}', isBold: true),
-        ]);
-    }
-
-    // Asset list
-    if ((q.contains('list') && (q.contains('asset') || q.contains('vehicle'))) || q.contains('all vehicle') || q.contains('fleet')) {
-      return _QueryResult(type: 'blue', icon: '🚗', title: 'All Vehicles',
-        body: '${_assets.length} vehicle(s) registered in the system.',
-        rows: _assets.map((a) => _Row(label: '${a['plate']} – ${a['desc']}', value: a['owner'] as String)).toList());
-    }
-
-    // Inventory status
-    if (q.contains('inventory') || q.contains('stock status') || q.contains('parts')) {
-      return _QueryResult(type: 'blue', icon: '📦', title: 'Inventory Status',
-        body: '${_inventory.length} item(s) in inventory.',
-        rows: _inventory.map((i) => _Row(
-          label: '${i['num']} – ${i['name']}',
-          value: '${i['stock']} ${i['unit']}',
-          isWarning: (i['stock'] as int) <= (i['min'] as int),
-        )).toList());
-    }
-
-    // Frequently maintained
-    if (q.contains('frequent') || q.contains('most maintained') || q.contains('often')) {
-      return _QueryResult(type: 'warning', icon: '🔧', title: 'Frequently Maintained Assets',
-        body: 'Based on service history, these assets have the most maintenance records.',
-        rows: _services.map((s) => _Row(label: '${s['plate']} – ${s['desc']}', value: s['status'] as String)).toList());
-    }
-
-    // Default
-    return _QueryResult(type: 'info', icon: '🤖', title: 'No Results Found',
-      body: 'I couldn\'t understand your query. Try asking about:\n• Low stock items\n• PMS overdue assets\n• Total repair cost\n• Assets under maintenance',
-      rows: []);
   }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -364,80 +372,138 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
         backgroundColor: _red,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text('Smart Reports',
-          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        title: const Text('Smart Reports AI',
+            style: TextStyle(
+                color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
         actions: [
+          // Online indicator dot
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Tooltip(
+              message: _backendOnline ? 'AI Online' : 'AI Offline',
+              child: Icon(Icons.circle,
+                  size: 10,
+                  color: _backendOnline ? Colors.greenAccent : Colors.orange),
+            ),
+          ),
           if (_messages.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.white),
               tooltip: 'Clear chat',
-              onPressed: () => setState(() => _messages.clear()),
+              onPressed: () => setState(() {
+                _messages.clear();
+                _history.clear();
+              }),
             ),
         ],
       ),
       body: Column(children: [
-        // Chat area
-        Expanded(
-          child: !_dataLoaded
-            ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 12),
-                Text('Loading fleet data...', style: TextStyle(color: Color(0xFF718096), fontSize: 13)),
-              ]))
-            : _messages.isEmpty ? _buildWelcome() : ListView.builder(
-            controller: _scrollCtrl,
-            padding: const EdgeInsets.all(16),
-            itemCount: _messages.length,
-            itemBuilder: (_, i) => _buildBubble(_messages[i]),
+        // Offline banner
+        if (!_backendOnline)
+          Container(
+            width: double.infinity,
+            color: const Color(0xFFFFFBEB),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(children: [
+              const Icon(Icons.warning_amber_rounded,
+                  size: 16, color: Color(0xFF975A16)),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'AI backend offline. Start: venv\\Scripts\\uvicorn main:app --port 8002',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF975A16)),
+                ),
+              ),
+              GestureDetector(
+                onTap: _checkBackend,
+                child: const Text('Retry',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF975A16))),
+              ),
+            ]),
           ),
+
+        // Chat
+        Expanded(
+          child: _messages.isEmpty
+              ? _buildWelcome()
+              : ListView.builder(
+                  controller: _scrollCtrl,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _messages.length + (_loading ? 1 : 0),
+                  itemBuilder: (_, i) {
+                    if (_loading && i == _messages.length) {
+                      return _buildTypingIndicator();
+                    }
+                    return _buildBubble(_messages[i]);
+                  },
+                ),
         ),
+
         // Input bar
         SafeArea(
           child: Container(
             color: Colors.white,
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
             child: Row(children: [
-            Expanded(
-              child: TextField(
-                controller: _inputCtrl,
-                maxLines: null,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _sendQuery(),
-                decoration: InputDecoration(
-                  hintText: 'Ask something about your fleet...',
-                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF718096)),
-                  filled: true, fillColor: const Color(0xFFF7F8FA),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              Expanded(
+                child: TextField(
+                  controller: _inputCtrl,
+                  maxLines: null,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _sendQuery(),
+                  enabled: !_loading,
+                  decoration: InputDecoration(
+                    hintText: 'Ask about fleet, inventory, reports…',
+                    hintStyle: const TextStyle(
+                        fontSize: 13, color: Color(0xFF718096)),
+                    filled: true,
+                    fillColor: const Color(0xFFF7F8FA),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: _sendQuery,
-              child: Container(
-                width: 44, height: 44,
-                decoration: BoxDecoration(color: _red, shape: BoxShape.circle),
-                child: const Icon(Icons.send, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: _loading ? null : _sendQuery,
+                child: Container(
+                  width: 44, height: 44,
+                  decoration: BoxDecoration(
+                    color: _loading ? Colors.grey : _red,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.send, color: Colors.white, size: 18),
+                ),
               ),
-            ),
-          ]),
+            ]),
           ),
         ),
       ]),
     );
   }
 
+  // ── Welcome screen ─────────────────────────────────────────────────────────
+
   Widget _buildWelcome() {
     final chips = [
-      ('🔧 Frequently maintained assets', 'Which assets are frequently under maintenance?'),
-      ('📦 Low stock items', 'What items are low in stock?'),
-      ('💰 Repair cost this month', 'Total repair cost this month'),
-      ('⚠️ PMS overdue assets', 'Assets with PMS overdue'),
-      ('🔵 Under maintenance', 'Which assets are under maintenance?'),
-      ('📋 All vehicles', 'List all vehicles'),
-      ('📄 PDF: PMS Overdue', 'Generate PDF report for PMS overdue assets'),
-      ('📊 CSV: Low Stock', 'Export CSV for low stock items'),
+      ('📊 Fleet summary',    'Show fleet summary'),
+      ('⚠️ PMS overdue',     'Which vehicles have PMS overdue?'),
+      ('📦 Low stock',        'What items are low in stock?'),
+      ('💰 Repair cost',      'Total repair cost this month'),
+      ('⏳ Pending services', 'How many services are pending?'),
+      ('📈 Fast moving',      'What are the fast moving inventory items?'),
+      ('🚗 All vehicles',     'List all vehicles'),
+      ('📋 Bookings',         'Show all service bookings'),
+      ('📄 Inventory PDF',    'Generate inventory report PDF'),
+      ('📊 Issuance Excel',   'Generate issuance report excel'),
+      ('📄 Maintenance PDF',  'Generate maintenance report PDF'),
+      ('📊 Vehicle Excel',    'Generate vehicle fleet report excel'),
     ];
 
     return SingleChildScrollView(
@@ -446,14 +512,23 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
         const SizedBox(height: 12),
         Container(
           width: 64, height: 64,
-          decoration: BoxDecoration(color: _blue.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+          decoration: BoxDecoration(
+              color: _blue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20)),
           child: const Icon(Icons.smart_toy_outlined, color: _blue, size: 32),
         ),
         const SizedBox(height: 14),
-        const Text('Smart Reports AI', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1a202c))),
+        const Text('Smart Reports AI',
+            style: TextStyle(
+                fontSize: 18, fontWeight: FontWeight.bold,
+                color: Color(0xFF1a202c))),
         const SizedBox(height: 6),
-        const Text('Ask me anything about your fleet — assets, inventory, maintenance costs, and more. Say "generate PDF report for…" or "export CSV for…" to download a report.',
-          style: TextStyle(fontSize: 13, color: Color(0xFF718096)), textAlign: TextAlign.center),
+        const Text(
+          'Ask me anything about the fleet, inventory, maintenance costs, '
+          'or generate branded PDF/Excel reports.',
+          style: TextStyle(fontSize: 13, color: Color(0xFF718096), height: 1.5),
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 24),
         Wrap(
           spacing: 8, runSpacing: 8,
@@ -465,15 +540,51 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: const Color(0xFFe2e8f0)),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4)],
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4)
+                ],
               ),
-              child: Text(c.$1, style: const TextStyle(fontSize: 12, color: Color(0xFF4a5568), fontWeight: FontWeight.w500)),
+              child: Text(c.$1,
+                  style: const TextStyle(
+                      fontSize: 12, color: Color(0xFF4a5568),
+                      fontWeight: FontWeight.w500)),
             ),
           )).toList(),
         ),
       ]),
     );
   }
+
+  // ── Typing indicator ───────────────────────────────────────────────────────
+
+  Widget _buildTypingIndicator() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6)
+          ],
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          const SizedBox(
+            width: 24, height: 24,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: Color(0xFFE8001C)),
+          ),
+          const SizedBox(width: 10),
+          Text('Thinking…',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
+        ]),
+      ),
+    );
+  }
+
+  // ── Chat bubble ────────────────────────────────────────────────────────────
 
   Widget _buildBubble(_ChatMessage msg) {
     if (msg.role == 'user') {
@@ -482,17 +593,16 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
         child: Container(
           margin: const EdgeInsets.only(bottom: 12, left: 48),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(color: _red, borderRadius: BorderRadius.circular(18)),
-          child: Text(msg.text!, style: const TextStyle(color: Colors.white, fontSize: 13)),
+          decoration: BoxDecoration(
+            color: _red,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [BoxShadow(color: _red.withOpacity(0.25), blurRadius: 6)],
+          ),
+          child: Text(msg.text!,
+              style: const TextStyle(color: Colors.white, fontSize: 13)),
         ),
       );
     }
-
-    final r = msg.result!;
-    final headerColor = r.type == 'danger' ? _red
-        : r.type == 'warning' ? Colors.orange
-        : r.type == 'success' ? const Color(0xFF2c7a7b)
-        : _blue;
 
     return Align(
       alignment: Alignment.centerLeft,
@@ -501,65 +611,127 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)],
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)
+          ],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Header
+          // Header strip
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: headerColor,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              color: _blue,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(16)),
             ),
-            child: Row(children: [
-              Text(r.icon, style: const TextStyle(fontSize: 16)),
-              const SizedBox(width: 8),
-              Expanded(child: Text(r.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))),
+            child: const Row(children: [
+              Text('🤖', style: TextStyle(fontSize: 14)),
+              SizedBox(width: 8),
+              Text('Smart Reports AI',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12)),
             ]),
           ),
           // Body
           Padding(
             padding: const EdgeInsets.all(12),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(r.body, style: const TextStyle(fontSize: 12, color: Color(0xFF4a5568))),
-              if (r.rows.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                ...r.rows.map((row) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Expanded(child: Text(row.label,
-                      style: TextStyle(fontSize: 12, fontWeight: row.isBold ? FontWeight.bold : FontWeight.w500,
-                        color: const Color(0xFF1a202c)))),
-                    Text(row.value,
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                        color: row.isBold ? headerColor : row.isWarning ? Colors.orange : headerColor)),
-                  ]),
-                )),
-              ],
-            ]),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SelectableText(
+                    msg.text ?? '',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF1a202c),
+                        height: 1.6),
+                  ),
+                  // If a report file was downloaded, show Open + Share buttons
+                  if (msg.reportFile != null) ...[
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      _actionBtn('📂 Open', _red, () async {
+                        await OpenFile.open(msg.reportFile!.path);
+                      }),
+                      const SizedBox(width: 8),
+                      _actionBtn('📤 Share', _blue, () async {
+                        await Printing.sharePdf(
+                          bytes: await msg.reportFile!.readAsBytes(),
+                          filename: msg.reportFile!.path.split('/').last,
+                        );
+                      }),
+                    ]),
+                  ],
+                  // Re-download buttons for long AI text responses
+                  if (msg.reportFile == null && (msg.text ?? '').length > 80) ...[
+                    const SizedBox(height: 10),
+                    Wrap(spacing: 8, runSpacing: 6, children: [
+                      for (final entry in _kReportTypes.entries)
+                        _tinyChip(
+                          '📄 ${entry.value.replaceAll(' Report', '')} PDF',
+                          () => _downloadReport(entry.key, 'pdf'),
+                        ),
+                    ]),
+                  ],
+                ]),
           ),
         ]),
       ),
     );
   }
+
+  Widget _actionBtn(String label, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(label,
+            style: const TextStyle(
+                fontSize: 11, fontWeight: FontWeight.bold,
+                color: Colors.white)),
+      ),
+    );
+  }
+
+  Widget _tinyChip(String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F8FA),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFe2e8f0)),
+        ),
+        child: Text(label,
+            style: const TextStyle(
+                fontSize: 10, color: Color(0xFF4a5568),
+                fontWeight: FontWeight.w500)),
+      ),
+    );
+  }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _ChatMessage {
   final String role;
   final String? text;
-  final _QueryResult? result;
-  _ChatMessage({required this.role, this.text, this.result});
-}
+  final File? reportFile;
+  final String? reportFormat;
+  final String? reportLabel;
 
-class _QueryResult {
-  final String type, icon, title, body;
-  final List<_Row> rows;
-  _QueryResult({required this.type, required this.icon, required this.title, required this.body, required this.rows});
-}
-
-class _Row {
-  final String label, value;
-  final bool isBold, isWarning;
-  _Row({required this.label, required this.value, this.isBold = false, this.isWarning = false});
+  _ChatMessage({
+    required this.role,
+    this.text,
+    this.reportFile,
+    this.reportFormat,
+    this.reportLabel,
+  });
 }

@@ -96,6 +96,7 @@
 (function() {
 var _ragInitials = 'AD';
 var _ragReady = false;
+var _ragSessionId = null;  // server-side session key — sent back on each request
 
 window.ragAiToggle = function() {
   var panel = document.getElementById('ragAiPanel');
@@ -195,15 +196,21 @@ window.ragAiSend = function(preset) {
   input.value=''; input.style.height='auto';
   _ragTyping();
 
-  // Call the Flask in-process RAG AI endpoint (user_type: admin)
+  // Call the Flask AI endpoint — session_id enables server-side memory
   fetch('/api/ai-chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: text, user_type: 'admin', session_id: 'admin-widget-' + (firebase.auth().currentUser ? firebase.auth().currentUser.uid : Date.now()) })
+    body: JSON.stringify({
+      message:    text,
+      user_type:  'admin',
+      session_id: _ragSessionId,
+    })
   })
   .then(function(res) { return res.json(); })
   .then(function(data) {
     _ragRemoveTyping();
+    // Persist the session_id returned by the backend for memory continuity
+    if (data.session_id) { _ragSessionId = data.session_id; }
     if (data.offline || !data.success) {
       // RAG engine not available — fall back to local JS engine
       var result = _ragProcess(text);
@@ -238,6 +245,11 @@ window.ragAiSend = function(preset) {
 };
 
 window.ragAiClear = function() {
+  // Clear server-side session memory
+  if (_ragSessionId) {
+    fetch('/api/ai-session/' + _ragSessionId, { method: 'DELETE' }).catch(function(){});
+    _ragSessionId = null;
+  }
   document.getElementById('ragAiChat').innerHTML='';
   document.getElementById('ragAiChips').style.display='flex';
   _ragShowWelcome();
