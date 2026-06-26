@@ -60,10 +60,10 @@ def _fetch_inventory():
                 status = "OK"
         rows.append({
             "num":    d.get("num", ""),
-            "name":   d.get("name", ""),
-            "group":  d.get("group", ""),
+            "name":   d.get("name", "") or d.get("itemName", ""),
+            "group":  d.get("group", "") or d.get("commodityGroup", ""),
             "stock":  stock,
-            "uom":    d.get("uom", ""),
+            "uom":    d.get("uom", "") or d.get("unit", ""),
             "min":    min_lvl,
             "max":    max_lvl,
             "reorder":reorder,

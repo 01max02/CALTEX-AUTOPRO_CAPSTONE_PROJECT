@@ -23,7 +23,10 @@ def classify_and_run(text: str) -> dict | None:
 
     # ── Low stock / reorder ───────────────────────────────────────────────────
     if re.search(r"low.?stock|reorder|running.?low|below.?reorder|out.?of.?stock", t):
-        return {"intent": "low_stock", "result": get_low_stock_items()}
+        result = get_low_stock_items()
+        # Ensure count in result matches items list length (single source of truth for LLM)
+        result["low_stock_count"] = len(result["items"])
+        return {"intent": "low_stock", "result": result}
 
     # ── Services catalog ──────────────────────────────────────────────────────
     if re.search(r"(list|show|what|display|get).*(services?|service.offerings?|service.types?)"

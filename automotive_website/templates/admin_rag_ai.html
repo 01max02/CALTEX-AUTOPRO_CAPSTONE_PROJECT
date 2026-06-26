@@ -266,6 +266,7 @@ window.ragAiSend = function(preset) {
 
     if (data.offline || !data.success) {
       // RAG engine not available — fall back to local JS engine
+      _ragAppend('ai', '<div style="background:#fff7ed;border:1px solid #fb923c;border-radius:8px;padding:7px 11px;font-size:11px;color:#9a3412;margin-bottom:6px;">⚠️ <strong>AI backend offline</strong> — using local data mode.</div>');
       var result = _ragProcess(text);
       _ragAppend('ai', result.html);
     } else if (data.report_ready) {
@@ -285,13 +286,15 @@ window.ragAiSend = function(preset) {
       var answer = data.answer.replace(/\n/g, '<br>').replace(/^- /gm, '• ');
       _ragAppend('ai', answer);
     } else {
+      // AI returned success but no answer — use local fallback
       var result = _ragProcess(text);
       _ragAppend('ai', result.html);
     }
   })
   .catch(function(err) {
-    // Network error or Flask down — fall back to local JS query engine
+    // Network error or Flask/AI backend down — fall back to local JS query engine
     _ragRemoveTyping();
+    _ragAppend('ai', '<div style="background:#fff7ed;border:1px solid #fb923c;border-radius:8px;padding:7px 11px;font-size:11px;color:#9a3412;margin-bottom:6px;">⚠️ <strong>AI backend unreachable</strong> — using local data mode.</div>');
     var result = _ragProcess(text);
     _ragAppend('ai', result.html);
   });
@@ -421,9 +424,23 @@ function _ragProcess(query) {
     return ret('<strong>📦 Low Stock ('+list.length+')</strong>'+tbl(['Item','Stock/Min','Unit'],rows));
   }
   // Inventory summary
-  if(q.includes('inventory')){
+  if(q.includes('inventory summary')||q.includes('inventory overview')){
     var tot=inventory.length,ls=inventory.filter(isLowStock).length,ok=tot-ls;
     return ret('<strong>🗃️ Inventory</strong><br>• Total: <strong>'+tot+'</strong><br>• OK: <strong>'+ok+'</strong><br>• Low: <strong>'+ls+'</strong>');
+  }
+  // Materials / parts / stock list
+  if(q.includes('material')||q.includes('parts')||q.includes('supplies')||q.includes('stock item')||(q.includes('list')&&q.includes('inventor'))||(q.includes('show')&&(q.includes('stock')||q.includes('inventor')))){
+    if(!inventory.length)return ret('📦 No inventory data loaded yet.');
+    var rows=inventory.slice(0,20).map(function(i){return [_ragEsc(i.itemName||i.name||'—'),String(i.stock||0),_ragEsc(i.unit||i.uom||''),_ragEsc(i.group||'—')];});
+    var note=inventory.length>20?'<div style="font-size:10px;color:#718096;margin-top:4px;">Showing 20 of '+inventory.length+' items. Start the AI backend for the full list.</div>':'';
+    return ret('<strong>📦 Materials / Stock ('+inventory.length+')</strong>'+tbl(['Item','Stock','Unit','Group'],rows)+note);
+  }
+  // Full inventory list
+  if(q.includes('inventory')){
+    if(!inventory.length)return ret('📦 No inventory data loaded yet.');
+    var tot=inventory.length,ls=inventory.filter(isLowStock).length,ok=tot-ls;
+    var rows=inventory.slice(0,15).map(function(i){return [_ragEsc(i.itemName||i.name||'—'),String(i.stock||0),_ragEsc(i.unit||i.uom||'')];});
+    return ret('<strong>🗃️ Inventory ('+tot+')</strong><br>• OK: <strong>'+ok+'</strong> &nbsp;• Low: <strong>'+ls+'</strong>'+tbl(['Item','Stock','Unit'],rows));
   }
   // Cost
   if(q.includes('cost')||q.includes('expense')){
@@ -455,7 +472,7 @@ function _ragProcess(query) {
     return ret('<strong>👥 Users ('+users.length+')</strong><br>• Admin: '+adm+'<br>• Staff: '+stf+'<br>• Customer: '+cus);
   }
   // Fallback
-  return ret('🤔 Try: <em>fleet summary, overdue, low stock, cost, pending, fast moving</em>');
+  return ret('🤖 <strong>AI backend offline</strong> — running in local mode.<br><span style="font-size:11px;color:#718096;">Local mode supports: <em>fleet summary, overdue, due soon, low stock, inventory, materials, cost, pending, fast moving, users</em>.<br>For full natural language queries, start the AI backend (<code>start.bat</code>).</span>');
 }
 
 })();

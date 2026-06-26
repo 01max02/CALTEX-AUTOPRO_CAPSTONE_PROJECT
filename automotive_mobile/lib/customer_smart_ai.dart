@@ -12,7 +12,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 const _kAiBaseUrl = String.fromEnvironment(
   'AI_BACKEND_URL',
-  defaultValue: 'http://10.0.2.2:8002',
+  defaultValue: 'http://10.0.2.2:8001',
 );
 
 class CustomerSmartAI extends StatefulWidget {

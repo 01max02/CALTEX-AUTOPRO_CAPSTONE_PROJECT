@@ -92,13 +92,13 @@ def get_stock_levels(group: str | None = None, status: str | None = None) -> dic
         d = doc.to_dict()
         items.append({
             "num":     d.get("num", ""),
-            "name":    d.get("name", ""),
-            "group":   d.get("group", ""),
+            "name":    d.get("name", "") or d.get("itemName", ""),
+            "group":   d.get("group", "") or d.get("commodityGroup", ""),
             "stock":   d.get("stock", 0),
-            "uom":     d.get("uom", ""),
-            "min":     d.get("min", 0),
-            "max":     d.get("max", 0),
-            "reorder": d.get("reorder", 0),
+            "uom":     d.get("uom", "") or d.get("unit", ""),
+            "min":     d.get("min", 0) or d.get("minLevel", 0),
+            "max":     d.get("max", 0) or d.get("maxLevel", 0),
+            "reorder": d.get("reorder", 0) or d.get("reorderQty", 0),
             "status":  d.get("status", ""),
         })
 
@@ -112,22 +112,32 @@ def get_stock_levels(group: str | None = None, status: str | None = None) -> dic
 
 
 def get_low_stock_items() -> dict:
-    """Return all items at or below their reorder point."""
+    """Return all items at or below their reorder point (reorder point must be > 0)."""
     db = get_db()
     items = []
     for doc in db.collection("stock_inventory").stream():
         d = doc.to_dict()
         stock   = int(d.get("stock",   0))
         reorder = int(d.get("reorder", 0))
-        if stock <= reorder:
+        min_lvl = int(d.get("min",     0))
+        status  = (d.get("status") or "").strip()
+
+        # Match the frontend logic: status=='Low' OR (stock <= min AND min > 0)
+        is_low = (
+            status.lower() == "low"
+            or (min_lvl > 0 and stock <= min_lvl)
+            or (reorder > 0 and stock <= reorder)
+        )
+        if is_low:
             items.append({
                 "num":     d.get("num", ""),
                 "name":    d.get("name", ""),
                 "group":   d.get("group", ""),
                 "stock":   stock,
+                "min":     min_lvl,
                 "reorder": reorder,
                 "uom":     d.get("uom", ""),
-                "status":  d.get("status", ""),
+                "status":  status or ("Low" if is_low else "OK"),
             })
 
     items.sort(key=lambda x: x["stock"])

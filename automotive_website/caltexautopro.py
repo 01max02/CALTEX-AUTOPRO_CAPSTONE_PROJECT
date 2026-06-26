@@ -640,7 +640,7 @@ def customer_header():
 
 # ── Admin AI Backend Proxy ─────────────────────────────────────────────────────
 # The admin AI is served by the standalone FastAPI service in ai_assistant/.
-# Start it with:  cd ai_assistant && uvicorn main:app --port 8000
+# Start it with:  cd ai_assistant && venv\Scripts\uvicorn main:app --port 8001
 #
 # The Flask server acts as a proxy so the browser never talks directly to the
 # FastAPI service (avoids CORS and keeps auth in one place).
@@ -650,7 +650,7 @@ def customer_header():
 import requests as _requests_lib
 
 # Base URL of the ai_assistant FastAPI service — override via env var if needed.
-_AI_BACKEND_URL = os.environ.get('AI_BACKEND_URL', 'http://localhost:8002')
+_AI_BACKEND_URL = os.environ.get('AI_BACKEND_URL', 'http://localhost:8001')
 
 
 def _ai_backend_available() -> bool:
@@ -673,11 +673,11 @@ def ai_chat():
     next request — this is how server-side conversational memory works.
     """
     data          = request.get_json(silent=True) or {}
-    message       = data.get('message', '').strip()
+    message       = (data.get('message') or '').strip()
     user_type     = data.get('user_type', 'customer')
-    session_id    = data.get('session_id', '').strip() or None
-    customer_uid  = data.get('customer_uid', '').strip()
-    customer_name = data.get('customer_name', '').strip()
+    session_id    = (data.get('session_id') or '').strip() or None
+    customer_uid  = (data.get('customer_uid') or '').strip()
+    customer_name = (data.get('customer_name') or '').strip()
 
     if not message:
         return jsonify({'success': False, 'error': 'Empty message'}), 400
@@ -794,7 +794,7 @@ def ai_chat():
         return jsonify({
             'success': False,
             'offline': True,
-            'answer': 'The AI service is offline. Start it with: cd ai_assistant && uvicorn main:app --port 8000',
+            'answer': 'The AI service is offline. Start it with: ai_assistant\\start.bat',
         }), 503
     except _requests_lib.exceptions.Timeout:
         return jsonify({
@@ -866,12 +866,16 @@ def ai_generate_report():
                     else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         filename = f'{report_type}_report{ext}'
 
-        return send_file(
+        response = send_file(
             _io.BytesIO(resp.content),
             mimetype=mimetype,
             as_attachment=True,
             download_name=filename,
         )
+        # Tell the browser this is a safe, expected download
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['Cache-Control'] = 'no-store'
+        return response
     except _requests_lib.exceptions.ConnectionError:
         return jsonify({'success': False, 'error': 'AI service offline'}), 503
     except Exception as e:

@@ -18,7 +18,7 @@ import 'package:open_file/open_file.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 const _kAiBaseUrl = String.fromEnvironment(
   'AI_BACKEND_URL',
-  defaultValue: 'http://10.0.2.2:8002',
+  defaultValue: 'http://10.0.2.2:8001',
 );
 
 // ── Report types supported by the backend ────────────────────────────────────
