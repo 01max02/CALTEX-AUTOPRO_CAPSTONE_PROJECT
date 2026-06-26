@@ -22,18 +22,21 @@ def _parse_rate_limit_reset(error_message: str) -> str:
     """
     Extract the reset time from a Groq RateLimitError message.
     e.g. 'Please try again in 15m46.944s' → 'about 15 minutes'
+         'Please try again in 1h30m.'     → 'about 1 hour and 30 minutes'
     """
-    m = _re.search(r'in\s+(\d+h)?\s*(\d+m)?', error_message)
-    if m:
-        hours   = m.group(1) or ""
-        minutes = m.group(2) or ""
-        parts   = []
-        if hours:
-            parts.append(hours.replace("h", " hour(s)"))
-        if minutes:
-            parts.append(minutes.replace("m", " minute(s)"))
-        if parts:
-            return "about " + " and ".join(parts)
+    hours   = _re.search(r'in\s+(\d+)h', error_message)
+    minutes = _re.search(r'in\s+(?:\d+h\s*)?(\d+)m', error_message)
+
+    parts = []
+    if hours:
+        h = int(hours.group(1))
+        parts.append(f"{h} hour{'s' if h != 1 else ''}")
+    if minutes:
+        m = int(minutes.group(1))
+        parts.append(f"{m} minute{'s' if m != 1 else ''}")
+
+    if parts:
+        return "about " + " and ".join(parts)
     return "some time"
 
 
@@ -52,7 +55,8 @@ def _rate_limit_reply(error_message: str) -> dict:
 
 
 def _is_rate_limit(exc: Exception) -> bool:
-    return "rate_limit" in type(exc).__name__.lower() or "429" in str(exc)
+    cls_name = type(exc).__name__.lower()
+    return "ratelimit" in cls_name or "rate_limit" in cls_name or "429" in str(exc)
 
 
 # ── Health ────────────────────────────────────────────────────────────────────

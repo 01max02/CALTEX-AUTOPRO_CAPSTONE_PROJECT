@@ -185,7 +185,14 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
             _loading = false;
             _rateLimited = true;
             _resetIn = resetIn;
-            _messages.add(_ChatMessage(role: 'ai', text: answer));
+            _messages.add(_ChatMessage(
+              role: 'ai',
+              text: '🚫 AI Unavailable\n\n'
+                  'The AI service has reached its daily token limit (Groq free tier).\n\n'
+                  '⏱️ The limit resets in $resetIn.\n\n'
+                  'You cannot send new messages until the quota resets automatically.',
+              isRateLimit: true,
+            ));
           });
           return;
         }
@@ -455,24 +462,44 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
         if (_rateLimited)
           Container(
             width: double.infinity,
-            color: const Color(0xFFFFFBEB),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(children: [
-              const Text('⚠️', style: TextStyle(fontSize: 16)),
-              const SizedBox(width: 8),
+            color: const Color(0xFFFFF7ED),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Color(0xFFFB923C), width: 2),
+              ),
+            ),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('🚫', style: TextStyle(fontSize: 18)),
+              const SizedBox(width: 10),
               Expanded(
-                child: RichText(
-                  text: TextSpan(
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF975A16)),
-                    children: [
-                      const TextSpan(
-                          text: 'Daily AI limit reached. ',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-                      TextSpan(
-                          text: 'Resets in $_resetIn. '
-                              'Chat is disabled until then.'),
-                    ],
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'AI service unavailable — daily token limit reached',
+                      style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF9A3412)),
+                    ),
+                    const SizedBox(height: 3),
+                    RichText(
+                      text: TextSpan(
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF9A3412), height: 1.5),
+                        children: [
+                          const TextSpan(text: 'The Groq API free-tier quota is exhausted. '),
+                          TextSpan(
+                            text: 'Resets in $_resetIn. ',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const TextSpan(
+                              text: 'You cannot send messages until the limit resets automatically.'),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ]),
@@ -507,9 +534,11 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
                   maxLines: null,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _sendQuery(),
-                  enabled: !_loading,
+                  enabled: !_loading && !_rateLimited,
                   decoration: InputDecoration(
-                    hintText: 'Ask about fleet, inventory, reports…',
+                    hintText: _rateLimited
+                        ? 'AI unavailable — daily limit reached'
+                        : 'Ask about fleet, inventory, reports…',
                     hintStyle: const TextStyle(
                         fontSize: 13, color: Color(0xFF718096)),
                     filled: true,
@@ -657,6 +686,78 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
       );
     }
 
+    // Rate-limit special card
+    if (msg.isRateLimit) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12, right: 16),
+          constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.88),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF7ED),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFFB923C), width: 1.5),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6)
+            ],
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: const BoxDecoration(
+                color: Color(0xFFEA580C),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+              ),
+              child: const Row(children: [
+                Text('🚫', style: TextStyle(fontSize: 14)),
+                SizedBox(width: 8),
+                Text('AI Service Unavailable',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12.5)),
+              ]),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(13),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Daily token limit reached (Groq free tier)',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF9A3412)),
+                  ),
+                  const SizedBox(height: 8),
+                  RichText(
+                    text: TextSpan(
+                      style: const TextStyle(
+                          fontSize: 12.5, color: Color(0xFF9A3412), height: 1.55),
+                      children: [
+                        const TextSpan(
+                            text: 'The Groq API has exhausted its free-tier quota for today.\n\n'),
+                        const TextSpan(text: '⏱️ Resets in '),
+                        TextSpan(
+                          text: _resetIn.isNotEmpty ? _resetIn : 'some time',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const TextSpan(
+                            text: '.\n\nYou cannot send new messages until the limit resets automatically.'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ]),
+        ),
+      );
+    }
+
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
@@ -779,6 +880,7 @@ class _ChatMessage {
   final File? reportFile;
   final String? reportFormat;
   final String? reportLabel;
+  final bool isRateLimit;
 
   _ChatMessage({
     required this.role,
@@ -786,5 +888,6 @@ class _ChatMessage {
     this.reportFile,
     this.reportFormat,
     this.reportLabel,
+    this.isRateLimit = false,
   });
 }

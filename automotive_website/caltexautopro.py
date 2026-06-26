@@ -756,6 +756,16 @@ def ai_chat():
             'booking':     'bookings',
             'appointment': 'bookings',
         }
+        # ── Rate limit check BEFORE report intent ────────────────────────────
+        if payload.get('rate_limited'):
+            return jsonify({
+                'success':      True,
+                'rate_limited': True,
+                'reset_in':     payload.get('reset_in', ''),
+                'answer':       payload.get('reply', ''),
+                'session_id':   payload.get('session_id', ''),
+            })
+
         if _report_keywords.search(_msg_lower):
             detected_type   = 'inventory'
             for kw, rtype in _type_map.items():

@@ -108,25 +108,28 @@ function _ragSetRateLimited(limited, resetIn) {
 
   if (limited) {
     if (input)   { input.disabled = true;  input.placeholder = 'AI unavailable — daily limit reached'; }
-    if (sendBtn) { sendBtn.style.opacity = '0.4'; sendBtn.style.pointerEvents = 'none'; }
+    if (sendBtn) { sendBtn.disabled = true; sendBtn.style.opacity = '0.45'; sendBtn.style.cursor = 'not-allowed'; }
     if (!banner) {
       // Insert banner below the panel header
       var chat = document.getElementById('ragAiChat');
       if (chat && chat.parentNode) {
         var b = document.createElement('div');
         b.id = 'ragRateBanner';
-        b.style.cssText = 'background:#fffbeb;border-bottom:1px solid #f6e05e;' +
-          'padding:8px 14px;font-size:11px;color:#975a16;display:flex;' +
-          'align-items:center;gap:6px;flex-shrink:0;';
-        b.innerHTML = '⚠️ <strong>Daily AI limit reached.</strong> ' +
-          'Resets in <strong>' + (resetIn || 'some time') + '</strong>. ' +
-          'Chat is disabled until reset.';
+        b.style.cssText =
+          'background:#fff7ed;border-bottom:2px solid #fb923c;' +
+          'padding:10px 14px;font-size:11.5px;color:#9a3412;display:flex;' +
+          'align-items:flex-start;gap:8px;flex-shrink:0;line-height:1.55;';
+        b.innerHTML =
+          '<span style="font-size:16px;line-height:1.2;">🚫</span>' +
+          '<div><strong style="display:block;margin-bottom:2px;">AI unavailable — daily token limit reached</strong>' +
+          'Groq free-tier quota is exhausted. Resets in <strong>' + (resetIn || 'some time') + '</strong>. ' +
+          'Chat is disabled until then.</div>';
         chat.parentNode.insertBefore(b, chat);
       }
     }
   } else {
     if (input)   { input.disabled = false; input.placeholder = 'Ask about fleet, inventory, maintenance...'; }
-    if (sendBtn) { sendBtn.style.opacity = ''; sendBtn.style.pointerEvents = ''; }
+    if (sendBtn) { sendBtn.disabled = false; sendBtn.style.opacity = ''; sendBtn.style.cursor = ''; }
     if (banner)  { banner.remove(); }
   }
 }
@@ -249,11 +252,15 @@ window.ragAiSend = function(preset) {
     // ── Rate limit notice ─────────────────────────────────────────────────
     if (data.rate_limited) {
       _ragSetRateLimited(true, data.reset_in || 'some time');
+      var resetMsg = data.reset_in || 'some time';
       _ragAppend('ai',
-        '⚠️ <strong>Daily AI limit reached.</strong><br>' +
-        'The AI service (Groq free tier) has reached its daily token limit.<br>' +
-        'It will reset in <strong>' + (data.reset_in || 'some time') + '</strong>.<br>' +
-        'Please try again later.');
+        '<div style="background:#fff7ed;border:1.5px solid #fb923c;border-radius:10px;padding:10px 13px;color:#9a3412;">' +
+        '<div style="font-size:13px;font-weight:700;margin-bottom:5px;">🚫 AI Unavailable</div>' +
+        '<div style="font-size:11.5px;line-height:1.6;">' +
+        'The AI service has reached its <strong>daily token limit</strong> (Groq free tier).<br>' +
+        '⏱️ Resets in <strong>' + resetMsg + '</strong>.<br>' +
+        'You cannot send new messages until the quota resets automatically.</div>' +
+        '</div>');
       return;
     }
 
